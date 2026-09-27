@@ -1,0 +1,392 @@
+# base: 53a44d8385ce4597d432f793b6b4384321886dc8, CP-01
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1,2 +1,50 @@
+ # HarmonicV2
+-Проект разрботки оборудования для создания волнового редуктора с ПТК
++
++Проект **EG-MACHINES** — станки собственного изготовления на эпоксигранитных
++станинах (SM-1-VMC — фрезерный, SE-1-VMC — электроэрозионная система ЭЭС),
++оснастка и метрология к ним. Прикладная цель — ячейка мелкосерийного
++производства волновых редукторов Ø≤110 мм: основная — ПТК (промежуточные тела
++вращения), вспомогательная — с гибким колесом (ГК). Назначение — промышленное
++станкостроение и робототехника. Приоритет: точность → дешевизна → скорость.
++
++## Правила работы с репозиторием
++
++1. **Code-first**: числа живут в коде и `specs/*.json`; `python main.py` пишет
++   результат в `out/`, заказчик переносит файлы в `specs/`. Руками не правятся.
++2. **Spec-first**: технология, методики, договорённости — правятся напрямую.
++   Если число из spec-first попадает в расчёт, оно переносится в код/JSON,
++   а документ ссылается на источник, не дублируя значение.
++3. Данные производителей — только из `specs/*.json`, без хардкода в коде.
++4. Решения — `Д-##` в DECISIONS.md, план кода — `CP-##` + `TODO(CP-##)` в коде.
++
++## Правила взаимодействия с ИИ
++
++1. ИИ не запускает код и не пишет в репозиторий: изменения — unified diff.
++2. Каждый файл: `diff --git a/<путь> b/<путь>`; новый — `new file mode 100644`,
++   `--- /dev/null`, один hunk `@@ -0,0 +1,N @@`, все строки с `+`.
++3. Правки существующих файлов — только от текущего коммита; первая строка
++   патча `# base: <sha>, CP-##`; ≥3 строк контекста дословно.
++4. UTF-8 без BOM, LF, перевод строки в конце; `--recount` не используется.
++5. Перед наложением: `python tools/fix_diff.py p.diff` → `git apply --check`.
++6. В начале сессии ИИ читает README, DECISIONS, CODE_PLAN и нужные spec.
++
++## Реестр спецификаций
++
++| Файл | Тип | Источник | Состояние |
++|---|---|---|---|
++| [specs/DECISIONS.md](specs/DECISIONS.md) | журнал | — | ведётся |
++| [archive/DECISIONS_ARCHIVE.md](archive/DECISIONS_ARCHIVE.md) | журнал | — | ведётся |
++| [specs/CODE_PLAN.md](specs/CODE_PLAN.md) | план | доработка кода, `TODO(CP-##)` | итерация 0 |
++| [specs/CANCELLED.md](specs/CANCELLED.md) | журнал | — | ведётся |
++| [specs/SPEC-01_NAMING.md](specs/SPEC-01_NAMING.md) | spec-first | Д-02 | черновик |
++| [specs/SPEC-02_PRECISION_EMBEDS.md](specs/SPEC-02_PRECISION_EMBEDS.md) | spec-first | Д-03, Д-04 | черновик |
++| [specs/CATALOGS.md](specs/CATALOGS.md) | реестр | `docs/` | черновик |
++| [specs/vendor_prices.json](specs/vendor_prices.json) | данные (заказчик) | поставщики | заполняется |
++| specs/SPEC-10_PTK_CALC.md | code-first | `egm/ptk.py`, `templates/` | после прогона CP-01 |
++
++Описание: SPEC-01 — маркировка станков и узлов; SPEC-02 — классы точности
++K1–K3, способы монтажа закладных M1–M4, правила раскроя; CATALOGS — реестр
++каталогов производителей; vendor_prices — наличие и цена; SPEC-10 — расчёт
++параметров редуктора ПТК (генерируется).
++
++## Запуск
++
++`python main.py` → `out/`; код выхода 0 = все проверки пройдены.
+diff --git a/specs/DECISIONS.md b/specs/DECISIONS.md
+--- a/specs/DECISIONS.md
++++ b/specs/DECISIONS.md
+@@ -9,6 +9,17 @@
+ | №    | Решение | Ревизия |
+ |------|---|---------|
+ | Д-01 | Порядок работ: исполнитель готовит патчи по плану CODE_PLAN.md (пункты CP-## дублируются `TODO(CP-##)` в коде); заказчик запускает `main.py` и докладывает результат; пункт закрывается только после прогона | rev 0   |
++| Д-02 | Маркировка станков `S<тип><№>-<компоновка>` по SPEC-01 | rev 0   |
++| Д-03 | Классы точности закладных K1/K2/K3 и способы монтажа M1–M4 по SPEC-02 | rev 0   |
++| Д-04 | Закладные — лазерный раскрой из 2–3 листов; жёсткость рёбрами/прокатом; под рельсы — сегменты с зазором 10 мм | rev 0   |
++| Д-05 | Основное формообразование — ЭЭС, фрезерование вспомогательное; перелитой слой снимается ЭХП | rev 0   |
++| Д-06 | Полярная схема обработки: контур круглых деталей по X+C, без контурного хода по Y | rev 0   |
++| Д-07 | Данные производителей только из `specs/*.json`; компоновка узлов — относительными правилами, не абсолютными координатами | rev 0   |
++| Д-08 | Редуктор ПТК: 4 ряда, фазировка 0°/90°/180°/270°, Øнар ≤110, u = 10…100 | rev 0   |
+
+ ## Открытые вопросы
+
++| №     | Вопрос | Статус |
++|-------|---|---|
++| OQ-01 | VMC или HMC для SM-1 и SE-1 (предварительно HMC выгоднее) — сравнение в CP-04 | открыт |
++| OQ-02 | Схема ПТК: выход на сепаратор (u = z_ж) или на жёсткое колесо — принять после CP-01 | открыт |
++| OQ-03 | Формат каталожного номера пары рельс+каретка (предложение `EGC-HG-<тип><размер><нагр>-<класс>-<натяг>`) | открыт |
+diff --git a/specs/CODE_PLAN.md b/specs/CODE_PLAN.md
+--- a/specs/CODE_PLAN.md
++++ b/specs/CODE_PLAN.md
+@@ -17,6 +17,16 @@
+ ## 2. Пункты плана
+
+ | CP | Содержание | Файлы | Основание | Зависит от | Статус |
+ |---|---|---|---|---|---|
++| CP-01 | Каркас `main.py`, пакет `egm`, калькулятор ПТК ур.1, шаблон SPEC-10 | main.py, egm/, templates/ | Д-08 | — | патч |
++| CP-02 | Парсер `docs/HG-Series-Catalog_opt.md` → `specs/catalog_hiwin_hg.json`; каталожные номера пар | egm/catalog.py | Д-07, OQ-03 | CP-01 | открыт |
++| CP-03 | Расчёт стоимости по `vendor_prices.json`, отчёт о несовместимостях | egm/cost.py | Д-07 | CP-02 | открыт |
++| CP-04 | БД узлов (дерево машин JSON), спецификации SM-1/SE-1 (10 разделов), сравнение VMC/HMC | egm/machine.py, specs/machines/ | Д-02, OQ-01 | CP-02 | открыт |
++| CP-05 | Компоновка правилами (attach/center/offset), примитивы CadQuery → STEP, каталог примитивов | egm/cad/ | Д-07 | CP-04 | открыт |
++| CP-06 | 2D SVG-проекции с размерами | egm/cad/svg.py | — | CP-05 | открыт |
++| CP-07 | Закладные: раскрой по листам, унификация, сегменты 10 мм | egm/embeds.py | Д-04 | CP-04 | открыт |
++| CP-08 | ПТК ур.2: момент по контакту Герца, 4-рядная фазировка, JSON конфигураций | egm/ptk.py | Д-08 | CP-01 | открыт |
++| CP-09 | Калькулятор ГК, материалы редукторов, перечень материалов моделей | egm/hd.py, specs/ | — | CP-08 | открыт |
++| CP-10 | Spec-first: технология ЭЭС+ЭХП, литьё, метрология, маршруты, спецификация ПО | specs/ | Д-05, Д-06 | — | открыт |
+
+
+diff --git a/specs/SPEC-01_NAMING.md b/specs/SPEC-01_NAMING.md
+new file mode 100644
+--- /dev/null
++++ b/specs/SPEC-01_NAMING.md
+@@ -0,0 +1,23 @@
++# SPEC-01 — Маркировка станков и узлов (spec-first, Д-02)
++
++## Станки: `S<T><N>-<L>`
++
++| Поз. | Значение |
++|---|---|
++| S | станок |
++| T | тип: M — milling (фрезерный); E — erosion (прошивочный электроэрозионный) |
++| N | порядковый номер варианта данного типа (1, 2, …) |
++| L | компоновка по `docs/cnc_axes_guide.md`: VMC — вертикальный шпиндель/электрод (Z вертикальна); HMC — горизонтальный (Y вертикальна) |
++
++Примеры: SM-1-VMC — фрезерный, вариант 1, вертикальный; SE-1-VMC —
++электроэрозионный, вариант 1, вертикальный. Смена компоновки даёт новый
++номер варианта (SM-2-HMC), старый не переименовывается.
++
++## Узлы и детали: `<станок>.<группа>.<NN>[.<NN>]`
++
++Группы: FR — станина (литьё), EM — закладные, AX — оси (AX-X, AX-Y, AX-Z, AX-C),
++SP — шпиндель/электрододержатель, TK — ванна ЭЭС, FX — оснастка, AC — навесное.
++Пример: `SE-1-VMC.AX-X.02` — каретка оси X. Номер совпадает с ключом в JSON-дереве.
++
++Покупные изделия — каталожным номером из `specs/catalog_*.json` (OQ-03),
++детали редукторов — `PTK-<исп>.<NN>` и `HD-<исп>.<NN>`.
+diff --git a/specs/SPEC-02_PRECISION_EMBEDS.md b/specs/SPEC-02_PRECISION_EMBEDS.md
+new file mode 100644
+--- /dev/null
++++ b/specs/SPEC-02_PRECISION_EMBEDS.md
+@@ -0,0 +1,34 @@
++# SPEC-02 — Классы точности и закладные в литьё (spec-first, Д-03, Д-04)
++
++## Классы точности
++
++| Класс | Назначение | Плоскостность, мм | Компланарность, мм | Позиция, мм |
++|---|---|---|---|---|
++| K1 | базовые поверхности (рельсы, опоры) | 0.02 на 300 | 0.03 в группе | ±0.10, шаблон ШБ-01/02 |
++| K2 | силовые, несущая способность | 0.10 | 0.20 | ±0.50 |
++| K3 | вспомогательные: кожухи, кабель-каналы, такелаж | 0.30 | 0.50 | ±2.00 |
++
++## Способы монтажа
++
++| Код | Способ | Точность | Для |
++|---|---|---|---|
++| M1 | изнутри опалубки болтами через щит; риск всплытия/утяжки | ±0.5…1.0 | K2/K3 |
++| M2 | карман (вкладыш) + подливочный компаунд после полимеризации, выставка приспособлением | ±0.05…0.2 | K2, регулируемые |
++| M3 | гильзы/футорки в опалубке → шпильки → юстировка на монтажном компаунде | ±0.02…0.1 | K2 + приводы |
++| M4 | «лицом вниз» на поверочную плиту по шаблону, разделительный слой 0.05 | компл. ≤0.03 | K1 (основной) |
++
++Правило проверки (CP-07): класс K1 допускает только M4 (или M3 с юстировкой
++по месту), K2 — M2/M3/M4, K3 — любой.
++
++## Раскрой закладных
++
++1. Все детали — лазерный раскрой; цель — один лист, предел — 2–3 толщины.
++   Новая толщина = новый лист = обоснование в DECISIONS.
++2. Жёсткость — рёбрами из того же листа (тавр/короб) или прокатом
++   (швеллер, полоса), а не увеличением толщины.
++3. Детали унифицируются: одинаковые сегменты, одинаковые рёбра.
++4. Закладные под рельсы — сегменты с зазором 10 мм (разгрузка отливки).
++5. Марки материалов расшифровываются в спецификации закладных (CP-07).
++
++Числа из таблиц, используемые в проверках, переносятся в
++`specs/precision.json` (CP-07); этот документ тогда ссылается на JSON.
+diff --git a/specs/CATALOGS.md b/specs/CATALOGS.md
+new file mode 100644
+--- /dev/null
++++ b/specs/CATALOGS.md
+@@ -0,0 +1,14 @@
++# CATALOGS — реестр каталогов производителей
++
++| ID | Производитель | Изделия | Исходник | Компиляция .md | JSON (code-first) | Состояние |
++|---|---|---|---|---|---|---|
++| CAT-01 | HIWIN | рельсы и каретки серии HG (G99TE17-1306) | [docs/HG-Series-Catalog_opt.pdf](../docs/HG-Series-Catalog_opt.pdf) | [docs/HG-Series-Catalog_opt.md](../docs/HG-Series-Catalog_opt.md) | specs/catalog_hiwin_hg.json (CP-02) | .md есть, парсер — CP-02 |
++
++Правила: PDF — первоисточник; .md — дословная компиляция (объединённые ячейки
++раскрыты); JSON строится только парсером из .md, руками не правится.
++Каталожный номер пары рельс+каретка присваивает парсер (формат — OQ-03).
++
++Наличие и цена — [vendor_prices.json](vendor_prices.json), заполняет заказчик:
++ключ — каталожный номер или обозначение HIWIN; `price` за шт (каретка)
++или за метр (`unit: "m"`, рельс); `available`, `lead_days`, `supplier`, `date`.
++Позиция без цены попадает в отчёт `out/cost_missing.md` (CP-03).
+diff --git a/specs/vendor_prices.json b/specs/vendor_prices.json
+new file mode 100644
+--- /dev/null
++++ b/specs/vendor_prices.json
+@@ -0,0 +1,21 @@
++{
++  "_comment": "Заполняет заказчик. Цена в currency; unit: pcs | m.",
++  "currency": "RUB",
++  "items": {
++    "HGH15CA": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
++    "HGR15R": {"unit": "m", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
++    "HGH20CA": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
++    "HGR20R": {"unit": "m", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
++    "HGW20CC": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
++    "HGH25CA": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
++    "HGR25R": {"unit": "m", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
++    "ROLLER_D5x8": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
++    "BALL_D6": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""}
++  },
++  "bodies": {
++    "_comment": "Тела вращения ПТК, доступные к закупке: type roller|ball, d, l (для ролика), мм",
++    "ROLLER_D5x8": {"type": "roller", "d": 5.0, "l": 8.0},
++    "ROLLER_D4x6": {"type": "roller", "d": 4.0, "l": 6.0},
++    "BALL_D6": {"type": "ball", "d": 6.0, "l": 6.0}
++  }
++}
+diff --git a/egm/__init__.py b/egm/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/egm/__init__.py
+@@ -0,0 +1 @@
++"""EG-MACHINES: расчёты, БД, генерация спецификаций."""
+diff --git a/egm/ptk.py b/egm/ptk.py
+new file mode 100644
+--- /dev/null
++++ b/egm/ptk.py
+@@ -0,0 +1,93 @@
++"""Калькулятор волнового редуктора ПТК, уровень 1 (кинематика + реализуемость).
++
++Схема (OQ-02, предварительно): генератор волн — вход, жёсткое колесо с z_r
++впадинами неподвижно, сепаратор с n = z_r - 1 телами — выход; u = z_r.
++4 ряда с фазировкой 0/90/180/270° (Д-08).
++"""
++import math
++from dataclasses import dataclass, asdict, field
++
++
++@dataclass
++class PtkLimits:
++    d_out_max: float = 110.0   # Д-08
++    u_min: int = 10
++    u_max: int = 100
++    wall_min: float = 4.0      # минимальная стенка корпуса/колеса, мм
++    gap_k: float = 1.15        # шаг тел / диаметр тела (перемычка сепаратора)
++    rows: int = 4
++    row_phases: tuple = (0, 90, 180, 270)
++    # TODO(CP-08): вынести в specs/ptk_limits.json
++
++
++@dataclass
++class PtkResult:
++    u: int
++    body: str
++    d_body: float
++    n_bodies: int
++    z_ring: int
++    ecc: float
++    d_pitch: float
++    d_out: float
++    width: float
++    ok: bool
++    errors: list = field(default_factory=list)
++
++
++def calc(u, body_id, body, lim=PtkLimits()):
++    """Расчёт одной конфигурации. body = {'type','d','l'}."""
++    err = []
++    d = body["d"]
++    z_r = u
++    n = z_r - 1
++    if not lim.u_min <= u <= lim.u_max:
++        err.append(f"u={u} вне диапазона {lim.u_min}..{lim.u_max}")
++    ecc = 0.5 * d * 0.5          # эксцентриситет ≈ четверть диаметра тела
++    # TODO(CP-08): эксцентриситет из условия непрерывного зацепления
++    step = lim.gap_k * d
++    d_pitch = max(n * step / math.pi, 1e-9)
++    d_out = d_pitch + d + 2 * ecc + 2 * lim.wall_min
++    if d_out > lim.d_out_max:
++        err.append(f"Øнар {d_out:.1f} > {lim.d_out_max}: тела Ø{d} не вмещаются при n={n}")
++    d_gen = d_pitch - d - 2 * ecc
++    if d_gen < 2 * lim.wall_min + 10:
++        err.append(f"генератор Ø{d_gen:.1f} слишком мал для подшипника/вала")
++    if lim.rows != len(lim.row_phases):
++        err.append("число рядов не совпадает с фазировкой")
++    width = lim.rows * body["l"] + (lim.rows + 1) * 1.0
++    return PtkResult(u, body_id, d, n, z_r, round(ecc, 3), round(d_pitch, 2),
++                     round(d_out, 2), round(width, 1), not err, err)
++
++
++def sweep(bodies, u_list=(10, 16, 20, 25, 32, 40, 50, 63, 80, 100)):
++    return [calc(u, bid, b) for u in u_list for bid, b in bodies.items()
++            if not bid.startswith("_")]
++
++
++def torque_estimate(r: PtkResult, q_allow=None):
++    """Грубая оценка момента: TODO(CP-08) — контакт Герца, доля нагруженных тел."""
++    q = q_allow or 30.0 * r.d_body ** 2   # Н на тело, заглушка
++    loaded = max(1, r.n_bodies // 3)
++    return round(q * loaded * (r.d_pitch / 2000.0) * 4, 1)  # Н·м, 4 ряда
++
++
++def to_rows(results):
++    out = []
++    for r in results:
++        row = asdict(r)
++        row["torque_Nm_est"] = torque_estimate(r) if r.ok else None
++        out.append(row)
++    return out
++
++
++def self_test():
++    """Проверки ПО: u=100 роликом Ø5 в Ø110 нереализуемо; u=20 Ø5 реализуемо."""
++    b = {"type": "roller", "d": 5.0, "l": 8.0}
++    assert not calc(100, "t", b).ok
++    assert calc(20, "t", b).ok
++    assert not calc(5, "t", b).ok
++    return True
++
++
++if __name__ == "__main__":
++    print(self_test())
+diff --git a/templates/SPEC-10_PTK_CALC.md.tmpl b/templates/SPEC-10_PTK_CALC.md.tmpl
+new file mode 100644
+--- /dev/null
++++ b/templates/SPEC-10_PTK_CALC.md.tmpl
+@@ -0,0 +1,14 @@
++# SPEC-10 — Расчёт редуктора ПТК (code-first, НЕ ПРАВИТЬ РУКАМИ)
++
++Сгенерировано `main.py` (egm/ptk.py, уровень 1). Схема и ограничения — Д-08, OQ-02.
++Момент — предварительная оценка, уточняется в CP-08.
++
++| u | Тело | Ø тела | n тел | z колеса | e, мм | Ø дел. | Øнар | B, мм | M, Н·м | Статус |
++|---|---|---|---|---|---|---|---|---|---|---|
++{rows}
++
++## Нереализуемые конфигурации
++
++{errors}
++
++Итого: {n_ok} реализуемых из {n_all}.
+diff --git a/main.py b/main.py
+new file mode 100644
+--- /dev/null
++++ b/main.py
+@@ -0,0 +1,50 @@
++"""Точка входа: python main.py -> out/. Код выхода 0 — все проверки пройдены."""
++import json
++import sys
++from pathlib import Path
++
++from egm import ptk
++
++ROOT = Path(__file__).resolve().parent
++SPECS, OUT, TPL = ROOT / "specs", ROOT / "out", ROOT / "templates"
++
++
++def load_json(name):
++    return json.loads((SPECS / name).read_text(encoding="utf-8"))
++
++
++def write(name, text):
++    OUT.mkdir(exist_ok=True)
++    (OUT / name).write_text(text, encoding="utf-8", newline="\n")
++
++
++def run_ptk(prices):
++    rows = ptk.to_rows(ptk.sweep(prices["bodies"]))
++    write("ptk_configs.json", json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
++    table, errs = [], []
++    for r in rows:
++        m = r["torque_Nm_est"] if r["ok"] else "—"
++        table.append(f"| {r['u']} | {r['body']} | {r['d_body']} | {r['n_bodies']} | "
++                     f"{r['z_ring']} | {r['ecc']} | {r['d_pitch']} | {r['d_out']} | "
++                     f"{r['width']} | {m} | {'OK' if r['ok'] else 'нет'} |")
++        errs += [f"- u={r['u']}, {r['body']}: {e}" for e in r["errors"]]
++    tpl = (TPL / "SPEC-10_PTK_CALC.md.tmpl").read_text(encoding="utf-8")
++    n_ok = sum(r["ok"] for r in rows)
++    write("SPEC-10_PTK_CALC.md", tpl.format(rows="\n".join(table),
++          errors="\n".join(errs) or "нет", n_ok=n_ok, n_all=len(rows)))
++
++
++def main():
++    fails = []
++    try:
++        ptk.self_test()
++    except AssertionError as e:
++        fails.append(f"ptk.self_test: {e}")
++    run_ptk(load_json("vendor_prices.json"))
++    # TODO(CP-02): catalog.build(); TODO(CP-03): cost.report(); TODO(CP-04): machines
++    write("checks.md", "# Проверки\n\n" + ("\n".join(fails) or "все пройдены") + "\n")
++    print("FAIL" if fails else "OK", *fails, sep="\n")
++    return 1 if fails else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
