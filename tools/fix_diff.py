@@ -1,41 +1,50 @@
 #!/usr/bin/env python3
-"""fix_diff.py — нормализация unified diff, подготовленного ИИ, для git apply / patch -p1.
+"""fix_diff.py — нормализация unified diff от ИИ под git apply / patch -p1.
 
-Исправляет:
-  * CRLF -> LF, UTF-8 BOM, UTF-16 (вывод PowerShell '>');
-  * отсутствие строк 'diff --git' / 'new file mode' / 'deleted file mode';
-  * неверные счётчики в заголовках @@ (пересчёт по телу hunk);
-  * пустые строки без префикса (внутри hunk -> контекст, в хвосте -> удаляются);
-  * пути без префиксов a/ b/.
+Стадия 1 (синтаксис): CRLF/BOM/UTF-16 патча, строки diff --git / new file mode /
+deleted file mode, счётчики @@, пустые строки без префикса, пути без a/ b/.
+Стадия 2 (сверка с рабочим деревом, для изменяемых и удаляемых файлов):
+  * hunk ищется в реальном файле (сравнение без учёта хвостовых пробелов);
+  * строки ' ' и '-' берутся из файла дословно;
+  * контекст добирается до 3 строк с каждой стороны (иначе git apply
+    привязывает hunk без хвостового контекста к концу файла);
+  * расставляется '\\ No newline at end of file';
+  * сохраняется стиль окончаний строк файла (LF/CRLF).
+
 Использование:
-  python tools/fix_diff.py IN [OUT]    (OUT по умолчанию: <IN>.fixed.diff)
-Код выхода: 0 — успех, 1 — патч неразборчив (см. сообщение).
+  python tools/fix_diff.py IN [OUT] [--root DIR]
+  OUT по умолчанию <IN>.fixed.diff, DIR — корень репозитория (по умолчанию текущий каталог).
+Код выхода: 0 — успех, 1 — ошибка (см. сообщение).
 """
 import re
+import subprocess
 import sys
+from itertools import takewhile
 from pathlib import Path
 
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$")
+BASE_RE = re.compile(r"^#\s*base:\s*([0-9a-fA-F]{7,40})")
 GIT_META = ("diff --git ", "index ", "new file mode", "deleted file mode",
             "old mode", "new mode", "similarity index", "rename from", "rename to")
 DEV_NULL = "/dev/null"
+CTX = 3
+NO_EOL = ("\\", " No newline at end of file")
 WARNINGS = []
 
 
-def die(line_no, msg):
-    sys.exit(f"ОШИБКА (строка {line_no}): {msg}")
+def die(msg):
+    sys.exit("ОШИБКА: " + msg)
 
 
-def warn(line_no, msg):
-    WARNINGS.append(f"строка {line_no}: {msg}")
+def warn(msg):
+    WARNINGS.append(msg)
 
+
+# ---------- стадия 1: разбор патча ----------
 
 def read_patch(path):
     raw = Path(path).read_bytes()
-    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
-        text = raw.decode("utf-16")
-    else:
-        text = raw.decode("utf-8-sig")
+    text = raw.decode("utf-16") if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else raw.decode("utf-8-sig")
     return text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
 
 
@@ -43,19 +52,18 @@ def clean_path(p):
     p = p.split("\t")[0].strip()
     if p == DEV_NULL:
         return None
-    if p.startswith(("a/", "b/")):
-        p = p[2:]
-    return p
+    return p[2:] if p.startswith(("a/", "b/")) else p
 
 
 def is_file_header(lines, i):
-    """'--- X' + '+++ Y' + '@@ ' — начало блока файла (а не удалённая строка '-- ...')."""
     return (lines[i].startswith("--- ") and i + 2 < len(lines)
             and lines[i + 1].startswith("+++ ") and lines[i + 2].startswith("@@ "))
 
 
 def parse(lines):
-    files, cur, hunk, i = [], None, None, 0
+    """-> (base_sha|None, [ {old,new,line,hunks:[{old_start,tail,line,body:[[kind,text,lineno]]}]} ])
+    kind: ' ', '-', '+', '?' (пустая строка без префикса — смысл уточняется позже)."""
+    files, cur, hunk, base, i = [], None, None, None, 0
     while i < len(lines):
         ln = lines[i]
         if is_file_header(lines, i):
@@ -68,104 +76,228 @@ def parse(lines):
         if ln.startswith("@@ ") and cur is not None:
             m = HUNK_RE.match(ln)
             if not m:
-                die(i + 1, f"неразборчивый заголовок hunk: {ln!r}")
+                die(f"строка {i + 1}: неразборчивый заголовок hunk: {ln!r}")
             hunk = {"old_start": int(m[1]), "tail": m[5], "body": [], "line": i + 1}
             cur["hunks"].append(hunk)
             i += 1
             continue
         if ln.startswith(GIT_META):
-            hunk = None  # служебные строки git генерируются заново
+            hunk = None
             i += 1
             continue
         if hunk is None:
-            if ln.strip():
-                warn(i + 1, f"текст вне hunk пропущен: {ln[:60]!r}")
+            m = BASE_RE.match(ln)
+            if m:
+                base = m[1].lower()
+            elif ln.strip():
+                warn(f"строка {i + 1}: текст вне hunk пропущен: {ln[:60]!r}")
             i += 1
             continue
-        if ln == "" or ln[0] in " +-\\":
-            hunk["body"].append((i + 1, ln))
+        if ln.startswith("\\"):
+            pass  # маркеры '\ No newline' расставляются заново по реальному файлу
+        elif ln == "":
+            hunk["body"].append(["?", "", i + 1])
+        elif ln[0] in " +-":
+            hunk["body"].append([ln[0], ln[1:], i + 1])
         else:
-            die(i + 1, f"строка без префикса ' ', '+', '-' внутри hunk: {ln[:60]!r}")
+            die(f"строка {i + 1}: строка без префикса ' ', '+', '-' внутри hunk: {ln[:60]!r}")
         i += 1
-    return files
+    return base, files
 
 
-def normalize(body, new_file):
-    while body and body[-1][1] == "":
+# ---------- стадия 2: сверка с рабочим деревом ----------
+
+def read_target(root, rel):
+    p = root / rel
+    if not p.is_file():
+        die(f"{rel}: файл не найден в рабочем дереве ({p})")
+    text = p.read_bytes().decode("utf-8")
+    eol = "\r\n" if "\r\n" in text else "\n"
+    lines = text.split(eol)
+    final_nl = lines[-1] == ""
+    if final_nl:
+        lines.pop()
+    return lines, eol, final_nl
+
+
+def find(flines, old, hint, lo):
+    key = [s.rstrip() for s in old]
+    n = len(key)
+    cands = [p for p in range(lo, len(flines) - n + 1)
+             if all(flines[p + k].rstrip() == key[k] for k in range(n))]
+    return min(cands, key=lambda p: abs(p - hint)) if cands else None
+
+
+def diagnose(flines, old, hint):
+    best_m, best_p = -1, 0
+    for p in range(max(1, len(flines))):
+        m = 0
+        while m < len(old) and p + m < len(flines) and flines[p + m].rstrip() == old[m].rstrip():
+            m += 1
+        if m > best_m or (m == best_m and abs(p - hint) < abs(best_p - hint)):
+            best_m, best_p = m, p
+    exp = old[best_m] if best_m < len(old) else "?"
+    got = flines[best_p + best_m] if best_p + best_m < len(flines) else "<конец файла>"
+    return (f"лучшее совпадение с строки {best_p + 1}: совпало {best_m} из {len(old)}; "
+            f"ожидалось {exp!r}, в файле {got!r}")
+
+
+def fix_eof(out):
+    """Файл без перевода строки в конце, hunk доходит до последней строки."""
+    idx = max((i for i, (k, _) in enumerate(out) if k in " -"), default=None)
+    if idx is None:
+        return
+    k, t = out[idx]
+    if k == " " and any(kk == "+" for kk, _ in out[idx + 1:]):
+        out[idx:idx + 1] = [("-", t), NO_EOL, ("+", t)]  # дописываем перевод строки
+    else:
+        out.insert(idx + 1, NO_EOL)
+
+
+def render(out, eol):
+    cr = "\r" if eol == "\r\n" else ""
+    return [k + t if k == "\\" else k + t + cr for k, t in out]
+
+
+def emit_new(f, root, path, hdr):
+    if (root / path).exists():
+        die(f"{path}: помечен как новый, но уже существует в рабочем дереве")
+    body = [b for h in f["hunks"] for b in h["body"]]
+    while body and body[-1][0] == "?":
         body.pop()
-    out = []
-    for no, ln in body:
-        if ln == "":
-            if new_file:
-                warn(no, "пустая строка без '+' в новом файле — считаю добавленной")
-                ln = "+"
+    bad = [b for b in body if b[0] in " -"]
+    if bad:
+        die(f"{path}: новый файл содержит строки ' '/'-' (строка патча {bad[0][2]})")
+    hdr.append("new file mode 100644")
+    if not body:
+        return hdr
+    return hdr + ["--- /dev/null", f"+++ b/{path}", f"@@ -0,0 +1,{len(body)} @@"] + \
+        ["+" + t for _, t, _ in body]
+
+
+def emit_deleted(root, path, hdr):
+    flines, eol, final_nl = read_target(root, path)
+    hdr.append("deleted file mode 100644")
+    if not flines:
+        return hdr
+    out = [("-", t) for t in flines]
+    if not final_nl:
+        fix_eof(out)
+    return hdr + [f"--- a/{path}", "+++ /dev/null", f"@@ -1,{len(flines)} +0,0 @@"] + render(out, eol)
+
+
+def locate(path, flines, hunks):
+    located, lo = [], 0
+    for h in hunks:
+        body = [list(b) for b in h["body"]]
+        while body and body[-1][0] in " ?" and not body[-1][1].strip():
+            body.pop()  # хвостовые пустые строки контекста доберём из файла
+        if not any(b[0] in "+-" for b in body):
+            warn(f"{path}: hunk со строки патча {h['line']} без изменений — пропущен")
+            continue
+        hint = max(h["old_start"] - 1, 0)
+        p = None
+        for amb in (" ", "+"):  # '?' сперва как контекст, затем как добавленная строка
+            cand = [(amb if k == "?" else k, t, n) for k, t, n in body]
+            old = [t for k, t, _ in cand if k in " -"]
+            if not old:
+                p = min(max(h["old_start"], lo), len(flines))
+                warn(f"{path}: hunk со строки патча {h['line']} без контекста — вставка после строки {p}")
+                break
+            p = find(flines, old, hint, lo)
+            if p is not None:
+                break
+        if p is None:
+            old = [t for k, t, _ in body if k in " -?"]
+            die(f"{path}: hunk со строки патча {h['line']} не найден в файле. "
+                + diagnose(flines, old, hint))
+        located.append((p, len(old), cand, h["tail"]))
+        lo = p + len(old)
+    return located
+
+
+def emit_modified(root, path, f, hdr):
+    flines, eol, final_nl = read_target(root, path)
+    located = locate(path, flines, f["hunks"])
+    if not located:
+        warn(f"{path}: нет изменений — файл пропущен")
+        return []
+    res = hdr + [f"--- a/{path}", f"+++ b/{path}"]
+    delta, prev_end = 0, 0
+    for idx, (p, n, body, tail) in enumerate(located):
+        nxt = located[idx + 1][0] if idx + 1 < len(located) else len(flines)
+        lead = sum(1 for _ in takewhile(lambda b: b[0] == " ", body))
+        trail = sum(1 for _ in takewhile(lambda b: b[0] == " ", reversed(body)))
+        s = max(prev_end, p - max(0, CTX - lead))
+        e = min(nxt, p + n + max(0, CTX - trail))
+        out = [(" ", flines[j]) for j in range(s, p)]
+        k = p
+        for kind, t, _ in body:
+            if kind in " -":
+                out.append((kind, flines[k]))  # дословно из файла
+                k += 1
             else:
-                ln = " "
-        out.append((no, ln))
-    return out
+                out.append(("+", t))
+        out += [(" ", flines[j]) for j in range(k, e)]
+        if e == len(flines) and not final_nl:
+            fix_eof(out)
+        o = sum(kk in " -" for kk, _ in out)
+        nn = sum(kk in " +" for kk, _ in out)
+        res.append(f"@@ -{s + (1 if o else 0)},{o} +{s + delta + (1 if nn else 0)},{nn} @@{tail}")
+        res += render(out, eol)
+        delta += nn - o
+        prev_end = e
+    return res
 
 
-def count(body):
-    old = sum(1 for _, l in body if l[0] in " -")
-    new = sum(1 for _, l in body if l[0] in " +")
-    return old, new
+def emit_file(f, root):
+    old, new = f["old"], f["new"]
+    if old is None and new is None:
+        die(f"строка {f['line']}: оба пути /dev/null")
+    if old and new and old != new:
+        die(f"{old} -> {new}: переименование не поддерживается")
+    path = old or new
+    hdr = [f"diff --git a/{path} b/{path}"]
+    if old is None:
+        return emit_new(f, root, path, hdr)
+    if new is None:
+        return emit_deleted(root, path, hdr)
+    return emit_modified(root, path, f, hdr)
 
 
-def emit(files):
-    out, seen = [], set()
-    for f in files:
-        old, new = f["old"], f["new"]
-        if old is None and new is None:
-            die(f["line"], "оба пути /dev/null")
-        path_a, path_b = old or new, new or old
-        if path_b in seen:
-            warn(f["line"], f"файл {path_b} встречается в патче повторно")
-        seen.add(path_b)
-        is_new, is_del = old is None, new is None
-        out.append(f"diff --git a/{path_a} b/{path_b}")
-        if is_new:
-            out.append("new file mode 100644")
-        elif is_del:
-            out.append("deleted file mode 100644")
-        out.append(f"--- {'a/' + old if old else DEV_NULL}")
-        out.append(f"+++ {'b/' + new if new else DEV_NULL}")
-
-        hunks = f["hunks"]
-        if is_new and len(hunks) > 1:  # новый файл — всегда один hunk
-            merged = [ln for h in hunks for ln in h["body"]]
-            hunks = [dict(hunks[0], body=merged)]
-        delta = 0
-        for h in hunks:
-            body = normalize(h["body"], is_new)
-            o, n = count(body)
-            if is_new and o:
-                die(h["line"], f"новый файл {new} содержит строки ' '/'-'")
-            if is_del and n:
-                die(h["line"], f"удаляемый файл {old} содержит строки ' '/'+'")
-            if is_new:
-                os_, ns = 0, (1 if n else 0)
-            elif is_del:
-                os_, ns = h["old_start"], 0
-            else:
-                os_ = h["old_start"]
-                ns = os_ + delta + (1 if o == 0 else 0)
-            delta += n - o
-            out.append(f"@@ -{os_},{o} +{ns},{n} @@{h['tail']}")
-            out.extend(ln for _, ln in body)
-    return "\n".join(out) + "\n"
+def git_head(root):
+    try:
+        return subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
+                              capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
 
 
 def main(argv):
-    if len(argv) < 2:
+    args, root = list(argv[1:]), Path.cwd()
+    if "--root" in args:
+        i = args.index("--root")
+        root = Path(args[i + 1])
+        del args[i:i + 2]
+    if not args:
         sys.exit(__doc__)
-    src = Path(argv[1])
-    dst = Path(argv[2]) if len(argv) > 2 else src.with_suffix(".fixed.diff")
-    files = parse(read_patch(src))
+    src = Path(args[0])
+    dst = Path(args[1]) if len(args) > 1 else src.with_suffix(".fixed.diff")
+    base, files = parse(read_patch(src))
     if not files:
-        sys.exit("ОШИБКА: не найдено ни одного блока файла ('--- ' / '+++ ' / '@@').")
-    dst.write_bytes(emit(files).encode("utf-8"))  # UTF-8 без BOM, LF
-    n_h = sum(len(f["hunks"]) for f in files)
-    print(f"Файлов: {len(files)}, hunk'ов: {n_h} -> {dst}")
+        die("не найдено ни одного блока файла ('--- ' / '+++ ' / '@@').")
+    head = git_head(root)
+    if base and head and not head.startswith(base):
+        warn(f"патч построен от {base[:12]}, HEAD = {head[:12]}; контекст сверен с рабочим деревом")
+    seen, out = set(), []
+    for f in files:
+        path = f["old"] or f["new"]
+        if path in seen:
+            die(f"{path}: файл встречается в патче дважды — объедините блоки")
+        seen.add(path)
+        out += emit_file(f, root)
+    dst.write_bytes(("\n".join(out) + "\n").encode("utf-8"))
+    print(f"Файлов: {len(files)}, hunk'ов: {sum(len(f['hunks']) for f in files)} -> {dst}")
     for w in WARNINGS:
         print("  предупреждение:", w)
     return 0
