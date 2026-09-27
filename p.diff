@@ -1,0 +1,693 @@
+```diff
+# base: 4eb0bbe235ea672d0aadcc0f0b59b4f8038013cc, CP-02, CP-11, CP-12
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -3,3 +3,4 @@
+ Проект **EG-MACHINES** — станки собственного изготовления на эпоксигранитных
+-станинах (SM-1-VMC — фрезерный, SE-1-VMC — электроэрозионная система ЭЭС),
++станинах (SM-1 — фрезерный, SE-1 — электроэрозионная система ЭЭС; основная
++компоновка HMC, вариант VMC считается параллельно для сравнения — Д-09),
+ оснастка и метрология к ним. Прикладная цель — ячейка мелкосерийного
+@@ -21,7 +22,9 @@
+ 3. Правки существующих файлов — только от текущего коммита; первая строка
+-   патча `# base: <sha>, CP-##`; ≥3 строк контекста дословно.
++   патча `# base: <sha>, CP-##`; контекст дословный, минимум не нормируется —
++   `tools/fix_diff.py` добирает его до 3 строк по рабочему дереву (Д-13).
+ 4. UTF-8 без BOM, LF, перевод строки в конце; `--recount` не используется.
+ 5. Перед наложением: `python tools/fix_diff.py p.diff` → `git apply --check`.
+-6. В начале сессии ИИ читает README, DECISIONS, CODE_PLAN и нужные spec.
++6. В начале сессии ИИ читает README, DECISIONS, CODE_PLAN и нужные spec
++   через GitHub REST API от последнего коммита (Д-12).
+
+@@ -37,11 +40,19 @@
+ | [specs/vendor_prices.json](specs/vendor_prices.json) | данные (заказчик) | поставщики | заполняется |
+-| specs/SPEC-10_PTK_CALC.md | code-first | `egm/ptk.py`, `templates/` | после прогона CP-01 |
++| [specs/SPEC-10_PTK_CALC.md](specs/SPEC-10_PTK_CALC.md) | code-first | `egm/ptk.py`, `templates/SPEC-10_PTK_CALC.md.tmpl` | rev 0 |
++| [specs/ptk_configs.json](specs/ptk_configs.json) | code-first (данные) | `egm/ptk.py` | rev 0 |
++| [specs/checks.md](specs/checks.md) | code-first (отчёт) | `main.py` | каждый прогон |
++| specs/catalog_hiwin_hg.json | code-first (БД) | `egm/catalog.py` ← CAT-01 | после прогона CP-02 |
++| specs/catalog_hiwin_hg_pairs.json | code-first (БД) | `egm/catalog.py`, Д-10 | после прогона CP-02 |
++| specs/catalog_report.md | code-first (отчёт) | `egm/catalog.py` | после прогона CP-02 |
+
+-Описание: SPEC-01 — маркировка станков и узлов; SPEC-02 — классы точности
+-K1–K3, способы монтажа закладных M1–M4, правила раскроя; CATALOGS — реестр
+-каталогов производителей; vendor_prices — наличие и цена; SPEC-10 — расчёт
+-параметров редуктора ПТК (генерируется).
++Описание: SPEC-01 — маркировка станков (варианты HMC/VMC) и ID узлов; SPEC-02 —
++классы точности K1–K3, способы монтажа закладных M1–M4, правила раскроя;
++CATALOGS — реестр каталогов производителей; vendor_prices — наличие и цена
++(заполняет заказчик); SPEC-10 и ptk_configs — расчёт редуктора ПТК;
++catalog_hiwin_hg — БД рельсов и кареток HIWIN HG; catalog_hiwin_hg_pairs —
++совместимые пары с каталожными номерами (Д-10); catalog_report — итог разбора
++каталога и проверок; checks — сводка проверок прогона.
+
+ ## Запуск
+
+ `python main.py` → `out/`; код выхода 0 = все проверки пройдены.
++После прогона все файлы из `out/` переносятся в `specs/`.
+diff --git a/specs/DECISIONS.md b/specs/DECISIONS.md
+--- a/specs/DECISIONS.md
++++ b/specs/DECISIONS.md
+@@ -18,9 +18,14 @@
+ | Д-08 | Редуктор ПТК: 4 ряда, фазировка 0°/90°/180°/270°, Øнар ≤110, u = 10…100 | rev 0   |
++| Д-09 | Основная компоновка — HMC (SM-1-HMC, SE-1-HMC); VMC (SM-1-VMC, SE-1-VMC) рассчитывается параллельно для сравнения. Компоновка входит в код станка и во все производные имена (спецификация, JSON-дерево, CAD, ID узлов), поэтому варианты не конфликтуют. Правила — SPEC-01, `egm/naming.py` | rev 0   |
++| Д-10 | Каталожный номер пары рельс+каретка: `EGC-HG-<тип><размер><нагр><крепл>-<класс>-<натяг>[-T]`, напр. `EGC-HG-H20CA-P-ZA` = каретка HGH20CAZAP + рельс HGR20R; `-T` — рельс HGR..T (крепление снизу). Пары — нераземные (matched set). Номера присваивает `egm/catalog.py` | rev 0   |
++| Д-11 | Схема ПТК: жёсткое колесо неподвижно, выход на сепаратор, n = z − 1, u = z. Одноступенчатый расчёт — только u = 10…100; для u > 100 калькулятор не считает и рекомендует двухступенчатую схему u = u1·u2 | rev 0   |
++| Д-12 | ИИ читает репозиторий через GitHub REST API: `/repos/euginb/HarmonicV2/commits` (база патча — последний sha), `/git/trees/<sha>?recursive=1` (состав), `/contents/<путь>?ref=<sha>` (содержимое в base64, крупные файлы — по частям). raw.githubusercontent.com для крупных файлов отдаёт сжатый ответ, который инструмент ИИ может не прочитать | rev 0   |
++| Д-13 | Правило «≥3 строк контекста» снято: `tools/fix_diff.py` сверяет hunk с рабочим деревом и добирает контекст сам. Контекст, присутствующий в патче, обязан совпадать с файлом дословно | rev 0   |
+
+ ## Открытые вопросы
+
+ | №     | Вопрос | Статус |
+ |-------|---|---|
+-| OQ-01 | VMC или HMC для SM-1 и SE-1 (предварительно HMC выгоднее) — сравнение в CP-04 | открыт |
+-| OQ-02 | Схема ПТК: выход на сепаратор (u = z_ж) или на жёсткое колесо — принять после CP-01 | открыт |
+-| OQ-03 | Формат каталожного номера пары рельс+каретка (предложение `EGC-HG-<тип><размер><нагр>-<класс>-<натяг>`) | открыт |
++| OQ-01 | VMC или HMC для SM-1 и SE-1 | закрыт → Д-09 |
++| OQ-02 | Схема ПТК: выход на сепаратор или на жёсткое колесо | закрыт → Д-11 |
++| OQ-03 | Формат каталожного номера пары рельс+каретка | закрыт → Д-10 |
+diff --git a/specs/CANCELLED.md b/specs/CANCELLED.md
+--- a/specs/CANCELLED.md
++++ b/specs/CANCELLED.md
+@@ -3,2 +3,8 @@
+ Список ведётся, чтобы отменённое не возвращалось в проект молча. Позиция
+ снимается отсюда только явным решением `Д-##` в [DECISIONS.md](DECISIONS.md).
++
++| № | Отменено | Чем заменено | Ревизия |
++|---|---|---|---|
++| X-01 | SPEC-01: «смена компоновки даёт новый номер варианта (SM-2-HMC)» | Д-09: компоновка — суффикс того же варианта (SM-1-HMC / SM-1-VMC) | rev 0 |
++| X-02 | README, CODE_PLAN: «≥3 строк контекста», `git apply --recount` | Д-13 | rev 0 |
++| X-03 | Расчёт одноступенчатого ПТК для u > 100 | Д-11: рекомендация двухступенчатой схемы | rev 0 |
+diff --git a/specs/CODE_PLAN.md b/specs/CODE_PLAN.md
+--- a/specs/CODE_PLAN.md
++++ b/specs/CODE_PLAN.md
+@@ -1,1 +1,1 @@
+-# CODE_PLAN — план доработки кода под rev 15 (консолидация с rev 11)
++# CODE_PLAN — план доработки кода (rev 0)
+@@ -11,2 +11,2 @@
+
+-Исполнитель готовит патч (`patch -p1` / `git apply --recount`) на один или
++Исполнитель готовит патч (`tools/fix_diff.py` → `git apply`, Д-13) на один или
+@@ -20,6 +20,6 @@
+ |---|---|---|---|---|---|
+-| CP-01 | Каркас `main.py`, пакет `egm`, калькулятор ПТК ур.1, шаблон SPEC-10 | main.py, egm/, templates/ | Д-08 | — | патч |
+-| CP-02 | Парсер `docs/HG-Series-Catalog_opt.md` → `specs/catalog_hiwin_hg.json`; каталожные номера пар | egm/catalog.py | Д-07, OQ-03 | CP-01 | открыт |
++| CP-01 | Каркас `main.py`, пакет `egm`, калькулятор ПТК ур.1, шаблон SPEC-10 | main.py, egm/, templates/ | Д-08 | — | закрыт (прогон OK, 4eb0bbe) |
++| CP-02 | Парсер `docs/HG-Series-Catalog_opt.md` → `catalog_hiwin_hg.json`, пары с каталожными номерами, проверка совместимости, раскладка отверстий рельса, сверка `vendor_prices.json` | egm/catalog.py, main.py | Д-07, Д-10 | CP-01 | патч |
+ | CP-03 | Расчёт стоимости по `vendor_prices.json`, отчёт о несовместимостях | egm/cost.py | Д-07 | CP-02 | открыт |
+-| CP-04 | БД узлов (дерево машин JSON), спецификации SM-1/SE-1 (10 разделов), сравнение VMC/HMC | egm/machine.py, specs/machines/ | Д-02, OQ-01 | CP-02 | открыт |
++| CP-04 | БД узлов (дерево машин JSON), спецификации по `naming.MACHINES`: SM-1-HMC, SE-1-HMC (основные), SM-1-VMC, SE-1-VMC (сравнение); 10 разделов; сравнительная таблица HMC/VMC | egm/machine.py, specs/machines/<код>.md/.json | Д-02, Д-09 | CP-02, CP-12 | открыт |
+ | CP-05 | Компоновка правилами (attach/center/offset), примитивы CadQuery → STEP, каталог примитивов | egm/cad/ | Д-07 | CP-04 | открыт |
+@@ -31,1 +31,3 @@
+ | CP-10 | Spec-first: технология ЭЭС+ЭХП, литьё, метрология, маршруты, спецификация ПО | specs/ | Д-05, Д-06 | — | открыт |
++| CP-11 | ПТК: u > 100 не считается, рекомендация двухступенчатой схемы; для нереализуемых по Ø — максимальный Ø тела | egm/ptk.py, main.py, templates/ | Д-11 | CP-01 | патч |
++| CP-12 | `egm/naming.py`: разбор кода станка с компоновкой, варианты HMC/VMC, имена файлов, ID узлов | egm/naming.py | Д-02, Д-09 | — | патч |
+diff --git a/specs/SPEC-01_NAMING.md b/specs/SPEC-01_NAMING.md
+--- a/specs/SPEC-01_NAMING.md
++++ b/specs/SPEC-01_NAMING.md
+@@ -1,1 +1,1 @@
+-# SPEC-01 — Маркировка станков и узлов (spec-first, Д-02)
++# SPEC-01 — Маркировка станков и узлов (spec-first, Д-02, Д-09)
+@@ -12,12 +12,31 @@
+-Примеры: SM-1-VMC — фрезерный, вариант 1, вертикальный; SE-1-VMC —
+-электроэрозионный, вариант 1, вертикальный. Смена компоновки даёт новый
+-номер варианта (SM-2-HMC), старый не переименовывается.
++Номер N — вариант конструкции; компоновка L — суффикс того же варианта.
++SM-1-HMC и SM-1-VMC — одна машина SM-1 в двух компоновках, они рассчитываются
++параллельно и сравниваются (Д-09). Основная компоновка — HMC.
++
++| Код | Описание | Статус |
++|---|---|---|
++| SM-1-HMC | фрезерный, вариант 1, горизонтальный (меньше нагрузка на ось Z) | основной |
++| SE-1-HMC | ЭЭС, вариант 1, горизонтальный (в ванну погружается только рабочая часть) | основной |
++| SM-1-VMC | фрезерный, вариант 1, вертикальный | для сравнения |
++| SE-1-VMC | ЭЭС, вариант 1, вертикальный | для сравнения |
++
++Код станка входит во все производные имена, поэтому файлы вариантов HMC и
++VMC не конфликтуют:
++
++| Объект | Имя |
++|---|---|
++| спецификация станка | `specs/machines/<код>.md` |
++| дерево узлов (JSON) | `specs/machines/<код>.json` |
++| 3D/2D модели | `out/cad/<код>/…` |
++| ID узла | `<код>.<группа>.<NN>[.<NN>]` |
++
++Правила разбора кода и список станков — `egm/naming.py` (`naming.MACHINES`).
+
+ ## Узлы и детали: `<станок>.<группа>.<NN>[.<NN>]`
+
+ Группы: FR — станина (литьё), EM — закладные, AX — оси (AX-X, AX-Y, AX-Z, AX-C),
+ SP — шпиндель/электрододержатель, TK — ванна ЭЭС, FX — оснастка, AC — навесное.
+-Пример: `SE-1-VMC.AX-X.02` — каретка оси X. Номер совпадает с ключом в JSON-дереве.
++Пример: `SE-1-HMC.AX-X.02` — каретка оси X. Номер совпадает с ключом в JSON-дереве.
+
+-Покупные изделия — каталожным номером из `specs/catalog_*.json` (OQ-03),
++Покупные изделия — каталожным номером из `specs/catalog_*.json` (Д-10),
+ детали редукторов — `PTK-<исп>.<NN>` и `HD-<исп>.<NN>`.
+diff --git a/specs/CATALOGS.md b/specs/CATALOGS.md
+--- a/specs/CATALOGS.md
++++ b/specs/CATALOGS.md
+@@ -5,7 +5,7 @@
+-| CAT-01 | HIWIN | рельсы и каретки серии HG (G99TE17-1306) | [docs/HG-Series-Catalog_opt.pdf](../docs/HG-Series-Catalog_opt.pdf) | [docs/HG-Series-Catalog_opt.md](../docs/HG-Series-Catalog_opt.md) | specs/catalog_hiwin_hg.json (CP-02) | .md есть, парсер — CP-02 |
++| CAT-01 | HIWIN | рельсы и каретки серии HG (G99TE17-1306) | [docs/HG-Series-Catalog_opt.pdf](../docs/HG-Series-Catalog_opt.pdf) | [docs/HG-Series-Catalog_opt.md](../docs/HG-Series-Catalog_opt.md) | specs/catalog_hiwin_hg.json, specs/catalog_hiwin_hg_pairs.json | парсер `egm/catalog.py` (CP-02) |
+
+ Правила: PDF — первоисточник; .md — дословная компиляция (объединённые ячейки
+ раскрыты); JSON строится только парсером из .md, руками не правится.
+-Каталожный номер пары рельс+каретка присваивает парсер (формат — OQ-03).
++Каталожный номер пары рельс+каретка присваивает парсер (формат — Д-10).
+diff --git a/egm/naming.py b/egm/naming.py
+new file mode 100644
+--- /dev/null
++++ b/egm/naming.py
+@@ -0,0 +1,67 @@
++"""Маркировка станков (SPEC-01, Д-02, Д-09): код S<T>-<N>-<L> и производные имена.
++
++Компоновка L входит в код станка и во все производные имена, поэтому варианты
++HMC (основной) и VMC (сравнение) одной машины не конфликтуют.
++"""
++import re
++
++CODE_RE = re.compile(r"^S([A-Z])-(\d+)-([A-Z]{3})$")
++TYPES = {"M": "фрезерный (milling)",
++         "E": "прошивочный электроэрозионный (erosion, ЭЭС)"}
++LAYOUTS = {"HMC": "горизонтальная компоновка (шпиндель/электрод и ось Z горизонтальны)",
++           "VMC": "вертикальная компоновка (шпиндель/электрод и ось Z вертикальны)"}
++PRIMARY_LAYOUT = "HMC"  # Д-09
++MACHINES = ("SM-1-HMC", "SE-1-HMC", "SM-1-VMC", "SE-1-VMC")
++GROUPS = ("FR", "EM", "AX-X", "AX-Y", "AX-Z", "AX-C", "SP", "TK", "FX", "AC")
++
++
++def parse(code):
++    m = CODE_RE.match(code)
++    if not m or m[1] not in TYPES or m[3] not in LAYOUTS:
++        raise ValueError(f"неверный код станка {code!r} (SPEC-01)")
++    return {"code": code, "type": m[1], "n": int(m[2]), "layout": m[3],
++            "base": f"S{m[1]}-{m[2]}", "primary": m[3] == PRIMARY_LAYOUT,
++            "title": f"{TYPES[m[1]]}, вариант {m[2]}, {LAYOUTS[m[3]]}"}
++
++
++def variants(base):
++    """'SM-1' -> ['SM-1-HMC', 'SM-1-VMC'] — все компоновки для сравнения."""
++    return [f"{base}-{lay}" for lay in LAYOUTS]
++
++
++def spec_path(code):
++    return f"machines/{parse(code)['code']}.md"
++
++
++def tree_path(code):
++    return f"machines/{parse(code)['code']}.json"
++
++
++def cad_dir(code):
++    return f"cad/{parse(code)['code']}"
++
++
++def node_id(code, group, *nums):
++    parse(code)
++    if group not in GROUPS:
++        raise ValueError(f"неизвестная группа {group!r} (SPEC-01)")
++    return ".".join([code, group] + [f"{n:02d}" for n in nums])
++
++
++def owner(node):
++    return parse(node.split(".")[0])
++
++
++def self_test():
++    p = parse("SM-1-HMC")
++    assert p["primary"] and p["base"] == "SM-1"
++    assert not parse("SE-1-VMC")["primary"]
++    assert variants("SE-1") == ["SE-1-HMC", "SE-1-VMC"]
++    assert node_id("SE-1-HMC", "AX-X", 2) == "SE-1-HMC.AX-X.02"
++    assert owner("SE-1-HMC.AX-X.02")["layout"] == "HMC"
++    assert spec_path("SM-1-HMC") != spec_path("SM-1-VMC")
++    for c in MACHINES:
++        parse(c)
++    for bad in ("SM-1", "SX-1-HMC", "SM-1-XYZ"):
++        try:
++            parse(bad)
++            raise AssertionError(f"принят неверный код {bad}")
++        except ValueError:
++            pass
++    return True
+diff --git a/egm/catalog.py b/egm/catalog.py
+new file mode 100644
+--- /dev/null
++++ b/egm/catalog.py
+@@ -0,0 +1,277 @@
++"""Парсер каталога HIWIN HG (CAT-01) -> БД JSON, пары рельс+каретка (Д-10), проверки.
++
++Все числа берутся из docs/HG-Series-Catalog_opt.md. В коде — только правила
++разбора таблиц и формула раскладки отверстий рельса L = (n-1)*P + 2*E (Eq. 2.1).
++"""
++import json
++import re
++
++BLOCK_RE = re.compile(r"^HG([HWL])(\d{2})([CH])([ABC])$")
++RAIL_T_RE = re.compile(r"^HGR(\d{2})T$")
++SIZE_RE = re.compile(r"^HG(\d{2})$")
++RAIL_COLS = ("WR", "HR", "D", "h", "d", "P", "E", "rail_bolt")
++KEYS = {"Масса блока": "mass_block_kg", "Масса рельса": "mass_rail_kg_m",
++        "Масса": "mass_rail_kg_m", "Mxl": "M", "M (Ø)": "M", "Болт для рельса": "rail_bolt"}
++DASH = {"–", "—", "-", ""}
++PN_FMT = "EGC-HG-{type}{size}{load}{mount}-{cls}-{pre}{bottom}"  # Д-10
++
++
++def _key(h):
++    k = h.split(",")[0].strip()
++    return KEYS.get(k, k.split(" (")[0])
++
++
++def _val(s):
++    s = s.strip()
++    if s in DASH:
++        return None
++    t = s.replace(",", "")
++    return float(t) if re.fullmatch(r"[-+]?\d+(?:\.\d+)?", t) else s
++
++
++def _lengths(cell):
++    return [[float(a.replace(",", "")), int(b)]
++            for a, b in re.findall(r"([\d,.]+)\s*\((\d+)\)", cell)]
++
++
++def _tables(text):
++    """Markdown-таблицы: {'title', 'header', 'rows'}; title — последний заголовок/жирная строка."""
++    title, cur = "", None
++    for ln in text.split("\n"):
++        s = ln.strip()
++        if s.startswith("|"):
++            cells = [c.strip() for c in s.strip("|").split("|")]
++            if cur is None:
++                cur = {"title": title, "header": cells, "rows": []}
++            elif all(c and set(c) <= set("-: ") for c in cells):
++                continue
++            else:
++                cur["rows"].append(cells)
++            continue
++        if cur is not None:
++            yield cur
++            cur = None
++        if s.startswith("#"):
++            title = s.lstrip("#").strip()
++        elif s.startswith("**"):
++            title = s
++    if cur is not None:
++        yield cur
++
++
++def _size(db, size):
++    return db["sizes"].setdefault(str(size), {})
++
++
++def _row_size(cell):
++    m = SIZE_RE.match(cell.strip())
++    return int(m[1]) if m else None
++
++
++def _set_rail(db, rid, size, mount, data):
++    r = db["rails"].setdefault(rid, {"size": size, "mount": mount, "dims": {}})
++    for k, v in data.items():
++        if v is None:
++            continue
++        old = r["dims"].get(k)
++        if old is not None and old != v:
++            db["conflicts"].append(f"{rid}.{k}: {old} ≠ {v}")
++        else:
++            r["dims"][k] = v
++
++
++def _model_table(db, hdr, rows):
++    for row in rows:
++        model = row[0].strip()
++        cells = {k: _val(c) for k, c in zip(hdr[1:], row[1:])}
++        mt = RAIL_T_RE.match(model)
++        if mt:
++            _set_rail(db, model, int(mt[1]), "T", cells)
++            continue
++        mb = BLOCK_RE.match(model)
++        if not mb:
++            db["unparsed"].append(f"модель {model}")
++            continue
++        size = int(mb[2])
++        b = db["blocks"].setdefault(model, {"type": mb[1], "size": size, "load": mb[3],
++                                            "mount": mb[4], "dims": {}, "loads": {}})
++        if "C0" in cells:
++            rail_mass = cells.pop("mass_rail_kg_m", None)
++            b["loads"].update(cells)
++            _set_rail(db, f"HGR{size}R", size, "R", {"mass_rail_kg_m": rail_mass})
++        else:
++            rail = {k: cells.pop(k) for k in RAIL_COLS if k in cells}
++            b["dims"].update(cells)
++            _set_rail(db, f"HGR{size}R", size, "R", rail)
++
++
++def _size_table(db, t):
++    title, h, rows = t["title"], t["header"], t["rows"]
++    if any("Стандартные длины" in c for c in h):
++        for row in rows:
++            size = _row_size(row[0])
++            if size is None:
++                continue
++            mx = _lengths(row[4])
++            _size(db, size).update({"lengths": _lengths(row[1]), "P": _val(row[2]),
++                                    "Es": _val(row[3]),
++                                    "max_std": mx[0][0] if mx else _val(row[4]),
++                                    "max_len": _val(row[5])})
++    elif len(h) > 1 and all(re.fullmatch(r"Z[0A-Z]", c) for c in h[1:]):
++        key = ("parallel_um" if "2-1-21" in title else
++               "height_um" if "2-1-22" in title else None)
++        if key is None:
++            db["unparsed"].append(title[:70])
++            return
++        for p in h[1:]:
++            if p not in db["preloads"]:
++                db["preloads"].append(p)
++        for row in rows:
++            size = _row_size(row[0])
++            if size is not None:
++                _size(db, size)[key] = {p: _val(v) for p, v in zip(h[1:], row[1:])}
++    elif "2-1-23" in title:
++        cols = [(re.search(r"\b(r1|r2|E1|E2|H1)\b", c) or [None])[0] for c in h]
++        for row in rows:
++            size = _row_size(row[0])
++            if size is not None:
++                _size(db, size)["mounting"] = {c: _val(v) for c, v in zip(cols[1:], row[1:]) if c}
++    else:
++        db["unparsed"].append(f"{title[:70]} | Типоразмер")
++
++
++def _accuracy_table(db, t):
++    cls = [re.search(r"\(([A-Z]{1,2})\)", c) for c in t["header"][1:]]
++    cls = [m[1] if m else None for m in cls]
++    for c in cls:
++        if c and c not in db["classes"]:
++            db["classes"].append(c)
++    db["accuracy"][t["title"][:80]] = {
++        r[0]: {c: _val(v) for c, v in zip(cls, r[1:]) if c} for r in t["rows"]}
++
++
++def parse_md(text, source=""):
++    m = re.search(r"G\d{2}TE\d+-\d+", text)
++    db = {"source": source, "catalog": m[0] if m else None, "classes": [], "preloads": [],
++          "blocks": {}, "rails": {}, "sizes": {}, "accuracy": {}, "unparsed": [],
++          "conflicts": []}
++    for t in _tables(text):
++        if not t["rows"]:
++            continue
++        first = t["header"][0]
++        if first == "Модель":
++            _model_table(db, [_key(h) for h in t["header"]], t["rows"])
++        elif first == "Типоразмер":
++            _size_table(db, t)
++        elif first.startswith("Параметр") and re.search(r"\([A-Z]{1,2}\)", " ".join(t["header"])):
++            _accuracy_table(db, t)
++        else:
++            db["unparsed"].append(f"{t['title'][:70]} | {first}")
++    return db
++
++
++def build_pairs(db):
++    pairs = {}
++    for model, b in sorted(db["blocks"].items()):
++        avail = db["sizes"].get(str(b["size"]), {}).get("parallel_um") or {}
++        for cls in db["classes"]:
++            for pre in db["preloads"]:
++                if avail and avail.get(pre) is None:
++                    continue  # натяг не поставляется для типоразмера (прочерк в 2-1-21)
++                for mount in ("R", "T"):
++                    rail = f"HGR{b['size']}{mount}"
++                    if rail not in db["rails"]:
++                        continue
++                    pn = PN_FMT.format(type=b["type"], size=b["size"], load=b["load"],
++                                       mount=b["mount"], cls=cls, pre=pre,
++                                       bottom="-T" if mount == "T" else "")
++                    pairs[pn] = {"block": model, "rail": rail, "class": cls,
++                                 "preload": pre, "order_block": f"{model}{pre}{cls}"}
++    return {"format": "EGC-HG-<тип><размер><нагр><крепл>-<класс>-<натяг>[-T] (Д-10)",
++            "pairs": pairs}
++
++
++def pairs_json(p):
++    """Одна пара — одна строка, чтобы файл оставался читаемым в diff."""
++    body = ",\n".join(f"  {json.dumps(k)}: {json.dumps(v, ensure_ascii=False)}"
++                      for k, v in p["pairs"].items())
++    return ('{\n "format": ' + json.dumps(p["format"], ensure_ascii=False)
++            + ',\n "pairs": {\n' + body + "\n }\n}\n")
++
++
++def resolve(pn, pairs, db):
++    """Каталожный номер -> каретка + рельс; KeyError = несовместимость/неизвестный номер."""
++    if pn not in pairs["pairs"]:
++        raise KeyError(f"{pn}: нет в catalog_hiwin_hg_pairs.json "
++                       f"(несовместимая или неизвестная комбинация)")
++    p = pairs["pairs"][pn]
++    return {**p, "block_data": db["blocks"][p["block"]], "rail_data": db["rails"][p["rail"]]}
++
++
++def rail_holes(db, size, length, e_min=None):
++    """Раскладка отверстий рельса: L = (n-1)*P + 2*E; E >= e_min (по умолчанию Es)."""
++    s = db["sizes"][str(size)]
++    P, Es = s["P"], s["Es"]
++    e_min = Es if e_min is None else e_min
++    n = int((length - 2 * e_min) // P) + 1
++    E = (length - (n - 1) * P) / 2
++    w = []
++    if n < 2:
++        w.append(f"L={length:g}: меньше двух отверстий")
++    if s.get("max_len") and length > s["max_len"]:
++        w.append(f"L={length:g} > макс. {s['max_len']:g}: нужен составной рельс")
++    if E > P / 2:
++        w.append(f"E={E:.1f} > P/2: рекомендуется L={(n - 1) * P + 2 * Es:g}")
++    return {"L": length, "n": n, "E": round(E, 2), "P": P, "warnings": w}
++
++
++def validate(db, pairs, prices):
++    err, warn = list(db["conflicts"]), []
++    if not db["blocks"]:
++        err.append("не распознано ни одной каретки")
++    if not db["classes"]:
++        err.append("не распознаны классы точности")
++    if not db["preloads"]:
++        err.append("не распознаны классы натяга")
++    for m, b in db["blocks"].items():
++        if not b["dims"]:
++            err.append(f"{m}: нет размеров")
++        if not b["loads"]:
++            err.append(f"{m}: нет грузоподъёмности")
++    for size in sorted({b["size"] for b in db["blocks"].values()}):
++        s = db["sizes"].get(str(size), {})
++        r = db["rails"].get(f"HGR{size}R", {}).get("dims", {})
++        if not s.get("lengths") or not s.get("P") or not s.get("Es"):
++            warn.append(f"HG{size}: нет данных стандартных длин рельса (2-1-25)")
++            continue
++        if r.get("P") != s["P"]:
++            err.append(f"HG{size}: шаг P в таблице размеров {r.get('P')} ≠ {s['P']} в 2-1-25")
++        for L, n in s["lengths"]:
++            h = rail_holes(db, size, L)
++            if h["n"] != n:
++                err.append(f"HG{size}: L={L:g} — формула 2.1 даёт n={h['n']}, в каталоге {n}")
++        t = db["rails"].get(f"HGR{size}T")
++        if t is None:
++            warn.append(f"HG{size}: нет рельса HGR{size}T")
++            continue
++        for k in ("WR", "HR", "P", "E"):
++            if t["dims"].get(k) is not None and t["dims"][k] != r.get(k):
++                err.append(f"HGR{size}T.{k}={t['dims'][k]} ≠ HGR{size}R.{k}={r.get(k)}")
++    known = (set(db["blocks"]) | set(db["rails"]) | set(pairs["pairs"])
++             | set(prices.get("bodies", {})))
++    no_price = 0
++    for k, v in prices.get("items", {}).items():
++        if k.startswith("_"):
++            continue
++        if k not in known:
++            warn.append(f"vendor_prices: позиция {k} не найдена в каталогах")
++        if v.get("price") is None:
++            no_price += 1
++    stats = {"blocks": len(db["blocks"]), "rails": len(db["rails"]),
++             "sizes": len(db["sizes"]), "pairs": len(pairs["pairs"]), "no_price": no_price}
++    return {"errors": err, "warnings": warn, "stats": stats}
++
++
++def report_md(db, pairs, rep):
++    st = rep["stats"]
++    L = ["# Отчёт разбора каталога HIWIN HG (code-first, НЕ ПРАВИТЬ РУКАМИ)", "",
++         f"Источник: `docs/{db['source']}`, каталог {db['catalog']}. "
++         f"Генерирует `egm/catalog.py` (CP-02).", "",
++         f"Кареток: {st['blocks']}, рельсов: {st['rails']}, типоразмеров: {st['sizes']}, "
++         f"пар (Д-10): {st['pairs']}.",
++         f"Классы точности: {', '.join(db['classes'])}; натяг: {', '.join(db['preloads'])}.",
++         f"Позиций vendor_prices без цены: {st['no_price']}.", "",
++         "## Каретки", "", "| Модель | H | W | L | C, кН | C0, кН | Масса, кг |",
++         "|---|---|---|---|---|---|---|"]
++    for m, b in sorted(db["blocks"].items()):
++        d, ld = b["dims"], b["loads"]
++        L.append(f"| {m} | {d.get('H')} | {d.get('W')} | {d.get('L')} | {ld.get('C')} | "
++                 f"{ld.get('C0')} | {ld.get('mass_block_kg')} |")
++    L += ["", "## Рельсы", "", "| Рельс | WR | HR | P | E | Болт | Масса, кг/м |",
++          "|---|---|---|---|---|---|---|"]
++    for rid, r in sorted(db["rails"].items()):
++        d = r["dims"]
++        L.append(f"| {rid} | {d.get('WR')} | {d.get('HR')} | {d.get('P')} | {d.get('E')} | "
++                 f"{d.get('rail_bolt', d.get('S'))} | {d.get('mass_rail_kg_m')} |")
++    L += ["", "## Типоразмеры", "",
++          "| HG | P | Es | Макс. станд. L | Макс. L | Параллельность по натягу, µm |",
++          "|---|---|---|---|---|---|"]
++    for k, s in sorted(db["sizes"].items(), key=lambda kv: int(kv[0])):
++        L.append(f"| {k} | {s.get('P')} | {s.get('Es')} | {s.get('max_std')} | "
++                 f"{s.get('max_len')} | {s.get('parallel_um')} |")
++    ex = [pn for pn in pairs["pairs"] if "H20CA" in pn][:6]
++    L += ["", "## Примеры каталожных номеров", ""]
++    L += [f"- `{pn}` = {pairs['pairs'][pn]['order_block']} + {pairs['pairs'][pn]['rail']}"
++          for pn in ex] or ["нет"]
++    L += ["", "## Ошибки", ""] + ([f"- {e}" for e in rep["errors"]] or ["нет"])
++    L += ["", "## Предупреждения", ""] + ([f"- {w}" for w in rep["warnings"]] or ["нет"])
++    L += ["", "## Нераспознанные таблицы (информационно)", ""]
++    L += [f"- {u}" for u in db["unparsed"]] or ["нет"]
++    return "\n".join(L) + "\n"
++
++
++SAMPLE = """**Table 2-1-25 Rail Standard Length**
++
++| Типоразмер | Стандартные длины L(n), мм | Pitch P, мм | Distance to End Es, мм | Макс. стандартная длина, мм | Макс. длина, мм |
++|---|---|---|---|---|---|
++| HG15 | 160 (3), 1,960 (33) | 60 | 20 | 1,960 (33) | 2,000 |
++"""
++
++
++def self_test():
++    db = parse_md(SAMPLE)
++    s = db["sizes"]["15"]
++    assert s["lengths"] == [[160.0, 3], [1960.0, 33]] and s["max_len"] == 2000.0, s
++    assert rail_holes(db, 15, 160)["n"] == 3 and rail_holes(db, 15, 1960)["n"] == 33
++    assert _val("–") is None and _val("M4x16") == "M4x16" and _val("1,960") == 1960.0
++    assert BLOCK_RE.match("HGW20CC") and not BLOCK_RE.match("HGR20R")
++    return True
+diff --git a/egm/ptk.py b/egm/ptk.py
+--- a/egm/ptk.py
++++ b/egm/ptk.py
+@@ -33,2 +33,3 @@
+     ok: bool
+     errors: list = field(default_factory=list)
++    d_body_max: float = 0.0   # макс. Ø тела, вмещающегося в Øнар при данном n
+@@ -42,4 +43,11 @@
+     n = z_r - 1
+-    if not lim.u_min <= u <= lim.u_max:
+-        err.append(f"u={u} вне диапазона {lim.u_min}..{lim.u_max}")
++    if u > lim.u_max:
++        s = two_stage(u, lim)
++        err.append(f"u={u} > {lim.u_max}: одноступенчатый ПТК не считается; рекомендуется "
++                   f"двухступенчатая схема {s['u1']}×{s['u2']} = {s['u']} (Д-11)")
++        return PtkResult(u, body_id, d, 0, 0, 0.0, 0.0, 0.0, 0.0, False, err)
++    if u < lim.u_min:
++        err.append(f"u={u} < {lim.u_min}: вне диапазона (Д-08)")
+     ecc = 0.5 * d * 0.5          # эксцентриситет ≈ четверть диаметра тела
+@@ -60,3 +68,4 @@
+     width = lim.rows * body["l"] + (lim.rows + 1) * 1.0
++    d_max = (lim.d_out_max - 2 * lim.wall_min) / (n * lim.gap_k / math.pi + 1.5)  # 1.5 = 1 + 2e/d
+     return PtkResult(u, body_id, d, n, z_r, round(ecc, 3), round(d_pitch, 2),
+-                     round(d_out, 2), round(width, 1), not err, err)
++                     round(d_out, 2), round(width, 1), not err, err, round(d_max, 2))
+@@ -66,3 +75,34 @@
+ def sweep(bodies, u_list=(10, 16, 20, 25, 32, 40, 50, 63, 80, 100)):
+     return [calc(u, bid, b) for u in u_list for bid, b in bodies.items()
+             if not bid.startswith("_")]
++
++
++def two_stage(u, lim=PtkLimits()):
++    """Д-11: u = u1·u2, обе ступени в u_min..u_max, ступени по возможности равны."""
++    best = None
++    for u1 in range(lim.u_min, lim.u_max + 1):
++        u2 = min(max(round(u / u1), lim.u_min), lim.u_max)
++        key = (abs(u1 * u2 - u), abs(u1 - u2))
++        if best is None or key < best[0]:
++            best = (key, max(u1, u2), min(u1, u2))
++    _, u1, u2 = best
++    return {"u": u1 * u2, "u1": u1, "u2": u2, "exact": u1 * u2 == u,
++            "ok": lim.u_min ** 2 <= u <= lim.u_max ** 2}
++
++
++def two_stage_table(u_list=(101, 120, 150, 200, 300, 500, 1000, 2500)):
++    rows = ["| u | u1 | u2 | u1·u2 | Точно |", "|---|---|---|---|---|"]
++    for u in u_list:
++        s = two_stage(u)
++        exact = "да" if s["exact"] else "нет, ближайшее"
++        rows.append(f"| {u} | {s['u1']} | {s['u2']} | {s['u']} | {exact} |")
++    return ("Одноступенчатый ПТК считается только для u ≤ 100 (Д-11). Для больших u "
++            "применяется двухступенчатая схема; каждая ступень рассчитывается этим же "
++            "калькулятором как самостоятельный редуктор.\n\n" + "\n".join(rows))
+@@ -86,2 +126,6 @@
+     assert not calc(5, "t", b).ok
++    r = calc(120, "t", b)
++    assert not r.ok and "двухступенчат" in r.errors[0]
++    assert two_stage(200)["u"] == 200 and two_stage(200)["exact"]
++    assert calc(63, "t", b).d_body_max < 5.0
+     return True
+diff --git a/templates/SPEC-10_PTK_CALC.md.tmpl b/templates/SPEC-10_PTK_CALC.md.tmpl
+--- a/templates/SPEC-10_PTK_CALC.md.tmpl
++++ b/templates/SPEC-10_PTK_CALC.md.tmpl
+@@ -3,5 +3,5 @@
+-Сгенерировано `main.py` (egm/ptk.py, уровень 1). Схема и ограничения — Д-08, OQ-02.
++Сгенерировано `main.py` (egm/ptk.py, уровень 1). Схема и ограничения — Д-08, Д-11.
+ Момент — предварительная оценка, уточняется в CP-08.
+
+-| u | Тело | Ø тела | n тел | z колеса | e, мм | Ø дел. | Øнар | B, мм | M, Н·м | Статус |
+-|---|---|---|---|---|---|---|---|---|---|---|
++| u | Тело | Ø тела | Ø тела max | n тел | z колеса | e, мм | Ø дел. | Øнар | B, мм | M, Н·м | Статус |
++|---|---|---|---|---|---|---|---|---|---|---|---|
+@@ -14,1 +14,5 @@
+ Итого: {n_ok} реализуемых из {n_all}.
++
++## Передаточные числа u > 100 (Д-11)
++
++{two_stage}
+diff --git a/main.py b/main.py
+--- a/main.py
++++ b/main.py
+@@ -6,1 +6,1 @@
+-from egm import ptk
++from egm import catalog, naming, ptk
+@@ -25,1 +25,1 @@
+-        table.append(f"| {r['u']} | {r['body']} | {r['d_body']} | {r['n_bodies']} | "
++        table.append(f"| {r['u']} | {r['body']} | {r['d_body']} | {r['d_body_max']} | {r['n_bodies']} | "
+@@ -34,11 +34,31 @@
+     write("SPEC-10_PTK_CALC.md", tpl.format(rows="\n".join(table),
+-          errors="\n".join(errs) or "нет", n_ok=n_ok, n_all=len(rows)))
++          errors="\n".join(errs) or "нет", n_ok=n_ok, n_all=len(rows),
++          two_stage=ptk.two_stage_table()))
++
++
++def run_catalog(prices):
++    """CP-02: CAT-01 -> catalog_hiwin_hg.json, пары (Д-10), отчёт проверок."""
++    md = ROOT / "docs" / "HG-Series-Catalog_opt.md"
++    db = catalog.parse_md(md.read_text(encoding="utf-8"), source=md.name)
++    pairs = catalog.build_pairs(db)
++    rep = catalog.validate(db, pairs, prices)
++    write("catalog_hiwin_hg.json", json.dumps(db, ensure_ascii=False, indent=1) + "\n")
++    write("catalog_hiwin_hg_pairs.json", catalog.pairs_json(pairs))
++    write("catalog_report.md", catalog.report_md(db, pairs, rep))
++    return [f"catalog: {e}" for e in rep["errors"]]
+
+
+ def main():
+     fails = []
+-    try:
+-        ptk.self_test()
+-    except AssertionError as e:
+-        fails.append(f"ptk.self_test: {e}")
+-    run_ptk(load_json("vendor_prices.json"))
+-    # TODO(CP-02): catalog.build(); TODO(CP-03): cost.report(); TODO(CP-04): machines
++    for name, test in (("ptk", ptk.self_test), ("naming", naming.self_test),
++                       ("catalog", catalog.self_test)):
++        try:
++            test()
++        except AssertionError as e:
++            fails.append(f"{name}.self_test: {e!r}")
++    prices = load_json("vendor_prices.json")
++    run_ptk(prices)
++    fails += run_catalog(prices)
++    # TODO(CP-03): cost.report(); TODO(CP-04): машины по naming.MACHINES (HMC + VMC)
+```
