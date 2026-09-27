@@ -12,6 +12,8 @@ __pycache__/
 build/
 specs/task.md
 specs/init.md
+*.diff
+*.fixed.diff
 dist/
 patch/
 out/

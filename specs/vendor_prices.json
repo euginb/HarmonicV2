@@ -1,0 +1,21 @@
+{
+  "_comment": "Заполняет заказчик. Цена в currency; unit: pcs | m.",
+  "currency": "RUB",
+  "items": {
+    "HGH15CA": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
+    "HGR15R": {"unit": "m", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
+    "HGH20CA": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
+    "HGR20R": {"unit": "m", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
+    "HGW20CC": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
+    "HGH25CA": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
+    "HGR25R": {"unit": "m", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
+    "ROLLER_D5x8": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
+    "BALL_D6": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""}
+  },
+  "bodies": {
+    "_comment": "Тела вращения ПТК, доступные к закупке: type roller|ball, d, l (для ролика), мм",
+    "ROLLER_D5x8": {"type": "roller", "d": 5.0, "l": 8.0},
+    "ROLLER_D4x6": {"type": "roller", "d": 4.0, "l": 6.0},
+    "BALL_D6": {"type": "ball", "d": 6.0, "l": 6.0}
+  }
+}

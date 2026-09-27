@@ -1,0 +1,448 @@
+[
+  {
+    "u": 10,
+    "body": "ROLLER_D5x8",
+    "d_body": 5.0,
+    "n_bodies": 9,
+    "z_ring": 10,
+    "ecc": 1.25,
+    "d_pitch": 16.47,
+    "d_out": 31.97,
+    "width": 37.0,
+    "ok": false,
+    "errors": [
+      "генератор Ø9.0 слишком мал для подшипника/вала"
+    ],
+    "torque_Nm_est": null
+  },
+  {
+    "u": 10,
+    "body": "ROLLER_D4x6",
+    "d_body": 4.0,
+    "n_bodies": 9,
+    "z_ring": 10,
+    "ecc": 1.0,
+    "d_pitch": 13.18,
+    "d_out": 27.18,
+    "width": 29.0,
+    "ok": false,
+    "errors": [
+      "генератор Ø7.2 слишком мал для подшипника/вала"
+    ],
+    "torque_Nm_est": null
+  },
+  {
+    "u": 10,
+    "body": "BALL_D6",
+    "d_body": 6.0,
+    "n_bodies": 9,
+    "z_ring": 10,
+    "ecc": 1.5,
+    "d_pitch": 19.77,
+    "d_out": 36.77,
+    "width": 29.0,
+    "ok": false,
+    "errors": [
+      "генератор Ø10.8 слишком мал для подшипника/вала"
+    ],
+    "torque_Nm_est": null
+  },
+  {
+    "u": 16,
+    "body": "ROLLER_D5x8",
+    "d_body": 5.0,
+    "n_bodies": 15,
+    "z_ring": 16,
+    "ecc": 1.25,
+    "d_pitch": 27.45,
+    "d_out": 42.95,
+    "width": 37.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 205.9
+  },
+  {
+    "u": 16,
+    "body": "ROLLER_D4x6",
+    "d_body": 4.0,
+    "n_bodies": 15,
+    "z_ring": 16,
+    "ecc": 1.0,
+    "d_pitch": 21.96,
+    "d_out": 35.96,
+    "width": 29.0,
+    "ok": false,
+    "errors": [
+      "генератор Ø16.0 слишком мал для подшипника/вала"
+    ],
+    "torque_Nm_est": null
+  },
+  {
+    "u": 16,
+    "body": "BALL_D6",
+    "d_body": 6.0,
+    "n_bodies": 15,
+    "z_ring": 16,
+    "ecc": 1.5,
+    "d_pitch": 32.95,
+    "d_out": 49.95,
+    "width": 29.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 355.9
+  },
+  {
+    "u": 20,
+    "body": "ROLLER_D5x8",
+    "d_body": 5.0,
+    "n_bodies": 19,
+    "z_ring": 20,
+    "ecc": 1.25,
+    "d_pitch": 34.78,
+    "d_out": 50.28,
+    "width": 37.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 313.0
+  },
+  {
+    "u": 20,
+    "body": "ROLLER_D4x6",
+    "d_body": 4.0,
+    "n_bodies": 19,
+    "z_ring": 20,
+    "ecc": 1.0,
+    "d_pitch": 27.82,
+    "d_out": 41.82,
+    "width": 29.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 160.2
+  },
+  {
+    "u": 20,
+    "body": "BALL_D6",
+    "d_body": 6.0,
+    "n_bodies": 19,
+    "z_ring": 20,
+    "ecc": 1.5,
+    "d_pitch": 41.73,
+    "d_out": 58.73,
+    "width": 29.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 540.8
+  },
+  {
+    "u": 25,
+    "body": "ROLLER_D5x8",
+    "d_body": 5.0,
+    "n_bodies": 24,
+    "z_ring": 25,
+    "ecc": 1.25,
+    "d_pitch": 43.93,
+    "d_out": 59.43,
+    "width": 37.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 527.2
+  },
+  {
+    "u": 25,
+    "body": "ROLLER_D4x6",
+    "d_body": 4.0,
+    "n_bodies": 24,
+    "z_ring": 25,
+    "ecc": 1.0,
+    "d_pitch": 35.14,
+    "d_out": 49.14,
+    "width": 29.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 269.9
+  },
+  {
+    "u": 25,
+    "body": "BALL_D6",
+    "d_body": 6.0,
+    "n_bodies": 24,
+    "z_ring": 25,
+    "ecc": 1.5,
+    "d_pitch": 52.71,
+    "d_out": 69.71,
+    "width": 29.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 910.8
+  },
+  {
+    "u": 32,
+    "body": "ROLLER_D5x8",
+    "d_body": 5.0,
+    "n_bodies": 31,
+    "z_ring": 32,
+    "ecc": 1.25,
+    "d_pitch": 56.74,
+    "d_out": 72.24,
+    "width": 37.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 851.1
+  },
+  {
+    "u": 32,
+    "body": "ROLLER_D4x6",
+    "d_body": 4.0,
+    "n_bodies": 31,
+    "z_ring": 32,
+    "ecc": 1.0,
+    "d_pitch": 45.39,
+    "d_out": 59.39,
+    "width": 29.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 435.7
+  },
+  {
+    "u": 32,
+    "body": "BALL_D6",
+    "d_body": 6.0,
+    "n_bodies": 31,
+    "z_ring": 32,
+    "ecc": 1.5,
+    "d_pitch": 68.09,
+    "d_out": 85.09,
+    "width": 29.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 1470.7
+  },
+  {
+    "u": 40,
+    "body": "ROLLER_D5x8",
+    "d_body": 5.0,
+    "n_bodies": 39,
+    "z_ring": 40,
+    "ecc": 1.25,
+    "d_pitch": 71.38,
+    "d_out": 86.88,
+    "width": 37.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 1391.9
+  },
+  {
+    "u": 40,
+    "body": "ROLLER_D4x6",
+    "d_body": 4.0,
+    "n_bodies": 39,
+    "z_ring": 40,
+    "ecc": 1.0,
+    "d_pitch": 57.1,
+    "d_out": 71.1,
+    "width": 29.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 712.6
+  },
+  {
+    "u": 40,
+    "body": "BALL_D6",
+    "d_body": 6.0,
+    "n_bodies": 39,
+    "z_ring": 40,
+    "ecc": 1.5,
+    "d_pitch": 85.66,
+    "d_out": 102.66,
+    "width": 29.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 2405.3
+  },
+  {
+    "u": 50,
+    "body": "ROLLER_D5x8",
+    "d_body": 5.0,
+    "n_bodies": 49,
+    "z_ring": 50,
+    "ecc": 1.25,
+    "d_pitch": 89.68,
+    "d_out": 105.18,
+    "width": 37.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 2152.3
+  },
+  {
+    "u": 50,
+    "body": "ROLLER_D4x6",
+    "d_body": 4.0,
+    "n_bodies": 49,
+    "z_ring": 50,
+    "ecc": 1.0,
+    "d_pitch": 71.75,
+    "d_out": 85.75,
+    "width": 29.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 1102.1
+  },
+  {
+    "u": 50,
+    "body": "BALL_D6",
+    "d_body": 6.0,
+    "n_bodies": 49,
+    "z_ring": 50,
+    "ecc": 1.5,
+    "d_pitch": 107.62,
+    "d_out": 124.62,
+    "width": 29.0,
+    "ok": false,
+    "errors": [
+      "Øнар 124.6 > 110.0: тела Ø6.0 не вмещаются при n=49"
+    ],
+    "torque_Nm_est": null
+  },
+  {
+    "u": 63,
+    "body": "ROLLER_D5x8",
+    "d_body": 5.0,
+    "n_bodies": 62,
+    "z_ring": 63,
+    "ecc": 1.25,
+    "d_pitch": 113.48,
+    "d_out": 128.98,
+    "width": 37.0,
+    "ok": false,
+    "errors": [
+      "Øнар 129.0 > 110.0: тела Ø5.0 не вмещаются при n=62"
+    ],
+    "torque_Nm_est": null
+  },
+  {
+    "u": 63,
+    "body": "ROLLER_D4x6",
+    "d_body": 4.0,
+    "n_bodies": 62,
+    "z_ring": 63,
+    "ecc": 1.0,
+    "d_pitch": 90.78,
+    "d_out": 104.78,
+    "width": 29.0,
+    "ok": true,
+    "errors": [],
+    "torque_Nm_est": 1743.0
+  },
+  {
+    "u": 63,
+    "body": "BALL_D6",
+    "d_body": 6.0,
+    "n_bodies": 62,
+    "z_ring": 63,
+    "ecc": 1.5,
+    "d_pitch": 136.17,
+    "d_out": 153.17,
+    "width": 29.0,
+    "ok": false,
+    "errors": [
+      "Øнар 153.2 > 110.0: тела Ø6.0 не вмещаются при n=62"
+    ],
+    "torque_Nm_est": null
+  },
+  {
+    "u": 80,
+    "body": "ROLLER_D5x8",
+    "d_body": 5.0,
+    "n_bodies": 79,
+    "z_ring": 80,
+    "ecc": 1.25,
+    "d_pitch": 144.59,
+    "d_out": 160.09,
+    "width": 37.0,
+    "ok": false,
+    "errors": [
+      "Øнар 160.1 > 110.0: тела Ø5.0 не вмещаются при n=79"
+    ],
+    "torque_Nm_est": null
+  },
+  {
+    "u": 80,
+    "body": "ROLLER_D4x6",
+    "d_body": 4.0,
+    "n_bodies": 79,
+    "z_ring": 80,
+    "ecc": 1.0,
+    "d_pitch": 115.67,
+    "d_out": 129.67,
+    "width": 29.0,
+    "ok": false,
+    "errors": [
+      "Øнар 129.7 > 110.0: тела Ø4.0 не вмещаются при n=79"
+    ],
+    "torque_Nm_est": null
+  },
+  {
+    "u": 80,
+    "body": "BALL_D6",
+    "d_body": 6.0,
+    "n_bodies": 79,
+    "z_ring": 80,
+    "ecc": 1.5,
+    "d_pitch": 173.51,
+    "d_out": 190.51,
+    "width": 29.0,
+    "ok": false,
+    "errors": [
+      "Øнар 190.5 > 110.0: тела Ø6.0 не вмещаются при n=79"
+    ],
+    "torque_Nm_est": null
+  },
+  {
+    "u": 100,
+    "body": "ROLLER_D5x8",
+    "d_body": 5.0,
+    "n_bodies": 99,
+    "z_ring": 100,
+    "ecc": 1.25,
+    "d_pitch": 181.2,
+    "d_out": 196.7,
+    "width": 37.0,
+    "ok": false,
+    "errors": [
+      "Øнар 196.7 > 110.0: тела Ø5.0 не вмещаются при n=99"
+    ],
+    "torque_Nm_est": null
+  },
+  {
+    "u": 100,
+    "body": "ROLLER_D4x6",
+    "d_body": 4.0,
+    "n_bodies": 99,
+    "z_ring": 100,
+    "ecc": 1.0,
+    "d_pitch": 144.96,
+    "d_out": 158.96,
+    "width": 29.0,
+    "ok": false,
+    "errors": [
+      "Øнар 159.0 > 110.0: тела Ø4.0 не вмещаются при n=99"
+    ],
+    "torque_Nm_est": null
+  },
+  {
+    "u": 100,
+    "body": "BALL_D6",
+    "d_body": 6.0,
+    "n_bodies": 99,
+    "z_ring": 100,
+    "ecc": 1.5,
+    "d_pitch": 217.44,
+    "d_out": 234.44,
+    "width": 29.0,
+    "ok": false,
+    "errors": [
+      "Øнар 234.4 > 110.0: тела Ø6.0 не вмещаются при n=99"
+    ],
+    "torque_Nm_est": null
+  }
+]
