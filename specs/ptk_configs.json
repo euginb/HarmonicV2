@@ -14,6 +14,45 @@
     "width": 37.0,
     "d_body_max": 17.73,
     "t_hold": 71.8,
+    "ring_variants": 2,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.5,
+        "s": 18.0,
+        "cage": 10.0,
+        "variant": "B",
+        "s_arc_mm": 5.729
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 20.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.5,
+        "s": 18.0,
+        "cage": 30.0,
+        "variant": "B",
+        "s_arc_mm": 5.729
+      }
+    ],
     "ok": false,
     "errors": [
       "генератор Ø9.0 < 18: мал для подшипника/вала"
@@ -36,6 +75,45 @@
     "width": 29.0,
     "d_body_max": 17.73,
     "t_hold": 62.3,
+    "ring_variants": 2,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.5,
+        "s": 18.0,
+        "cage": 10.0,
+        "variant": "B",
+        "s_arc_mm": 4.976
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 20.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.5,
+        "s": 18.0,
+        "cage": 30.0,
+        "variant": "B",
+        "s_arc_mm": 4.976
+      }
+    ],
     "ok": false,
     "errors": [
       "штифт Ø4 между болтами не помещается: 6.2 < 6.5 мм",
@@ -59,6 +137,45 @@
     "width": 29.0,
     "d_body_max": 17.73,
     "t_hold": 81.2,
+    "ring_variants": 2,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.5,
+        "s": 18.0,
+        "cage": 10.0,
+        "variant": "B",
+        "s_arc_mm": 6.483
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 20.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.5,
+        "s": 18.0,
+        "cage": 30.0,
+        "variant": "B",
+        "s_arc_mm": 6.483
+      }
+    ],
     "ok": false,
     "errors": [
       "генератор Ø10.8 < 18: мал для подшипника/вала"
@@ -81,6 +198,45 @@
     "width": 37.0,
     "d_body_max": 12.16,
     "t_hold": 93.4,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 18.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 12.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 6.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -103,6 +259,45 @@
     "width": 29.0,
     "d_body_max": 12.16,
     "t_hold": 79.6,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 18.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 12.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 6.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": false,
     "errors": [
       "генератор Ø16.0 < 18: мал для подшипника/вала"
@@ -125,6 +320,45 @@
     "width": 29.0,
     "d_body_max": 12.16,
     "t_hold": 107.1,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 18.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 12.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 6.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -147,6 +381,45 @@
     "width": 37.0,
     "d_body_max": 10.05,
     "t_hold": 107.8,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 14.2105,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 9.4737,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 4.7368,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -169,6 +442,45 @@
     "width": 29.0,
     "d_body_max": 10.05,
     "t_hold": 91.2,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 14.2105,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 9.4737,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 4.7368,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -191,6 +503,45 @@
     "width": 29.0,
     "d_body_max": 10.05,
     "t_hold": 124.4,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 14.2105,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 9.4737,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 4.7368,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -213,6 +564,45 @@
     "width": 37.0,
     "d_body_max": 8.26,
     "t_hold": 125.8,
+    "ring_variants": 2,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.25,
+        "s": 3.6,
+        "cage": 0.0,
+        "variant": "B",
+        "s_arc_mm": 2.008
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.5,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.75,
+        "s": 3.6,
+        "cage": 0.0,
+        "variant": "B",
+        "s_arc_mm": 2.008
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -235,6 +625,45 @@
     "width": 29.0,
     "d_body_max": 8.26,
     "t_hold": 105.6,
+    "ring_variants": 2,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.25,
+        "s": 3.6,
+        "cage": 0.0,
+        "variant": "B",
+        "s_arc_mm": 1.685
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.5,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.75,
+        "s": 3.6,
+        "cage": 0.0,
+        "variant": "B",
+        "s_arc_mm": 1.685
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -257,6 +686,45 @@
     "width": 29.0,
     "d_body_max": 8.26,
     "t_hold": 146.0,
+    "ring_variants": 2,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.25,
+        "s": 3.6,
+        "cage": 0.0,
+        "variant": "B",
+        "s_arc_mm": 2.331
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.5,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.75,
+        "s": 3.6,
+        "cage": 0.0,
+        "variant": "B",
+        "s_arc_mm": 2.331
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -279,6 +747,45 @@
     "width": 37.0,
     "d_body_max": 6.62,
     "t_hold": 151.0,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 8.7097,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 5.8065,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 2.9032,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -301,6 +808,45 @@
     "width": 29.0,
     "d_body_max": 6.62,
     "t_hold": 125.7,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 8.7097,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 5.8065,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 2.9032,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -323,6 +869,45 @@
     "width": 29.0,
     "d_body_max": 6.62,
     "t_hold": 176.3,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 8.7097,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 5.8065,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 2.9032,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -345,6 +930,45 @@
     "width": 37.0,
     "d_body_max": 5.39,
     "t_hold": 179.8,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 6.9231,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 4.6154,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 2.3077,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -367,6 +991,45 @@
     "width": 29.0,
     "d_body_max": 5.39,
     "t_hold": 148.8,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 6.9231,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 4.6154,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 2.3077,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -389,6 +1052,45 @@
     "width": 29.0,
     "d_body_max": 5.39,
     "t_hold": 210.9,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 6.9231,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 4.6154,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 2.3077,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": false,
     "errors": [
       "Øнар 119.7 > 110: тела Ø6 при n=39 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -411,6 +1113,45 @@
     "width": 37.0,
     "d_body_max": 4.37,
     "t_hold": 215.9,
+    "ring_variants": 2,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.5,
+        "s": 3.6,
+        "cage": 1.8367,
+        "variant": "B",
+        "s_arc_mm": 3.446
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 3.6735,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.5,
+        "s": 3.6,
+        "cage": 5.5102,
+        "variant": "B",
+        "s_arc_mm": 3.446
+      }
+    ],
     "ok": false,
     "errors": [
       "Øнар 122.2 > 110: тела Ø5 при n=49 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -433,6 +1174,45 @@
     "width": 29.0,
     "d_body_max": 4.37,
     "t_hold": 177.6,
+    "ring_variants": 2,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.5,
+        "s": 3.6,
+        "cage": 1.8367,
+        "variant": "B",
+        "s_arc_mm": 2.835
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 3.6735,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.5,
+        "s": 3.6,
+        "cage": 5.5102,
+        "variant": "B",
+        "s_arc_mm": 2.835
+      }
+    ],
     "ok": true,
     "errors": [],
     "warnings": [
@@ -455,6 +1235,45 @@
     "width": 29.0,
     "d_body_max": 4.37,
     "t_hold": 254.1,
+    "ring_variants": 2,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.5,
+        "s": 3.6,
+        "cage": 1.8367,
+        "variant": "B",
+        "s_arc_mm": 4.056
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 3.6735,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.5,
+        "s": 3.6,
+        "cage": 5.5102,
+        "variant": "B",
+        "s_arc_mm": 4.056
+      }
+    ],
     "ok": false,
     "errors": [
       "Øнар 141.6 > 110: тела Ø6 при n=49 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -477,6 +1296,45 @@
     "width": 37.0,
     "d_body_max": 3.51,
     "t_hold": 262.7,
+    "ring_variants": 2,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.75,
+        "s": 1.4286,
+        "cage": 2.9032,
+        "variant": "B",
+        "s_arc_mm": 1.664
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.5,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.25,
+        "s": 1.4286,
+        "cage": 2.9032,
+        "variant": "B",
+        "s_arc_mm": 1.664
+      }
+    ],
     "ok": false,
     "errors": [
       "Øнар 146.0 > 110: тела Ø5 при n=62 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -499,6 +1357,45 @@
     "width": 29.0,
     "d_body_max": 3.51,
     "t_hold": 215.1,
+    "ring_variants": 2,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.75,
+        "s": 1.4286,
+        "cage": 2.9032,
+        "variant": "B",
+        "s_arc_mm": 1.362
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.5,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.25,
+        "s": 1.4286,
+        "cage": 2.9032,
+        "variant": "B",
+        "s_arc_mm": 1.362
+      }
+    ],
     "ok": false,
     "errors": [
       "Øнар 121.8 > 110: тела Ø4 при n=62 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -521,6 +1418,45 @@
     "width": 29.0,
     "d_body_max": 3.51,
     "t_hold": 310.3,
+    "ring_variants": 2,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.75,
+        "s": 1.4286,
+        "cage": 2.9032,
+        "variant": "B",
+        "s_arc_mm": 1.966
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.5,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.25,
+        "s": 1.4286,
+        "cage": 2.9032,
+        "variant": "B",
+        "s_arc_mm": 1.966
+      }
+    ],
     "ok": false,
     "errors": [
       "Øнар 170.2 > 110: тела Ø6 при n=62 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -543,6 +1479,45 @@
     "width": 37.0,
     "d_body_max": 2.79,
     "t_hold": 323.9,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 3.4177,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 2.2785,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 1.1392,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": false,
     "errors": [
       "Øнар 177.1 > 110: тела Ø5 при n=79 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -565,6 +1540,45 @@
     "width": 29.0,
     "d_body_max": 2.79,
     "t_hold": 264.1,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 3.4177,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 2.2785,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 1.1392,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": false,
     "errors": [
       "Øнар 146.7 > 110: тела Ø4 при n=79 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -587,6 +1601,45 @@
     "width": 29.0,
     "d_body_max": 2.79,
     "t_hold": 383.8,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 3.4177,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 2.2785,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 1.1392,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": false,
     "errors": [
       "Øнар 207.5 > 110: тела Ø6 при n=79 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -609,6 +1662,45 @@
     "width": 37.0,
     "d_body_max": 2.25,
     "t_hold": 396.0,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 2.7273,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 1.8182,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.9091,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": false,
     "errors": [
       "Øнар 213.7 > 110: тела Ø5 при n=99 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -631,6 +1723,45 @@
     "width": 29.0,
     "d_body_max": 2.25,
     "t_hold": 321.7,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 2.7273,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 1.8182,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.9091,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": false,
     "errors": [
       "Øнар 176.0 > 110: тела Ø4 при n=99 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -653,6 +1784,45 @@
     "width": 29.0,
     "d_body_max": 2.25,
     "t_hold": 470.2,
+    "ring_variants": 1,
+    "phasing": [
+      {
+        "row": 1,
+        "phi": 0.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.0,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 2,
+        "phi": 90.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 2.7273,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 3,
+        "phi": 180.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 1.8182,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      },
+      {
+        "row": 4,
+        "phi": 270.0,
+        "delta_p": 0.0,
+        "s": 0.0,
+        "cage": 0.9091,
+        "variant": "A",
+        "s_arc_mm": 0.0
+      }
+    ],
     "ok": false,
     "errors": [
       "Øнар 251.4 > 110: тела Ø6 при n=99 с отверстиями 8×M4+2шт Ø4 не вмещаются"

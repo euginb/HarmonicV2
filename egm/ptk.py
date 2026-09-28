@@ -3,13 +3,15 @@
 Схема (Д-11): генератор волн — вход, жёсткое колесо (внешний венец) с z
 впадинами неподвижно, сепаратор с n = z - 1 телами — выход; u = z.
 4 ряда с фазировкой 0/90/180/270° (Д-08). Венец несёт крепёжные отверстия,
-они же технологические базы при изготовлении (Д-16).
+они же технологические базы при изготовлении (Д-16). Отверстия пакета сквозные,
+фазировка рядов переносится на сдвиг сверловки каждого венца (Д-19).
 
 Рабочие параметры — specs/ptk_input.json (instructions/INS-10_PTK_CALC.md).
 Значения по умолчанию в dataclass используются только в self_test() (Д-18).
 """
 import math
 from dataclasses import dataclass, asdict, field, fields
+from fractions import Fraction
 
 
 @dataclass
@@ -23,7 +25,7 @@ class PtkLimits:
     gen_bore_min: float = 18.0    # мин. Ø под генератор (подшипник + вал), мм
     row_gap: float = 1.0          # осевой зазор (шайба) между рядами, мм
     rows: int = 4
-    row_phases: tuple = (0, 90, 180, 270)
+    row_phases: tuple = (0, 90, 180, 270)   # фазы эксцентриков рядов, град (Д-19)
     u_list: tuple = (10, 16, 20, 25, 32, 40, 50, 63, 80, 100)
     # TODO(CP-08): ecc_k и gap_k — из условия непрерывного зацепления
 
@@ -31,9 +33,8 @@ class PtkLimits:
 @dataclass
 class RingHoles:
     bolt: str = "M4"              # ключ таблицы fasteners
-    n: int = 8                    # число крепёжных отверстий венца
-    n_multiple: int = 4           # кратность числа отверстий (индексация, Д-16)
-    pins: int = 2                 # штифтовые отверстия H7 между болтами
+    n: int = 8                    # число крепёжных отверстий венца (любое, Д-19)
+    pins: int = 2                 # штифтовые отверстия H7 в промежутках между болтами
     pin_d: float = 4.0            # Ø штифта, мм
     head_margin: float = 0.5      # зазор головки болта до кромки/впадин, мм
     web_min: float = 1.0          # мин. перемычка между головками/штифтами, мм
@@ -57,6 +58,8 @@ class PtkResult:
     width: float = 0.0
     d_body_max: float = 0.0
     t_hold: float = 0.0
+    ring_variants: int = 0
+    phasing: list = field(default_factory=list)
     ok: bool = False
     errors: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
@@ -85,6 +88,56 @@ def _band(holes, fast, lim):
     return max(lim.wall_min + f["d_clear"] / 2, f["dk"] / 2 + holes.head_margin)
 
 
+def _deg(x):
+    return round(float(x), 4)
+
+
+def pin_gaps(holes):
+    """Промежутки между болтами под штифты: j = round(i·n/pins); промежуток j —
+    между болтами j и j+1 (болт j на угле j·360/n)."""
+    if holes.pins <= 0 or holes.n < 1:
+        return []
+    return sorted({round(i * holes.n / holes.pins) % holes.n for i in range(holes.pins)})
+
+
+def pattern_order(holes):
+    """Порядок N поворотной симметрии сверловки (болты + штифты), шаг σ = 360/N."""
+    n = holes.n
+    if n < 1:
+        return 1
+    gaps = set(pin_gaps(holes))
+    for m in sorted((m for m in range(1, n + 1) if n % m == 0), reverse=True):
+        step = n // m
+        if {(g + step) % n for g in gaps} == gaps:
+            return m
+    return 1
+
+
+def phasing(z, n_bodies, holes, lim):
+    """Д-19: сдвиг сверловки венцов при сквозных отверстиях пакета.
+
+    Ряд k — копия ряда 1, повёрнутая на φk (эксцентрик генератора). Отверстия
+    в корпусе совпадают, поэтому в системе профиля венца (впадина 0 на 0°)
+    сверловка ряда k повёрнута на s = (−φk) mod g, g = 360°/НОК(z, N): венец
+    симметричен с шагом 360/z, сверловка — с шагом 360/N. Равные s — один
+    вариант венца. Гнёзда сепаратора ряда k смещены на φk mod (360/n)."""
+    order = pattern_order(holes)
+    g = Fraction(360, z * order // math.gcd(z, order))
+    p = Fraction(360, z)
+    q = Fraction(360, max(n_bodies, 1))
+    phases = [Fraction(str(x)) for x in lim.row_phases]
+    base = phases[0] if phases else Fraction(0)
+    rows, labels = [], {}
+    for k, ph in enumerate(phases):
+        phi = (ph - base) % 360
+        s = (-phi) % g
+        var = labels.setdefault(s, chr(ord("A") + len(labels)))
+        rows.append({"row": k + 1, "phi": _deg(phi), "delta_p": _deg((phi % p) / p),
+                     "s": _deg(s), "cage": _deg(phi % q), "variant": var})
+    return {"z": z, "pitch": _deg(p), "order": order, "g": _deg(g),
+            "variants": len(labels), "rows": rows}
+
+
 def ring(d_root, holes, fast, lim):
     """Отверстия венца (Д-16): окружность центров, Øнар, момент удержания, ошибки."""
     err = []
@@ -96,14 +149,15 @@ def ring(d_root, holes, fast, lim):
            "label": f"{holes.n}×{holes.bolt}{pins}"}
     if f is None:
         return res, [f"крепёж {holes.bolt} отсутствует в таблице fasteners"]
-    if holes.n_multiple < 1 or holes.n < holes.n_multiple or holes.n % holes.n_multiple:
-        err.append(f"число отверстий {holes.n} не кратно {holes.n_multiple} (Д-16)")
-    n = max(holes.n, 1)
-    chord = 2 * r_bc * math.sin(math.pi / n)
-    need = max(f["dk"] + holes.web_min, f["d_clear"] + lim.wall_min)
-    if chord < need:
-        err.append(f"{holes.n}×{holes.bolt} не помещаются на Ø{2 * r_bc:.1f}: "
-                   f"шаг {chord:.1f} < {need:.1f} мм")
+    if holes.n < 1:
+        return res, [f"число отверстий венца {holes.n} < 1"]
+    n = holes.n
+    if n >= 2:
+        chord = 2 * r_bc * math.sin(math.pi / n)
+        need = max(f["dk"] + holes.web_min, f["d_clear"] + lim.wall_min)
+        if chord < need:
+            err.append(f"{holes.n}×{holes.bolt} не помещаются на Ø{2 * r_bc:.1f}: "
+                       f"шаг {chord:.1f} < {need:.1f} мм")
     if holes.pins:
         half = 2 * r_bc * math.sin(math.pi / (2 * n))
         need_p = f["dk"] / 2 + holes.pin_d / 2 + holes.web_min
@@ -143,10 +197,14 @@ def calc(u, body_id, body, lim, holes, fast):
         r.errors.append(f"генератор Ø{d_gen:.1f} < {lim.gen_bore_min:g}: мал для подшипника/вала")
     if lim.rows != len(lim.row_phases):
         r.errors.append("число рядов не совпадает с фазировкой")
+    ph = phasing(u, n, holes, lim)
+    for row in ph["rows"]:
+        row["s_arc_mm"] = round(row["s"] * math.pi * rg["d_bc"] / 360, 3)
     band = _band(holes, fast, lim)
     r.n_bodies, r.z_ring, r.ecc = n, u, round(ecc, 3)
     r.d_pitch, r.d_root = round(d_pitch, 2), round(d_root, 2)
     r.holes, r.d_bc, r.t_hold = rg["label"], rg["d_bc"], rg["t_hold"]
+    r.ring_variants, r.phasing = ph["variants"], ph["rows"]
     r.d_out = round(rg["d_out"], 2)
     r.width = round(lim.rows * body["l"] + (lim.rows + 1) * lim.row_gap, 1)
     r.d_body_max = round((lim.d_out_max - 4 * band)
@@ -182,6 +240,28 @@ def two_stage_table(lim, u_list=(101, 120, 150, 200, 300, 500, 1000, 2500)):
     return (f"Одноступенчатый ПТК считается только для u ≤ {lim.u_max} (Д-11). Для больших u "
             "применяется двухступенчатая схема; каждая ступень рассчитывается этим же "
             "калькулятором как самостоятельный редуктор.\n\n" + "\n".join(rows))
+
+
+def phasing_table(lim, holes):
+    """Таблица фазировки рядов и сдвигов сверловки для SPEC-10 (Д-19)."""
+    order = pattern_order(holes)
+    gaps = pin_gaps(holes)
+    pins = (f", штифты Ø{holes.pin_d:g} в промежутках {gaps}" if gaps else ", без штифтов")
+    head = (f"Сверловка венца: {holes.n}×{holes.bolt} через {360 / max(holes.n, 1):g}°{pins}; "
+            f"порядок симметрии сверловки N = {order} (σ = {360 / order:g}°). "
+            "Не зависит от тела качения, поэтому дана по u.")
+    rows = ["| u = z | p, ° | g, ° | Венцов | Ряд | φ, ° | δ/p | s, ° | Сепаратор, ° | Вариант |",
+            "|---|---|---|---|---|---|---|---|---|---|"]
+    for u in lim.u_list:
+        if not 2 <= u <= lim.u_max:
+            continue
+        ph = phasing(u, u - 1, holes, lim)
+        for i, row in enumerate(ph["rows"]):
+            lead = (f"| {u} | {ph['pitch']:g} | {ph['g']:g} | {ph['variants']} |"
+                    if i == 0 else "| | | | |")
+            rows.append(lead + f" {row['row']} | {row['phi']:g} | {row['delta_p']:g} | "
+                        f"{row['s']:g} | {row['cage']:g} | {row['variant']} |")
+    return head + "\n\n" + "\n".join(rows)
 
 
 def params_md(lim, holes, fast):
@@ -230,16 +310,28 @@ def self_test():
     assert not c(100).ok
     r = c(20)
     assert r.ok, r.errors
-    assert abs(r.d_out - 67.28) < 0.05, r.d_out          # 42.275 + 4·6.25
+    assert abs(r.d_out - 67.28) < 0.05, r.d_out           # 42.275 + 4·6.25
     assert 107.0 < r.t_hold < 109.0, r.t_hold             # 8·4.1·0.12·27.39
+    assert r.ring_variants == 1, r.phasing                # z = 20 кратно 4
     assert not c(5).ok
     r = c(120)
     assert not r.ok and "двухступенчат" in r.errors[0]
     assert two_stage(200, lim)["u"] == 200 and two_stage(200, lim)["exact"]
     assert c(63).d_body_max < 5.0
-    assert not c(20, RingHoles(n=6)).ok                   # не кратно 4
+    r = c(20, RingHoles(n=6))
+    assert r.ok, r.errors                                 # кратность 4 не нужна (Д-19)
     assert not c(20, RingHoles(n=40)).ok                  # не помещаются по шагу
     assert not c(20, RingHoles(bolt="M99")).ok            # нет в таблице крепежа
+    # Д-19: симметрия сверловки и сдвиги
+    h8 = RingHoles(n=8, pins=0)
+    assert pattern_order(h8) == 8 and pattern_order(holes) == 2
+    assert pattern_order(RingHoles(n=8, pins=4)) == 4
+    ph = phasing(63, 62, holes, lim)                      # N=2: g = 360/126
+    assert ph["variants"] == 2 and abs(ph["rows"][1]["s"] - 180 / 126) < 1e-3, ph
+    assert phasing(63, 62, h8, lim)["variants"] == 1      # N=8: 90° кратно 360/504
+    ph = phasing(25, 24, RingHoles(n=5, pins=0), lim)     # НОК=25, g=14.4°
+    assert ph["variants"] == 4 and abs(ph["rows"][1]["s"] - 10.8) < 1e-3, ph
+    assert abs(phasing(20, 19, holes, lim)["rows"][1]["cage"] - 90 % (360 / 19)) < 1e-3
     return True
 
 

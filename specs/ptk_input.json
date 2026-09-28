@@ -16,7 +16,6 @@
   "ring_holes": {
     "bolt": "M4",
     "n": 8,
-    "n_multiple": 4,
     "pins": 2,
     "pin_d": 4.0,
     "head_margin": 0.5,

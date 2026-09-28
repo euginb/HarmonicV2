@@ -56,7 +56,8 @@ def run_ptk(prices):
         m = r["torque_Nm_est"] if r["ok"] else "—"
         table.append(f"| {r['u']} | {r['body']} | {r['d_body']} | {r['d_body_max']} | "
                      f"{r['n_bodies']} | {r['z_ring']} | {r['ecc']} | {r['d_pitch']} | "
-                     f"{r['d_root']} | {r['holes'] or '—'} | {r['d_bc']} | {r['d_out']} | "
+                     f"{r['d_root']} | {r['holes'] or '—'} | {r['ring_variants'] or '—'} | "
+                     f"{r['d_bc']} | {r['d_out']} | "
                      f"{r['width']} | {m} | {r['t_hold']} | {'OK' if r['ok'] else 'нет'} |")
         tag = f"- u={r['u']}, {r['body']}: "
         errs += [tag + e for e in r["errors"]]
@@ -66,7 +67,7 @@ def run_ptk(prices):
         params=ptk.params_md(lim, holes, fast), rows="\n".join(table),
         errors="\n".join(errs) or "нет", warnings="\n".join(warns) or "нет",
         n_ok=sum(r["ok"] for r in rows), n_all=len(rows),
-        two_stage=ptk.two_stage_table(lim)))
+        two_stage=ptk.two_stage_table(lim), phasing=ptk.phasing_table(lim, holes)))
     return []
 
 
