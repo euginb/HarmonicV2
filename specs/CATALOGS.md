@@ -11,4 +11,5 @@
 Наличие и цена — [vendor_prices.json](vendor_prices.json), заполняет заказчик:
 ключ — каталожный номер или обозначение HIWIN; `price` за шт (каретка)
 или за метр (`unit: "m"`, рельс); `available`, `lead_days`, `supplier`, `date`.
-Позиция без цены попадает в отчёт `out/cost_missing.md` (CP-03).
+Позиция без цены попадает в отчёт `reports/cost_missing.md` (CP-03).
+Как заполнять и как устроены каталожные номера — `instructions/INS-20_CATALOG.md`.

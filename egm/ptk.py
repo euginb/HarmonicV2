@@ -1,23 +1,44 @@
 """Калькулятор волнового редуктора ПТК, уровень 1 (кинематика + реализуемость).
 
-Схема (OQ-02, предварительно): генератор волн — вход, жёсткое колесо с z_r
-впадинами неподвижно, сепаратор с n = z_r - 1 телами — выход; u = z_r.
-4 ряда с фазировкой 0/90/180/270° (Д-08).
+Схема (Д-11): генератор волн — вход, жёсткое колесо (внешний венец) с z
+впадинами неподвижно, сепаратор с n = z - 1 телами — выход; u = z.
+4 ряда с фазировкой 0/90/180/270° (Д-08). Венец несёт крепёжные отверстия,
+они же технологические базы при изготовлении (Д-16).
+
+Рабочие параметры — specs/ptk_input.json (instructions/INS-10_PTK_CALC.md).
+Значения по умолчанию в dataclass используются только в self_test() (Д-18).
 """
 import math
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, asdict, field, fields
 
 
 @dataclass
 class PtkLimits:
-    d_out_max: float = 110.0   # Д-08
-    u_min: int = 10
+    d_out_max: float = 110.0      # макс. наружный Ø редуктора, мм (Д-08)
+    u_min: int = 10               # диапазон одноступенчатого u (Д-08, Д-11)
     u_max: int = 100
-    wall_min: float = 4.0      # минимальная стенка корпуса/колеса, мм
-    gap_k: float = 1.15        # шаг тел / диаметр тела (перемычка сепаратора)
+    wall_min: float = 4.0         # мин. стенка венца, мм
+    gap_k: float = 1.15           # шаг тел по окружности / Ø тела
+    ecc_k: float = 0.25           # эксцентриситет / Ø тела
+    gen_bore_min: float = 18.0    # мин. Ø под генератор (подшипник + вал), мм
+    row_gap: float = 1.0          # осевой зазор (шайба) между рядами, мм
     rows: int = 4
     row_phases: tuple = (0, 90, 180, 270)
-    # TODO(CP-08): вынести в specs/ptk_limits.json
+    u_list: tuple = (10, 16, 20, 25, 32, 40, 50, 63, 80, 100)
+    # TODO(CP-08): ecc_k и gap_k — из условия непрерывного зацепления
+
+
+@dataclass
+class RingHoles:
+    bolt: str = "M4"              # ключ таблицы fasteners
+    n: int = 8                    # число крепёжных отверстий венца
+    n_multiple: int = 4           # кратность числа отверстий (индексация, Д-16)
+    pins: int = 2                 # штифтовые отверстия H7 между болтами
+    pin_d: float = 4.0            # Ø штифта, мм
+    head_margin: float = 0.5      # зазор головки болта до кромки/впадин, мм
+    web_min: float = 1.0          # мин. перемычка между головками/штифтами, мм
+    mu: float = 0.12              # коэффициент трения в стыке венец/корпус
+    safety: float = 1.5           # запас удержания момента крепежом
 
 
 @dataclass
@@ -25,54 +46,121 @@ class PtkResult:
     u: int
     body: str
     d_body: float
-    n_bodies: int
-    z_ring: int
-    ecc: float
-    d_pitch: float
-    d_out: float
-    width: float
-    ok: bool
+    n_bodies: int = 0
+    z_ring: int = 0
+    ecc: float = 0.0
+    d_pitch: float = 0.0
+    d_root: float = 0.0
+    holes: str = ""
+    d_bc: float = 0.0
+    d_out: float = 0.0
+    width: float = 0.0
+    d_body_max: float = 0.0
+    t_hold: float = 0.0
+    ok: bool = False
     errors: list = field(default_factory=list)
-    d_body_max: float = 0.0   # макс. Ø тела, вмещающегося в Øнар при данном n
+    warnings: list = field(default_factory=list)
 
 
-def calc(u, body_id, body, lim=PtkLimits()):
-    """Расчёт одной конфигурации. body = {'type','d','l'}."""
+def _load(cls, d):
+    names = {f.name for f in fields(cls)}
+    data = {k: v for k, v in d.items() if not k.startswith("_")}
+    unknown = sorted(set(data) - names)
+    if unknown:
+        raise ValueError(f"{cls.__name__}: неизвестные параметры {unknown}")
+    return cls(**{k: tuple(v) if isinstance(v, list) else v for k, v in data.items()})
+
+
+def load_config(cfg):
+    """specs/ptk_input.json -> (PtkLimits, RingHoles, fasteners)."""
+    fast = {k: v for k, v in cfg["fasteners"].items() if not k.startswith("_")}
+    return _load(PtkLimits, cfg["limits"]), _load(RingHoles, cfg["ring_holes"]), fast
+
+
+def _band(holes, fast, lim):
+    """Радиальный размер от профиля впадин до оси отверстия (и от оси до Øнар)."""
+    f = fast.get(holes.bolt)
+    if f is None:
+        return lim.wall_min
+    return max(lim.wall_min + f["d_clear"] / 2, f["dk"] / 2 + holes.head_margin)
+
+
+def ring(d_root, holes, fast, lim):
+    """Отверстия венца (Д-16): окружность центров, Øнар, момент удержания, ошибки."""
     err = []
+    f = fast.get(holes.bolt)
+    band = _band(holes, fast, lim)
+    r_bc = d_root / 2 + band
+    pins = f"+{holes.pins}шт Ø{holes.pin_d:g}" if holes.pins else ""
+    res = {"d_bc": round(2 * r_bc, 2), "d_out": 2 * (r_bc + band), "t_hold": 0.0,
+           "label": f"{holes.n}×{holes.bolt}{pins}"}
+    if f is None:
+        return res, [f"крепёж {holes.bolt} отсутствует в таблице fasteners"]
+    if holes.n_multiple < 1 or holes.n < holes.n_multiple or holes.n % holes.n_multiple:
+        err.append(f"число отверстий {holes.n} не кратно {holes.n_multiple} (Д-16)")
+    n = max(holes.n, 1)
+    chord = 2 * r_bc * math.sin(math.pi / n)
+    need = max(f["dk"] + holes.web_min, f["d_clear"] + lim.wall_min)
+    if chord < need:
+        err.append(f"{holes.n}×{holes.bolt} не помещаются на Ø{2 * r_bc:.1f}: "
+                   f"шаг {chord:.1f} < {need:.1f} мм")
+    if holes.pins:
+        half = 2 * r_bc * math.sin(math.pi / (2 * n))
+        need_p = f["dk"] / 2 + holes.pin_d / 2 + holes.web_min
+        if half < need_p:
+            err.append(f"штифт Ø{holes.pin_d:g} между болтами не помещается: "
+                       f"{half:.1f} < {need_p:.1f} мм")
+        if holes.pins > holes.n:
+            err.append(f"штифтов {holes.pins} больше, чем промежутков между болтами {holes.n}")
+    res["t_hold"] = round(holes.n * f["F_M"] * holes.mu * r_bc, 1)  # кН·мм = Н·м
+    return res, err
+
+
+def calc(u, body_id, body, lim, holes, fast):
+    """Расчёт одной конфигурации. body = {'type','d','l'}."""
     d = body["d"]
-    z_r = u
-    n = z_r - 1
+    r = PtkResult(u, body_id, d)
     if u > lim.u_max:
         s = two_stage(u, lim)
-        err.append(f"u={u} > {lim.u_max}: одноступенчатый ПТК не считается; рекомендуется "
-                   f"двухступенчатая схема {s['u1']}×{s['u2']} = {s['u']} (Д-11)")
-        return PtkResult(u, body_id, d, 0, 0, 0.0, 0.0, 0.0, 0.0, False, err)
+        r.errors.append(f"u={u} > {lim.u_max}: одноступенчатый ПТК не считается; рекомендуется "
+                        f"двухступенчатая схема {s['u1']}×{s['u2']} = {s['u']} (Д-11)")
+        return r
     if u < lim.u_min:
-        err.append(f"u={u} < {lim.u_min}: вне диапазона (Д-08)")
-    ecc = 0.5 * d * 0.5          # эксцентриситет ≈ четверть диаметра тела
-    # TODO(CP-08): эксцентриситет из условия непрерывного зацепления
-    step = lim.gap_k * d
-    d_pitch = max(n * step / math.pi, 1e-9)
-    d_out = d_pitch + d + 2 * ecc + 2 * lim.wall_min
-    if d_out > lim.d_out_max:
-        err.append(f"Øнар {d_out:.1f} > {lim.d_out_max}: тела Ø{d} не вмещаются при n={n}")
+        r.errors.append(f"u={u} < {lim.u_min}: вне диапазона (Д-08)")
+    if u < 2:
+        return r
+    n = u - 1
+    ecc = lim.ecc_k * d
+    d_pitch = n * lim.gap_k * d / math.pi
+    d_root = d_pitch + d + 2 * ecc
+    rg, rerr = ring(d_root, holes, fast, lim)
+    r.errors += rerr
+    if rg["d_out"] > lim.d_out_max:
+        r.errors.append(f"Øнар {rg['d_out']:.1f} > {lim.d_out_max:g}: тела Ø{d:g} при n={n} "
+                        f"с отверстиями {rg['label']} не вмещаются")
     d_gen = d_pitch - d - 2 * ecc
-    if d_gen < 2 * lim.wall_min + 10:
-        err.append(f"генератор Ø{d_gen:.1f} слишком мал для подшипника/вала")
+    if d_gen < lim.gen_bore_min:
+        r.errors.append(f"генератор Ø{d_gen:.1f} < {lim.gen_bore_min:g}: мал для подшипника/вала")
     if lim.rows != len(lim.row_phases):
-        err.append("число рядов не совпадает с фазировкой")
-    width = lim.rows * body["l"] + (lim.rows + 1) * 1.0
-    d_max = (lim.d_out_max - 2 * lim.wall_min) / (n * lim.gap_k / math.pi + 1.5)  # 1.5 = 1 + 2e/d
-    return PtkResult(u, body_id, d, n, z_r, round(ecc, 3), round(d_pitch, 2),
-                     round(d_out, 2), round(width, 1), not err, err, round(d_max, 2))
+        r.errors.append("число рядов не совпадает с фазировкой")
+    band = _band(holes, fast, lim)
+    r.n_bodies, r.z_ring, r.ecc = n, u, round(ecc, 3)
+    r.d_pitch, r.d_root = round(d_pitch, 2), round(d_root, 2)
+    r.holes, r.d_bc, r.t_hold = rg["label"], rg["d_bc"], rg["t_hold"]
+    r.d_out = round(rg["d_out"], 2)
+    r.width = round(lim.rows * body["l"] + (lim.rows + 1) * lim.row_gap, 1)
+    r.d_body_max = round((lim.d_out_max - 4 * band)
+                         / (n * lim.gap_k / math.pi + 1 + 2 * lim.ecc_k), 2)
+    r.ok = not r.errors
+    return r
 
 
-def sweep(bodies, u_list=(10, 16, 20, 25, 32, 40, 50, 63, 80, 100)):
-    return [calc(u, bid, b) for u in u_list for bid, b in bodies.items()
-            if not bid.startswith("_")]
+def sweep(bodies, lim, holes, fast):
+    return [calc(u, bid, b, lim, holes, fast) for u in lim.u_list
+            for bid, b in bodies.items() if not bid.startswith("_")]
 
 
-def two_stage(u, lim=PtkLimits()):
+def two_stage(u, lim):
     """Д-11: u = u1·u2, обе ступени в u_min..u_max, ступени по возможности равны."""
     best = None
     for u1 in range(lim.u_min, lim.u_max + 1):
@@ -85,15 +173,27 @@ def two_stage(u, lim=PtkLimits()):
             "ok": lim.u_min ** 2 <= u <= lim.u_max ** 2}
 
 
-def two_stage_table(u_list=(101, 120, 150, 200, 300, 500, 1000, 2500)):
+def two_stage_table(lim, u_list=(101, 120, 150, 200, 300, 500, 1000, 2500)):
     rows = ["| u | u1 | u2 | u1·u2 | Точно |", "|---|---|---|---|---|"]
     for u in u_list:
-        s = two_stage(u)
+        s = two_stage(u, lim)
         exact = "да" if s["exact"] else "нет, ближайшее"
         rows.append(f"| {u} | {s['u1']} | {s['u2']} | {s['u']} | {exact} |")
-    return ("Одноступенчатый ПТК считается только для u ≤ 100 (Д-11). Для больших u "
+    return (f"Одноступенчатый ПТК считается только для u ≤ {lim.u_max} (Д-11). Для больших u "
             "применяется двухступенчатая схема; каждая ступень рассчитывается этим же "
             "калькулятором как самостоятельный редуктор.\n\n" + "\n".join(rows))
+
+
+def params_md(lim, holes, fast):
+    """Таблица входных параметров прогона для SPEC-10."""
+    rows = ["| Параметр | Значение |", "|---|---|"]
+    for obj, pre in ((lim, "limits"), (holes, "ring_holes")):
+        for f in fields(obj):
+            rows.append(f"| `{pre}.{f.name}` | {getattr(obj, f.name)} |")
+    f = fast.get(holes.bolt, {})
+    rows.append(f"| `fasteners.{holes.bolt}` | отверстие Ø{f.get('d_clear')}, головка "
+                f"Ø{f.get('dk')}, затяжка {f.get('F_M')} кН |")
+    return "\n".join(rows)
 
 
 def torque_estimate(r: PtkResult, q_allow=None):
@@ -103,25 +203,43 @@ def torque_estimate(r: PtkResult, q_allow=None):
     return round(q * loaded * (r.d_pitch / 2000.0) * 4, 1)  # Н·м, 4 ряда
 
 
-def to_rows(results):
+def to_rows(results, holes):
     out = []
     for r in results:
         row = asdict(r)
-        row["torque_Nm_est"] = torque_estimate(r) if r.ok else None
+        m = torque_estimate(r) if r.ok else None
+        row["torque_Nm_est"] = m
+        if m is not None and r.t_hold < m * holes.safety:
+            row["warnings"].append(
+                f"момент удержания крепежа {r.t_hold:g} Н·м < {holes.safety:g}×M "
+                f"({m * holes.safety:.0f} Н·м): больше/крупнее болтов или штифты под срез; "
+                "M — заглушка до CP-08")
         out.append(row)
     return out
 
 
 def self_test():
-    """Проверки ПО: u=100 роликом Ø5 в Ø110 нереализуемо; u=20 Ø5 реализуемо."""
+    """Проверки ПО на фиксированных параметрах (не зависят от ptk_input.json)."""
+    lim, holes = PtkLimits(), RingHoles()
+    fast = {"M4": {"d_clear": 4.5, "dk": 7.0, "F_M": 4.1}}
     b = {"type": "roller", "d": 5.0, "l": 8.0}
-    assert not calc(100, "t", b).ok
-    assert calc(20, "t", b).ok
-    assert not calc(5, "t", b).ok
-    r = calc(120, "t", b)
+
+    def c(u, h=holes):
+        return calc(u, "t", b, lim, h, fast)
+
+    assert not c(100).ok
+    r = c(20)
+    assert r.ok, r.errors
+    assert abs(r.d_out - 67.28) < 0.05, r.d_out          # 42.275 + 4·6.25
+    assert 107.0 < r.t_hold < 109.0, r.t_hold             # 8·4.1·0.12·27.39
+    assert not c(5).ok
+    r = c(120)
     assert not r.ok and "двухступенчат" in r.errors[0]
-    assert two_stage(200)["u"] == 200 and two_stage(200)["exact"]
-    assert calc(63, "t", b).d_body_max < 5.0
+    assert two_stage(200, lim)["u"] == 200 and two_stage(200, lim)["exact"]
+    assert c(63).d_body_max < 5.0
+    assert not c(20, RingHoles(n=6)).ok                   # не кратно 4
+    assert not c(20, RingHoles(n=40)).ok                  # не помещаются по шагу
+    assert not c(20, RingHoles(bolt="M99")).ok            # нет в таблице крепежа
     return True
 
 
