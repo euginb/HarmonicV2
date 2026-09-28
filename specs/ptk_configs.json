@@ -13,6 +13,7 @@
     "errors": [
       "генератор Ø9.0 слишком мал для подшипника/вала"
     ],
+    "d_body_max": 21.27,
     "torque_Nm_est": null
   },
   {
@@ -29,6 +30,7 @@
     "errors": [
       "генератор Ø7.2 слишком мал для подшипника/вала"
     ],
+    "d_body_max": 21.27,
     "torque_Nm_est": null
   },
   {
@@ -45,6 +47,7 @@
     "errors": [
       "генератор Ø10.8 слишком мал для подшипника/вала"
     ],
+    "d_body_max": 21.27,
     "torque_Nm_est": null
   },
   {
@@ -59,6 +62,7 @@
     "width": 37.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 14.59,
     "torque_Nm_est": 205.9
   },
   {
@@ -75,6 +79,7 @@
     "errors": [
       "генератор Ø16.0 слишком мал для подшипника/вала"
     ],
+    "d_body_max": 14.59,
     "torque_Nm_est": null
   },
   {
@@ -89,6 +94,7 @@
     "width": 29.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 14.59,
     "torque_Nm_est": 355.9
   },
   {
@@ -103,6 +109,7 @@
     "width": 37.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 12.06,
     "torque_Nm_est": 313.0
   },
   {
@@ -117,6 +124,7 @@
     "width": 29.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 12.06,
     "torque_Nm_est": 160.2
   },
   {
@@ -131,6 +139,7 @@
     "width": 29.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 12.06,
     "torque_Nm_est": 540.8
   },
   {
@@ -145,6 +154,7 @@
     "width": 37.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 9.92,
     "torque_Nm_est": 527.2
   },
   {
@@ -159,6 +169,7 @@
     "width": 29.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 9.92,
     "torque_Nm_est": 269.9
   },
   {
@@ -173,6 +184,7 @@
     "width": 29.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 9.92,
     "torque_Nm_est": 910.8
   },
   {
@@ -187,6 +199,7 @@
     "width": 37.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 7.94,
     "torque_Nm_est": 851.1
   },
   {
@@ -201,6 +214,7 @@
     "width": 29.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 7.94,
     "torque_Nm_est": 435.7
   },
   {
@@ -215,6 +229,7 @@
     "width": 29.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 7.94,
     "torque_Nm_est": 1470.7
   },
   {
@@ -229,6 +244,7 @@
     "width": 37.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 6.47,
     "torque_Nm_est": 1391.9
   },
   {
@@ -243,6 +259,7 @@
     "width": 29.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 6.47,
     "torque_Nm_est": 712.6
   },
   {
@@ -257,6 +274,7 @@
     "width": 29.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 6.47,
     "torque_Nm_est": 2405.3
   },
   {
@@ -271,6 +289,7 @@
     "width": 37.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 5.25,
     "torque_Nm_est": 2152.3
   },
   {
@@ -285,6 +304,7 @@
     "width": 29.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 5.25,
     "torque_Nm_est": 1102.1
   },
   {
@@ -301,6 +321,7 @@
     "errors": [
       "Øнар 124.6 > 110.0: тела Ø6.0 не вмещаются при n=49"
     ],
+    "d_body_max": 5.25,
     "torque_Nm_est": null
   },
   {
@@ -317,6 +338,7 @@
     "errors": [
       "Øнар 129.0 > 110.0: тела Ø5.0 не вмещаются при n=62"
     ],
+    "d_body_max": 4.22,
     "torque_Nm_est": null
   },
   {
@@ -331,6 +353,7 @@
     "width": 29.0,
     "ok": true,
     "errors": [],
+    "d_body_max": 4.22,
     "torque_Nm_est": 1743.0
   },
   {
@@ -347,6 +370,7 @@
     "errors": [
       "Øнар 153.2 > 110.0: тела Ø6.0 не вмещаются при n=62"
     ],
+    "d_body_max": 4.22,
     "torque_Nm_est": null
   },
   {
@@ -363,6 +387,7 @@
     "errors": [
       "Øнар 160.1 > 110.0: тела Ø5.0 не вмещаются при n=79"
     ],
+    "d_body_max": 3.35,
     "torque_Nm_est": null
   },
   {
@@ -379,6 +404,7 @@
     "errors": [
       "Øнар 129.7 > 110.0: тела Ø4.0 не вмещаются при n=79"
     ],
+    "d_body_max": 3.35,
     "torque_Nm_est": null
   },
   {
@@ -395,6 +421,7 @@
     "errors": [
       "Øнар 190.5 > 110.0: тела Ø6.0 не вмещаются при n=79"
     ],
+    "d_body_max": 3.35,
     "torque_Nm_est": null
   },
   {
@@ -411,6 +438,7 @@
     "errors": [
       "Øнар 196.7 > 110.0: тела Ø5.0 не вмещаются при n=99"
     ],
+    "d_body_max": 2.7,
     "torque_Nm_est": null
   },
   {
@@ -427,6 +455,7 @@
     "errors": [
       "Øнар 159.0 > 110.0: тела Ø4.0 не вмещаются при n=99"
     ],
+    "d_body_max": 2.7,
     "torque_Nm_est": null
   },
   {
@@ -443,6 +472,7 @@
     "errors": [
       "Øнар 234.4 > 110.0: тела Ø6.0 не вмещаются при n=99"
     ],
+    "d_body_max": 2.7,
     "torque_Nm_est": null
   }
 ]
