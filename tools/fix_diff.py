@@ -24,6 +24,8 @@ from pathlib import Path
 
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$")
 BASE_RE = re.compile(r"^#\s*base:\s*([0-9a-fA-F]{7,40})")
+FENCE_RE = re.compile(r"^(```|~~~)")  # markdown-обрамление из чата; строка diff так начинаться не может
+
 GIT_META = ("diff --git ", "index ", "new file mode", "deleted file mode",
             "old mode", "new mode", "similarity index", "rename from", "rename to")
 DEV_NULL = "/dev/null"
@@ -66,6 +68,11 @@ def parse(lines):
     files, cur, hunk, base, i = [], None, None, None, 0
     while i < len(lines):
         ln = lines[i]
+        if FENCE_RE.match(ln):
+            warn(f"строка {i + 1}: markdown-обрамление {ln.strip()!r} пропущено")
+            hunk = None  # закрывающее обрамление завершает hunk
+            i += 1
+            continue
         if is_file_header(lines, i):
             cur = {"old": clean_path(ln[4:]), "new": clean_path(lines[i + 1][4:]),
                    "hunks": [], "line": i + 1}
