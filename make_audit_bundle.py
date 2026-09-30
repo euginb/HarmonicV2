@@ -28,6 +28,8 @@ with OUT.open("w", encoding="utf-8", newline="\n") as out:
         out.write(f + "\n")
     out.write("```\n\n")
 
+    out.write("Примечание: Файлы в репозитории ссылаются на 'docs/HG-Series-Catalog_opt.pdf', но в самом репозитории его нет. Это не ошибка. Он исключен намеренно с целью уменьшить размер данного файла\n\n")
+
     out.write("## Text file contents\n\n")
 
     for rel in files:
