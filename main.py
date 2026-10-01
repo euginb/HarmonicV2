@@ -54,7 +54,7 @@ def run_ptk(prices):
     table, errs, warns = [], [], []
     for r in rows:
         m = r["torque_Nm_est"] if r["ok"] else "—"
-        table.append(f"| {r['u']} | {r['body']} | {r['d_body']} | {r['d_body_max']} | "
+        table.append(f"| {r['id']} | {r['u']} | {r['body']} | {r['d_body']} | {r['d_body_max']} | "
                      f"{r['n_bodies']} | {r['z_ring']} | {r['ecc']} | {r['d_pitch']} | "
                      f"{r['d_root']} | {r['holes'] or '—'} | {r['ring_variants'] or '—'} | "
                      f"{r['d_bc']} | {r['d_out']} | "
@@ -68,7 +68,10 @@ def run_ptk(prices):
         errors="\n".join(errs) or "нет", warnings="\n".join(warns) or "нет",
         n_ok=sum(r["ok"] for r in rows), n_all=len(rows),
         two_stage=ptk.two_stage_table(lim), phasing=ptk.phasing_table(lim, holes)))
-    return []
+    ids = [r["id"] for r in rows]
+    dup = sorted({i for i in ids if ids.count(i) > 1})
+    return ([f"ptk: одинаковые ID {dup} — одно тело под разными ключами "
+             "vendor_prices.json → bodies (Д-22)"] if dup else [])
 
 
 def run_catalog(prices):

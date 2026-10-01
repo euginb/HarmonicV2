@@ -3,6 +3,7 @@
     "u": 10,
     "body": "ROLLER_D5x8",
     "d_body": 5.0,
+    "id": "PTK-010-R5X8-8M4P2-BEF2FB",
     "n_bodies": 9,
     "z_ring": 10,
     "ecc": 1.25,
@@ -53,6 +54,63 @@
         "s_arc_mm": 5.729
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-010-R5X8-8M4P2-BEF2FB.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "PTK-010-R5X8-8M4P2-BEF2FB.01B",
+        "name": "венец",
+        "variant": "B",
+        "s": 18.0,
+        "s_arc_mm": 5.729,
+        "rows": [
+          2,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 10.0,
+      "body": {
+        "type": "roller",
+        "d": 5.0,
+        "l": 8.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "генератор Ø9.0 < 18: мал для подшипника/вала"
@@ -64,6 +122,7 @@
     "u": 10,
     "body": "ROLLER_D4x6",
     "d_body": 4.0,
+    "id": "PTK-010-R4X6-8M4P2-09C8FA",
     "n_bodies": 9,
     "z_ring": 10,
     "ecc": 1.0,
@@ -114,6 +173,63 @@
         "s_arc_mm": 4.976
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-010-R4X6-8M4P2-09C8FA.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "PTK-010-R4X6-8M4P2-09C8FA.01B",
+        "name": "венец",
+        "variant": "B",
+        "s": 18.0,
+        "s_arc_mm": 4.976,
+        "rows": [
+          2,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 10.0,
+      "body": {
+        "type": "roller",
+        "d": 4.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "штифт Ø4 между болтами не помещается: 6.2 < 6.5 мм",
@@ -126,6 +242,7 @@
     "u": 10,
     "body": "BALL_D6",
     "d_body": 6.0,
+    "id": "PTK-010-B6-8M4P2-5B5432",
     "n_bodies": 9,
     "z_ring": 10,
     "ecc": 1.5,
@@ -176,6 +293,63 @@
         "s_arc_mm": 6.483
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-010-B6-8M4P2-5B5432.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "PTK-010-B6-8M4P2-5B5432.01B",
+        "name": "венец",
+        "variant": "B",
+        "s": 18.0,
+        "s_arc_mm": 6.483,
+        "rows": [
+          2,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 10.0,
+      "body": {
+        "type": "ball",
+        "d": 6.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "генератор Ø10.8 < 18: мал для подшипника/вала"
@@ -187,6 +361,7 @@
     "u": 16,
     "body": "ROLLER_D5x8",
     "d_body": 5.0,
+    "id": "PTK-016-R5X8-8M4P2-DB5669",
     "n_bodies": 15,
     "z_ring": 16,
     "ecc": 1.25,
@@ -237,6 +412,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-016-R5X8-8M4P2-DB5669.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 16.0,
+      "body": {
+        "type": "roller",
+        "d": 5.0,
+        "l": 8.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -248,6 +471,7 @@
     "u": 16,
     "body": "ROLLER_D4x6",
     "d_body": 4.0,
+    "id": "PTK-016-R4X6-8M4P2-B5BCF2",
     "n_bodies": 15,
     "z_ring": 16,
     "ecc": 1.0,
@@ -298,6 +522,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-016-R4X6-8M4P2-B5BCF2.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 16.0,
+      "body": {
+        "type": "roller",
+        "d": 4.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "генератор Ø16.0 < 18: мал для подшипника/вала"
@@ -309,6 +581,7 @@
     "u": 16,
     "body": "BALL_D6",
     "d_body": 6.0,
+    "id": "PTK-016-B6-8M4P2-33803E",
     "n_bodies": 15,
     "z_ring": 16,
     "ecc": 1.5,
@@ -359,6 +632,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-016-B6-8M4P2-33803E.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 16.0,
+      "body": {
+        "type": "ball",
+        "d": 6.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -370,6 +691,7 @@
     "u": 20,
     "body": "ROLLER_D5x8",
     "d_body": 5.0,
+    "id": "PTK-020-R5X8-8M4P2-00124C",
     "n_bodies": 19,
     "z_ring": 20,
     "ecc": 1.25,
@@ -420,6 +742,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-020-R5X8-8M4P2-00124C.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 20.0,
+      "body": {
+        "type": "roller",
+        "d": 5.0,
+        "l": 8.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -431,6 +801,7 @@
     "u": 20,
     "body": "ROLLER_D4x6",
     "d_body": 4.0,
+    "id": "PTK-020-R4X6-8M4P2-F1752C",
     "n_bodies": 19,
     "z_ring": 20,
     "ecc": 1.0,
@@ -481,6 +852,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-020-R4X6-8M4P2-F1752C.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 20.0,
+      "body": {
+        "type": "roller",
+        "d": 4.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -492,6 +911,7 @@
     "u": 20,
     "body": "BALL_D6",
     "d_body": 6.0,
+    "id": "PTK-020-B6-8M4P2-9750FB",
     "n_bodies": 19,
     "z_ring": 20,
     "ecc": 1.5,
@@ -542,6 +962,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-020-B6-8M4P2-9750FB.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 20.0,
+      "body": {
+        "type": "ball",
+        "d": 6.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -553,6 +1021,7 @@
     "u": 25,
     "body": "ROLLER_D5x8",
     "d_body": 5.0,
+    "id": "PTK-025-R5X8-8M4P2-6FBD03",
     "n_bodies": 24,
     "z_ring": 25,
     "ecc": 1.25,
@@ -603,6 +1072,63 @@
         "s_arc_mm": 2.008
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-025-R5X8-8M4P2-6FBD03.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "PTK-025-R5X8-8M4P2-6FBD03.01B",
+        "name": "венец",
+        "variant": "B",
+        "s": 3.6,
+        "s_arc_mm": 2.008,
+        "rows": [
+          2,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 25.0,
+      "body": {
+        "type": "roller",
+        "d": 5.0,
+        "l": 8.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -614,6 +1140,7 @@
     "u": 25,
     "body": "ROLLER_D4x6",
     "d_body": 4.0,
+    "id": "PTK-025-R4X6-8M4P2-B15F61",
     "n_bodies": 24,
     "z_ring": 25,
     "ecc": 1.0,
@@ -664,6 +1191,63 @@
         "s_arc_mm": 1.685
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-025-R4X6-8M4P2-B15F61.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "PTK-025-R4X6-8M4P2-B15F61.01B",
+        "name": "венец",
+        "variant": "B",
+        "s": 3.6,
+        "s_arc_mm": 1.685,
+        "rows": [
+          2,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 25.0,
+      "body": {
+        "type": "roller",
+        "d": 4.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -675,6 +1259,7 @@
     "u": 25,
     "body": "BALL_D6",
     "d_body": 6.0,
+    "id": "PTK-025-B6-8M4P2-9FEB5B",
     "n_bodies": 24,
     "z_ring": 25,
     "ecc": 1.5,
@@ -725,6 +1310,63 @@
         "s_arc_mm": 2.331
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-025-B6-8M4P2-9FEB5B.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "PTK-025-B6-8M4P2-9FEB5B.01B",
+        "name": "венец",
+        "variant": "B",
+        "s": 3.6,
+        "s_arc_mm": 2.331,
+        "rows": [
+          2,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 25.0,
+      "body": {
+        "type": "ball",
+        "d": 6.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -736,6 +1378,7 @@
     "u": 32,
     "body": "ROLLER_D5x8",
     "d_body": 5.0,
+    "id": "PTK-032-R5X8-8M4P2-BA58A5",
     "n_bodies": 31,
     "z_ring": 32,
     "ecc": 1.25,
@@ -786,6 +1429,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-032-R5X8-8M4P2-BA58A5.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 32.0,
+      "body": {
+        "type": "roller",
+        "d": 5.0,
+        "l": 8.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -797,6 +1488,7 @@
     "u": 32,
     "body": "ROLLER_D4x6",
     "d_body": 4.0,
+    "id": "PTK-032-R4X6-8M4P2-057AB0",
     "n_bodies": 31,
     "z_ring": 32,
     "ecc": 1.0,
@@ -847,6 +1539,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-032-R4X6-8M4P2-057AB0.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 32.0,
+      "body": {
+        "type": "roller",
+        "d": 4.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -858,6 +1598,7 @@
     "u": 32,
     "body": "BALL_D6",
     "d_body": 6.0,
+    "id": "PTK-032-B6-8M4P2-B0C1DB",
     "n_bodies": 31,
     "z_ring": 32,
     "ecc": 1.5,
@@ -908,6 +1649,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-032-B6-8M4P2-B0C1DB.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 32.0,
+      "body": {
+        "type": "ball",
+        "d": 6.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -919,6 +1708,7 @@
     "u": 40,
     "body": "ROLLER_D5x8",
     "d_body": 5.0,
+    "id": "PTK-040-R5X8-8M4P2-E5DC99",
     "n_bodies": 39,
     "z_ring": 40,
     "ecc": 1.25,
@@ -969,6 +1759,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-040-R5X8-8M4P2-E5DC99.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 40.0,
+      "body": {
+        "type": "roller",
+        "d": 5.0,
+        "l": 8.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -980,6 +1818,7 @@
     "u": 40,
     "body": "ROLLER_D4x6",
     "d_body": 4.0,
+    "id": "PTK-040-R4X6-8M4P2-D822DC",
     "n_bodies": 39,
     "z_ring": 40,
     "ecc": 1.0,
@@ -1030,6 +1869,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-040-R4X6-8M4P2-D822DC.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 40.0,
+      "body": {
+        "type": "roller",
+        "d": 4.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -1041,6 +1928,7 @@
     "u": 40,
     "body": "BALL_D6",
     "d_body": 6.0,
+    "id": "PTK-040-B6-8M4P2-598B75",
     "n_bodies": 39,
     "z_ring": 40,
     "ecc": 1.5,
@@ -1091,6 +1979,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-040-B6-8M4P2-598B75.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 40.0,
+      "body": {
+        "type": "ball",
+        "d": 6.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "Øнар 119.7 > 110: тела Ø6 при n=39 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -1102,6 +2038,7 @@
     "u": 50,
     "body": "ROLLER_D5x8",
     "d_body": 5.0,
+    "id": "PTK-050-R5X8-8M4P2-61DD07",
     "n_bodies": 49,
     "z_ring": 50,
     "ecc": 1.25,
@@ -1152,6 +2089,63 @@
         "s_arc_mm": 3.446
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-050-R5X8-8M4P2-61DD07.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "PTK-050-R5X8-8M4P2-61DD07.01B",
+        "name": "венец",
+        "variant": "B",
+        "s": 3.6,
+        "s_arc_mm": 3.446,
+        "rows": [
+          2,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 50.0,
+      "body": {
+        "type": "roller",
+        "d": 5.0,
+        "l": 8.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "Øнар 122.2 > 110: тела Ø5 при n=49 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -1163,6 +2157,7 @@
     "u": 50,
     "body": "ROLLER_D4x6",
     "d_body": 4.0,
+    "id": "PTK-050-R4X6-8M4P2-4D1404",
     "n_bodies": 49,
     "z_ring": 50,
     "ecc": 1.0,
@@ -1213,6 +2208,63 @@
         "s_arc_mm": 2.835
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-050-R4X6-8M4P2-4D1404.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "PTK-050-R4X6-8M4P2-4D1404.01B",
+        "name": "венец",
+        "variant": "B",
+        "s": 3.6,
+        "s_arc_mm": 2.835,
+        "rows": [
+          2,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 50.0,
+      "body": {
+        "type": "roller",
+        "d": 4.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": true,
     "errors": [],
     "warnings": [
@@ -1224,6 +2276,7 @@
     "u": 50,
     "body": "BALL_D6",
     "d_body": 6.0,
+    "id": "PTK-050-B6-8M4P2-2A4103",
     "n_bodies": 49,
     "z_ring": 50,
     "ecc": 1.5,
@@ -1274,6 +2327,63 @@
         "s_arc_mm": 4.056
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-050-B6-8M4P2-2A4103.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "PTK-050-B6-8M4P2-2A4103.01B",
+        "name": "венец",
+        "variant": "B",
+        "s": 3.6,
+        "s_arc_mm": 4.056,
+        "rows": [
+          2,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 50.0,
+      "body": {
+        "type": "ball",
+        "d": 6.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "Øнар 141.6 > 110: тела Ø6 при n=49 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -1285,6 +2395,7 @@
     "u": 63,
     "body": "ROLLER_D5x8",
     "d_body": 5.0,
+    "id": "PTK-063-R5X8-8M4P2-42CE4C",
     "n_bodies": 62,
     "z_ring": 63,
     "ecc": 1.25,
@@ -1335,6 +2446,63 @@
         "s_arc_mm": 1.664
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-063-R5X8-8M4P2-42CE4C.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "PTK-063-R5X8-8M4P2-42CE4C.01B",
+        "name": "венец",
+        "variant": "B",
+        "s": 1.4286,
+        "s_arc_mm": 1.664,
+        "rows": [
+          2,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 63.0,
+      "body": {
+        "type": "roller",
+        "d": 5.0,
+        "l": 8.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "Øнар 146.0 > 110: тела Ø5 при n=62 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -1346,6 +2514,7 @@
     "u": 63,
     "body": "ROLLER_D4x6",
     "d_body": 4.0,
+    "id": "PTK-063-R4X6-8M4P2-911D64",
     "n_bodies": 62,
     "z_ring": 63,
     "ecc": 1.0,
@@ -1396,6 +2565,63 @@
         "s_arc_mm": 1.362
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-063-R4X6-8M4P2-911D64.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "PTK-063-R4X6-8M4P2-911D64.01B",
+        "name": "венец",
+        "variant": "B",
+        "s": 1.4286,
+        "s_arc_mm": 1.362,
+        "rows": [
+          2,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 63.0,
+      "body": {
+        "type": "roller",
+        "d": 4.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "Øнар 121.8 > 110: тела Ø4 при n=62 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -1407,6 +2633,7 @@
     "u": 63,
     "body": "BALL_D6",
     "d_body": 6.0,
+    "id": "PTK-063-B6-8M4P2-F1EA95",
     "n_bodies": 62,
     "z_ring": 63,
     "ecc": 1.5,
@@ -1457,6 +2684,63 @@
         "s_arc_mm": 1.966
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-063-B6-8M4P2-F1EA95.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          3
+        ]
+      },
+      {
+        "id": "PTK-063-B6-8M4P2-F1EA95.01B",
+        "name": "венец",
+        "variant": "B",
+        "s": 1.4286,
+        "s_arc_mm": 1.966,
+        "rows": [
+          2,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 63.0,
+      "body": {
+        "type": "ball",
+        "d": 6.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "Øнар 170.2 > 110: тела Ø6 при n=62 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -1468,6 +2752,7 @@
     "u": 80,
     "body": "ROLLER_D5x8",
     "d_body": 5.0,
+    "id": "PTK-080-R5X8-8M4P2-DBAB2E",
     "n_bodies": 79,
     "z_ring": 80,
     "ecc": 1.25,
@@ -1518,6 +2803,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-080-R5X8-8M4P2-DBAB2E.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 80.0,
+      "body": {
+        "type": "roller",
+        "d": 5.0,
+        "l": 8.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "Øнар 177.1 > 110: тела Ø5 при n=79 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -1529,6 +2862,7 @@
     "u": 80,
     "body": "ROLLER_D4x6",
     "d_body": 4.0,
+    "id": "PTK-080-R4X6-8M4P2-0FE68E",
     "n_bodies": 79,
     "z_ring": 80,
     "ecc": 1.0,
@@ -1579,6 +2913,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-080-R4X6-8M4P2-0FE68E.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 80.0,
+      "body": {
+        "type": "roller",
+        "d": 4.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "Øнар 146.7 > 110: тела Ø4 при n=79 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -1590,6 +2972,7 @@
     "u": 80,
     "body": "BALL_D6",
     "d_body": 6.0,
+    "id": "PTK-080-B6-8M4P2-933C76",
     "n_bodies": 79,
     "z_ring": 80,
     "ecc": 1.5,
@@ -1640,6 +3023,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-080-B6-8M4P2-933C76.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 80.0,
+      "body": {
+        "type": "ball",
+        "d": 6.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "Øнар 207.5 > 110: тела Ø6 при n=79 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -1651,6 +3082,7 @@
     "u": 100,
     "body": "ROLLER_D5x8",
     "d_body": 5.0,
+    "id": "PTK-100-R5X8-8M4P2-993273",
     "n_bodies": 99,
     "z_ring": 100,
     "ecc": 1.25,
@@ -1701,6 +3133,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-100-R5X8-8M4P2-993273.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 100.0,
+      "body": {
+        "type": "roller",
+        "d": 5.0,
+        "l": 8.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "Øнар 213.7 > 110: тела Ø5 при n=99 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -1712,6 +3192,7 @@
     "u": 100,
     "body": "ROLLER_D4x6",
     "d_body": 4.0,
+    "id": "PTK-100-R4X6-8M4P2-AA4AD8",
     "n_bodies": 99,
     "z_ring": 100,
     "ecc": 1.0,
@@ -1762,6 +3243,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-100-R4X6-8M4P2-AA4AD8.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 100.0,
+      "body": {
+        "type": "roller",
+        "d": 4.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "Øнар 176.0 > 110: тела Ø4 при n=99 с отверстиями 8×M4+2шт Ø4 не вмещаются"
@@ -1773,6 +3302,7 @@
     "u": 100,
     "body": "BALL_D6",
     "d_body": 6.0,
+    "id": "PTK-100-B6-8M4P2-35B8B2",
     "n_bodies": 99,
     "z_ring": 100,
     "ecc": 1.5,
@@ -1823,6 +3353,54 @@
         "s_arc_mm": 0.0
       }
     ],
+    "parts": [
+      {
+        "id": "PTK-100-B6-8M4P2-35B8B2.01A",
+        "name": "венец",
+        "variant": "A",
+        "s": 0.0,
+        "s_arc_mm": 0.0,
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    ],
+    "geom": {
+      "rev": 1.0,
+      "u": 100.0,
+      "body": {
+        "type": "ball",
+        "d": 6.0,
+        "l": 6.0
+      },
+      "limits": {
+        "gap_k": 1.15,
+        "ecc_k": 0.25,
+        "wall_min": 4.0,
+        "row_gap": 1.0,
+        "rows": 4.0,
+        "row_phases": [
+          0.0,
+          90.0,
+          180.0,
+          270.0
+        ]
+      },
+      "ring_holes": {
+        "bolt": "M4",
+        "n": 8.0,
+        "pins": 2.0,
+        "pin_d": 4.0,
+        "head_margin": 0.5
+      },
+      "fastener": {
+        "d_clear": 4.5,
+        "dk": 7.0
+      }
+    },
     "ok": false,
     "errors": [
       "Øнар 251.4 > 110: тела Ø6 при n=99 с отверстиями 8×M4+2шт Ø4 не вмещаются"

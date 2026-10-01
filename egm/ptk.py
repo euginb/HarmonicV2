@@ -10,6 +10,8 @@
 Значения по умолчанию в dataclass используются только в self_test() (Д-18).
 """
 import math
+import hashlib
+import json
 from dataclasses import dataclass, asdict, field, fields
 from fractions import Fraction
 
@@ -47,6 +49,7 @@ class PtkResult:
     u: int
     body: str
     d_body: float
+    id: str = ""
     n_bodies: int = 0
     z_ring: int = 0
     ecc: float = 0.0
@@ -60,6 +63,8 @@ class PtkResult:
     t_hold: float = 0.0
     ring_variants: int = 0
     phasing: list = field(default_factory=list)
+    parts: list = field(default_factory=list)
+    geom: dict = field(default_factory=dict)
     ok: bool = False
     errors: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
@@ -170,10 +175,85 @@ def ring(d_root, holes, fast, lim):
     return res, err
 
 
+# Д-22: маркировка конфигураций. GEOM_REV повышается при смене формул геометрии
+# (CP-08 и далее) — тогда меняются все ID, старые чертежи остаются при старых ID.
+GEOM_REV = 1
+GEOM_LIMITS = ("gap_k", "ecc_k", "wall_min", "row_gap", "rows", "row_phases")
+GEOM_HOLES = ("bolt", "n", "pins", "pin_d", "head_margin")
+BODY_TYPES = {"roller": "R", "ball": "B"}
+
+
+def _n(v):
+    """Нормализация для хэша: 4 и 4.0 — одно значение."""
+    if isinstance(v, bool) or v is None or isinstance(v, str):
+        return v
+    if isinstance(v, (int, float)):
+        return round(float(v), 6)
+    if isinstance(v, (list, tuple)):
+        return [_n(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _n(x) for k, x in v.items()}
+    return v
+
+
+def _num(x):
+    return f"{float(x):g}".replace(".", "_")   # точка занята разделителем детали
+
+
+def body_code(body):
+    t = BODY_TYPES.get(body.get("type"), "X")
+    if t == "B":
+        return f"B{_num(body['d'])}"
+    return f"{t}{_num(body['d'])}X{_num(body.get('l', body['d']))}"
+
+
+def holes_code(holes):
+    return f"{holes.n}{holes.bolt}" + (f"P{holes.pins}" if holes.pins else "")
+
+
+def geom_params(u, body, lim, holes, fast):
+    """Все параметры, определяющие геометрию исполнения (вход хэша и CAD)."""
+    f = fast.get(holes.bolt, {})
+    return _n({"rev": GEOM_REV, "u": u,
+               "body": {k: body.get(k) for k in ("type", "d", "l")},
+               "limits": {k: getattr(lim, k) for k in GEOM_LIMITS},
+               "ring_holes": {k: getattr(holes, k) for k in GEOM_HOLES},
+               "fastener": {k: f.get(k) for k in ("d_clear", "dk")}})
+
+
+def config_id(u, body, lim, holes, fast):
+    """ID исполнения PTK-<u>-<тело>-<отверстия>-<хэш> (Д-22) и снимок геометрии."""
+    g = geom_params(u, body, lim, holes, fast)
+    raw = json.dumps(g, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+    h = hashlib.sha1(raw.encode("ascii")).hexdigest()[:6].upper()
+    return f"PTK-{u:03d}-{body_code(body)}-{holes_code(holes)}-{h}", g
+
+
+def ring_parts(cid, ph):
+    """Детали .01<вариант> — венцы (Д-19, Д-22). Остальные детали — OQ-04."""
+    out = {}
+    for row in ph["rows"]:
+        v = row["variant"]
+        p = out.setdefault(v, {"id": f"{cid}.01{v}", "name": "венец", "variant": v,
+                               "s": row["s"], "s_arc_mm": row.get("s_arc_mm"), "rows": []})
+        p["rows"].append(row["row"])
+    return list(out.values())
+
+
+def find(rows, cid):
+    """Запись ptk_configs.json по ID исполнения или детали (вход CP-05)."""
+    base = cid.split(".")[0]
+    for r in rows:
+        if r.get("id") == base:
+            return r
+    raise KeyError(f"конфигурация {base} не найдена в ptk_configs.json")
+
+
 def calc(u, body_id, body, lim, holes, fast):
     """Расчёт одной конфигурации. body = {'type','d','l'}."""
     d = body["d"]
     r = PtkResult(u, body_id, d)
+    r.id, r.geom = config_id(u, body, lim, holes, fast)
     if u > lim.u_max:
         s = two_stage(u, lim)
         r.errors.append(f"u={u} > {lim.u_max}: одноступенчатый ПТК не считается; рекомендуется "
@@ -205,6 +285,7 @@ def calc(u, body_id, body, lim, holes, fast):
     r.d_pitch, r.d_root = round(d_pitch, 2), round(d_root, 2)
     r.holes, r.d_bc, r.t_hold = rg["label"], rg["d_bc"], rg["t_hold"]
     r.ring_variants, r.phasing = ph["variants"], ph["rows"]
+    r.parts = ring_parts(r.id, ph)
     r.d_out = round(rg["d_out"], 2)
     r.width = round(lim.rows * body["l"] + (lim.rows + 1) * lim.row_gap, 1)
     r.d_body_max = round((lim.d_out_max - 4 * band)
@@ -332,6 +413,18 @@ def self_test():
     ph = phasing(25, 24, RingHoles(n=5, pins=0), lim)     # НОК=25, g=14.4°
     assert ph["variants"] == 4 and abs(ph["rows"][1]["s"] - 10.8) < 1e-3, ph
     assert abs(phasing(20, 19, holes, lim)["rows"][1]["cage"] - 90 % (360 / 19)) < 1e-3
+    # Д-22: маркировка
+    r = c(20)
+    assert r.id.startswith("PTK-020-R5X8-8M4P2-") and len(r.id.split("-")[-1]) == 6, r.id
+    assert c(20).id == r.id                                       # детерминирован
+    assert c(20, RingHoles(safety=3.0, mu=0.2)).id == r.id        # не геометрия
+    assert c(20, RingHoles(pin_d=4)).id == r.id                   # 4 == 4.0
+    assert c(20, RingHoles(pin_d=5.0)).id != r.id                 # геометрия
+    assert calc(20, "t", b, PtkLimits(gap_k=1.2), holes, fast).id != r.id
+    assert body_code({"type": "ball", "d": 2.5}) == "B2_5"
+    assert [p["id"] for p in c(63).parts] == [c(63).id + ".01A", c(63).id + ".01B"]
+    rows = [asdict(c(20)), asdict(c(63))]
+    assert find(rows, c(63).id + ".01B")["u"] == 63
     return True
 
 
