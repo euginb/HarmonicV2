@@ -14,6 +14,7 @@ specs/task.md
 specs/init.md
 *.diff
 *.fixed.diff
+AUDIT_BUNDLE.md
 dist/
 patch/
 out/
