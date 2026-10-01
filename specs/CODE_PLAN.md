@@ -34,5 +34,6 @@ code-first перегенерируются только прогоном.
 | CP-14 | ПТК: отверстия венца (крепёжные = технологические), момент удержания, параметры в `specs/ptk_input.json`, входные параметры и расшифровка колонок в SPEC-10 | egm/ptk.py, main.py, templates/, specs/ptk_input.json | Д-16, Д-18 | CP-11 | закрыт (прогон OK, dbcf67c) |
 | CP-15 | Инструкции INS-00, INS-10, INS-20 | instructions/ | Д-17 | — | закрыт (прогон OK, dbcf67c) |
 | CP-16 | ПТК: фазировка рядов через сдвиг сверловки венцов, число вариантов венца, смещение гнёзд сепаратора; снята кратность 4 | egm/ptk.py, main.py, templates/, specs/ptk_input.json, instructions/INS-10 | Д-19 | CP-14 | патч |
+| CP-17 | Детерминированный сбор контекста (bundle) по ключам, фиксированный пол чтения, pinned base, зеркало в AI Drive и порядок синхронизации, выдача патчей файлами; область действия — инфраструктура Genspark (AI Drive) | tools/context_bundle.py, README.md, specs/DECISIONS.md | Д-20 | — | закрыт (прогон OK, 369a808) |
 
 
