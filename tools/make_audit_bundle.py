@@ -1,7 +1,7 @@
 from pathlib import Path
 import subprocess
 
-ROOT = Path(".").resolve()
+ROOT = Path("..").resolve()
 OUT = ROOT / "AUDIT_BUNDLE.md"
 
 TEXT_EXT = {
