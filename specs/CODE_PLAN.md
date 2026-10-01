@@ -17,7 +17,7 @@ code-first перегенерируются только прогоном.
 ## 2. Пункты плана
 
 | CP | Содержание | Файлы | Основание | Зависит от | Статус |
-|---|---|---|---|---|---|
+|---|---|---|---|---|--|
 | CP-01 | Каркас `main.py`, пакет `egm`, калькулятор ПТК ур.1, шаблон SPEC-10 | main.py, egm/, templates/ | Д-08 | — | закрыт (прогон OK, 4eb0bbe) |
 | CP-02 | Парсер `docs/HG-Series-Catalog_opt.md` → `catalog_hiwin_hg.json`, пары с каталожными номерами, проверка совместимости, раскладка отверстий рельса, сверка `vendor_prices.json` | egm/catalog.py, main.py | Д-07, Д-10 | CP-01 | закрыт (прогон OK, 0291bd6) |
 | CP-03 | Расчёт стоимости по `vendor_prices.json`, отчёт о несовместимостях | egm/cost.py | Д-07 | CP-02 | открыт |
@@ -33,7 +33,7 @@ code-first перегенерируются только прогоном.
 | CP-13 | Выход прогона `out/specs/` и `out/reports/`, ключ `--publish` | main.py | Д-14 | — | закрыт (прогон OK, dbcf67c) |
 | CP-14 | ПТК: отверстия венца (крепёжные = технологические), момент удержания, параметры в `specs/ptk_input.json`, входные параметры и расшифровка колонок в SPEC-10 | egm/ptk.py, main.py, templates/, specs/ptk_input.json | Д-16, Д-18 | CP-11 | закрыт (прогон OK, dbcf67c) |
 | CP-15 | Инструкции INS-00, INS-10, INS-20 | instructions/ | Д-17 | — | закрыт (прогон OK, dbcf67c) |
-| CP-16 | ПТК: фазировка рядов через сдвиг сверловки венцов, число вариантов венца, смещение гнёзд сепаратора; снята кратность 4 | egm/ptk.py, main.py, templates/, specs/ptk_input.json, instructions/INS-10 | Д-19 | CP-14 | патч |
+| CP-16 | ПТК: фазировка рядов через сдвиг сверловки венцов, число вариантов венца, смещение гнёзд сепаратора; снята кратность 4 | egm/ptk.py, main.py, templates/, specs/ptk_input.json, instructions/INS-10 | Д-19 | CP-14 | закрыт (прогон OK) |
 | CP-17 | Детерминированный сбор контекста (bundle) по ключам, фиксированный пол чтения, pinned base, зеркало в AI Drive и порядок синхронизации, выдача патчей файлами; область действия — инфраструктура Genspark (AI Drive) | tools/context_bundle.py, README.md, specs/DECISIONS.md | Д-20 | — | закрыт (прогон OK, 369a808) |
 | CP-18 | AUDIT_BUNDLE: регистрация скрипта формирования, инструкции INS-90 (применение — только при одновременной недоступности GitHub и AI Drive) и места результатов review | tools/make_audit_bundle.py, instructions/INS-90_AUDIT_BUNDLE.md, specs/DECISIONS.md, review_reports/ | Д-21 | — | закрыт (прогон OK, c563a6a) |
 
