@@ -1,13 +1,20 @@
 from pathlib import Path
 import subprocess
 
-ROOT = Path("..").resolve()
+ROOT = Path(".").resolve()
 OUT = ROOT / "AUDIT_BUNDLE.md"
 
 TEXT_EXT = {
     ".md", ".py", ".json", ".toml", ".yaml", ".yml", ".txt",
     ".cfg", ".ini", ".j2", ".jinja", ".jinja2", ".csv", ".tsv",
     ".svg",
+}
+
+"""
+ Список пропускаемых файлов при выгрузке с обоснованием
+"""
+SKIP_FILES = {
+    "docs/HG-Series-Catalog_opt.pdf": "Пропущен так-как vendor based, out of scope by review process"
 }
 
 MAX_FILE_BYTES = 300_000
@@ -28,7 +35,10 @@ with OUT.open("w", encoding="utf-8", newline="\n") as out:
         out.write(f + "\n")
     out.write("```\n\n")
 
-    out.write("Примечание: Файлы в репозитории ссылаются на 'docs/HG-Series-Catalog_opt.pdf', но в самом репозитории его нет. Это не ошибка. Он исключен намеренно с целью уменьшить размер данного файла\n\n")
+    out.write("## Skipped content of files from the report for some reasons: \n\n")
+
+    for file, desc in SKIP_FILES.items():
+        out.write(f"{file} - {desc}\n\n")
 
     out.write("## Text file contents\n\n")
 
