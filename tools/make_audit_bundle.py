@@ -63,6 +63,12 @@ PROFILES = {
             "specs/catalog_*.json": "code-first БД каталога, производная от docs/ (egm/catalog.py)",
         },
     ),
+    "ins20": (
+        "без инструкций к code-first спецификациям",
+        {
+            "instructions/INS-20*": "инструкция к каталогу HIWIN HG",
+        },
+    ),
     "ins": (
         "без инструкций к code-first спецификациям",
         {
