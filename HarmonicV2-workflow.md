@@ -25,6 +25,8 @@
 | `2bc44fd5a3b1a7d300476575c0faff9ffbddad09` | 2026-10-01 | архив codeload main; коммит «Фиксация правил детерминированного сбора контекста» — применён CP-17 (родитель a460793, состав совпадает с патчем: README +6, CODE_PLAN +1, DECISIONS +1); в дереве есть Д-20, CP-17, п.7 README; `main.py` exit 0 (OK); bundle «Д-20» → exit 0 (26 707 байт), повторный прогон байт-в-байт идентичен (cmp); bundle «CP-17» → exit 0 |
 | `c563a6a629ece1d2854beb06dc0a21d15ece6376` | 2026-10-01 | архив codeload main; коммиты 0be88c89 (AUDIT_BUNDLE.md в .gitignore) и c563a6a6 (доработки генератора: список пропущенных файлов); в дереве `tools/make_audit_bundle.py`; `main.py` exit 0 (OK); make_audit_bundle проверен в git-клоне — exit 0, AUDIT_BUNDLE.md создан |
 | `4d1a84626b54f37d76bb6e0c918b56e06fa6adae` | 2026-10-01 | архив codeload main; коммиты c0c21ea1 (применён CP-18: INS-90, Д-21, CP-18) и 4d1a8462 («Закрыл все патчи»: правки статусов в CODE_PLAN +2/-2); в дереве Д-21 и CP-18 на месте, INS-90 с условием «резервный»; `main.py` exit 0 (OK); bundle «CP-18» и «Д-21» → exit 0 |
+| `71df0e6b02aa5851193d5acd8cb5708cb6a886b8` | 2026-10-02 | архив codeload main; rev-06/07: CP-19, CP-20 (products, `egm/cad/`), Д-22…Д-24, `HarmonicV2-workflow.md` в корне как референс, `review_reports/` удалена после отработки; `main.py` exit 0 (OK) |
+| `574dea135f6241ca3389588fe64b31617580871c` | 2026-10-02 | архив codeload main; [rev-07] d80b2d9c — применён CP-21, 574dea13 — исправление после наложения (пустая строка в таблице CANCELLED, выравнивание CODE_PLAN), CP-21 закрыт; `main.py` exit 0 (OK); `AUDIT_BUNDLE.md` 687 КБ |
 | `a46079347b55f9c4de57333be773b44f36dddb77` | 2026-10-01 | архив codeload main; коммит «Правила использования AUDIT_BUNDLE.md…»: + `instructions/INS-90_AUDIT_BUNDLE.md`, + `review_reports/AUDIT_FORMULATION_ISSUES.md`; CP-17 в репо ещё не применён (Д-20, CP-17, п.7 README отсутствуют) — статус «выдан», `git apply --check` на новой базе чисто; `main.py` exit 0 (OK); bundle: отсутствующий ключ Д-20 → exit 3 (корректно), повторный прогон байт-в-байт идентичен (cmp) |
 
 Перед работой агент сверяет sha последнего коммита
@@ -147,6 +149,8 @@
 | `context-bundle_base2031649.diff` | `20316490cff28eb438f61ec0ce83edf90fd90734` | — | 2026-09-30 | применён (rev-05, 2026-10-01) |
 | `CP-17_context-registration_base369a808.diff` | `369a808aa850d557efa4890d5f03125e33be61e5` | CP-17 | 2026-10-01 | применён (rev-05, 2bc44fd, 2026-10-01) |
 | `CP-18_audit-bundle-registration_basec563a6a.diff` | `c563a6a629ece1d2854beb06dc0a21d15ece6376` | CP-18 | 2026-10-01 | применён (rev-05, c0c21ea1, 2026-10-01) |
+| `CP-21_instructions-docs_base71df0e6.diff` | `71df0e6b02aa5851193d5acd8cb5708cb6a886b8` | CP-21 | 2026-10-02 | применён (rev-07, d80b2d9c + исправление 574dea13, 2026-10-02) |
+| `CP-22_audit-bundle-profiles_base574dea1.diff` | `574dea135f6241ca3389588fe64b31617580871c` | CP-22, CP-23 | 2026-10-02 | выдан |
 
 ## Правила для пользователя
 
@@ -161,8 +165,10 @@
   база <sha>: <задача> (CP-##)»;
 - AI Chat (без песочницы) продолжает читать через GitHub API по Д-12/Д-15 —
   прежние инструкции в чате сохраняются как резервный путь.
-- для модели в AI Chat артефакты контекста — `AUDIT_BUNDLE.md` (Д-21,
-  формируется `tools/make_audit_bundle.py`) и файлы, приложенные к сообщению;
+- для модели в AI Chat артефакты контекста — bundle по ключам
+  (`tools/context_bundle.py`) или `AUDIT_BUNDLE.md` (`tools/make_audit_bundle.py`),
+  порядок — `instructions/INS-90_AUDIT_BUNDLE.md` (Д-26), режимы —
+  `instructions/README.md` §2; плюс файлы, приложенные к сообщению;
   файлы читаются моделями с `raw.githubusercontent.com` (pinned к base sha);
   ссылки AI Drive моделям не передаются.
 
