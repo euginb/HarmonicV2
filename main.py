@@ -9,7 +9,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from egm import catalog, naming, products, ptk
+from egm import catalog, naming, products, ptk, ptk_profile
 from egm.cad import ptk_ring
 
 ROOT = Path(__file__).resolve().parent
@@ -47,28 +47,33 @@ def publish(ok):
 def run_ptk(prices):
     """SPEC-10: калькулятор ПТК по specs/ptk_input.json (Д-16, Д-18)."""
     try:
-        lim, holes, fast = ptk.load_config(load_json("ptk_input.json"))
+        lim, mounts, fast, mode = ptk.load_config(load_json("ptk_input.json"))
     except (KeyError, ValueError, TypeError) as e:
         return [f"ptk_input.json: {e!r}"]
-    rows = ptk.to_rows(ptk.sweep(prices["bodies"], lim, holes, fast), holes)
+    rows = ptk.to_rows(ptk.sweep(prices["bodies"], lim, mounts, fast, mode), mounts)
     write("specs", "ptk_configs.json", json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
     table, errs, warns = [], [], []
     for r in rows:
         m = r["torque_Nm_est"] if r["ok"] else "—"
         table.append(f"| {r['id']} | {r['u']} | {r['body']} | {r['d_body']} | {r['d_body_max']} | "
                      f"{r['n_bodies']} | {r['z_ring']} | {r['ecc']} | {r['d_pitch']} | "
-                     f"{r['d_root']} | {r['holes'] or '—'} | {r['ring_variants'] or '—'} | "
+                     f"{r['d_root']} | {(r['holes'] + ' (' + r['mount'] + ')') if r['holes'] else '—'} | "
+                     f"{r['ring_variants'] or '—'} | "
                      f"{r['d_bc']} | {r['d_out']} | "
                      f"{r['width']} | {m} | {r['t_hold']} | {'OK' if r['ok'] else 'нет'} |")
         tag = f"- u={r['u']}, {r['body']}: "
         errs += [tag + e for e in r["errors"]]
         warns += [tag + w for w in r["warnings"]]
     tpl = (TPL / "SPEC-10_PTK_CALC.md.tmpl").read_text(encoding="utf-8")
+    params = "\n\n".join(f"Крепление `{k}` (режим `{mode}`, Д-33):\n\n" + ptk.params_md(lim, h, fast)
+                         for k, h in mounts.items())
+    phasing = "\n\n".join(f"### Крепление `{k}`\n\n" + ptk.phasing_table(lim, h)
+                          for k, h in mounts.items())
     write("specs", "SPEC-10_PTK_CALC.md", tpl.format(
-        params=ptk.params_md(lim, holes, fast), rows="\n".join(table),
+        params=params, rows="\n".join(table), profile=ptk_profile.theory_md(),
         errors="\n".join(errs) or "нет", warnings="\n".join(warns) or "нет",
         n_ok=sum(r["ok"] for r in rows), n_all=len(rows),
-        two_stage=ptk.two_stage_table(lim), phasing=ptk.phasing_table(lim, holes)))
+        two_stage=ptk.two_stage_table(lim), phasing=phasing))
     ids = [r["id"] for r in rows]
     dup = sorted({i for i in ids if ids.count(i) > 1})
     return ([f"ptk: одинаковые ID {dup} — одно тело под разными ключами "
@@ -93,7 +98,7 @@ def main(argv):
     fails = []
     for name, test in (("ptk", ptk.self_test), ("naming", naming.self_test),
                        ("catalog", catalog.self_test), ("products", products.self_test),
-                       ("cad", ptk_ring.self_test)):
+                       ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test)):
         try:
             test()
         except AssertionError as e:

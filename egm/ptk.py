@@ -15,6 +15,8 @@ import json
 from dataclasses import dataclass, asdict, field, fields
 from fractions import Fraction
 
+from egm import ptk_profile
+
 
 @dataclass
 class PtkLimits:
@@ -29,7 +31,7 @@ class PtkLimits:
     rows: int = 4
     row_phases: tuple = (0, 90, 180, 270)   # фазы эксцентриков рядов, град (Д-19)
     u_list: tuple = (10, 16, 20, 25, 32, 40, 50, 63, 80, 100)
-    # TODO(CP-08): ecc_k и gap_k — из условия непрерывного зацепления
+    e_margin: float = 0.8         # e = min(ecc_k·Ø тела, e_margin·e max) (Д-31)
 
 
 @dataclass
@@ -53,9 +55,12 @@ class PtkResult:
     n_bodies: int = 0
     z_ring: int = 0
     ecc: float = 0.0
+    e_max: float = 0.0
     d_pitch: float = 0.0
     d_root: float = 0.0
+    d_tip: float = 0.0
     holes: str = ""
+    mount: str = ""
     d_bc: float = 0.0
     d_out: float = 0.0
     width: float = 0.0
@@ -80,9 +85,11 @@ def _load(cls, d):
 
 
 def load_config(cfg):
-    """specs/ptk_input.json -> (PtkLimits, RingHoles, fasteners)."""
+    """specs/ptk_input.json -> (PtkLimits, {ключ: RingHoles}, fasteners, mount_mode) (Д-33)."""
     fast = {k: v for k, v in cfg["fasteners"].items() if not k.startswith("_")}
-    return _load(PtkLimits, cfg["limits"]), _load(RingHoles, cfg["ring_holes"]), fast
+    raw = cfg.get("ring_mounts") or {"default": cfg["ring_holes"]}
+    mounts = {k: _load(RingHoles, v) for k, v in raw.items() if not k.startswith("_")}
+    return _load(PtkLimits, cfg["limits"]), mounts, fast, cfg.get("mount_mode", "first_ok")
 
 
 def _band(holes, fast, lim):
@@ -177,8 +184,8 @@ def ring(d_root, holes, fast, lim):
 
 # Д-22: маркировка конфигураций. GEOM_REV повышается при смене формул геометрии
 # (CP-08 и далее) — тогда меняются все ID, старые чертежи остаются при старых ID.
-GEOM_REV = 1
-GEOM_LIMITS = ("gap_k", "ecc_k", "wall_min", "row_gap", "rows", "row_phases")
+GEOM_REV = 2                       # Д-31: z = u + 1, точный профиль, e по подрезу
+GEOM_LIMITS = ("gap_k", "ecc_k", "e_margin", "wall_min", "row_gap", "rows", "row_phases")
 GEOM_HOLES = ("bolt", "n", "pins", "pin_d", "head_margin")
 BODY_TYPES = {"roller": "R", "ball": "B"}
 
@@ -263,9 +270,16 @@ def calc(u, body_id, body, lim, holes, fast):
         r.errors.append(f"u={u} < {lim.u_min}: вне диапазона (Д-08)")
     if u < 2:
         return r
-    n = u - 1
-    ecc = lim.ecc_k * d
+    z, n = u + 1, u                      # Д-31: венец неподвижен, выход — сепаратор
     d_pitch = n * lim.gap_k * d / math.pi
+    e_max = ptk_profile.e_max(round(d_pitch / 2, 6), d / 2, z)
+    ecc = min(lim.ecc_k * d, lim.e_margin * e_max)
+    r.e_max = round(e_max, 3)
+    if ecc > e_max:
+        r.errors.append(f"подрез профиля венца: e={ecc:.3f} > e max={e_max:.3f} мм (Д-31)")
+    if 2 * ecc < 0.05 * d:
+        r.warnings.append(f"глубина волны 2e={2 * ecc:.3f} мм < 5% Ø тела: увеличить gap_k "
+                          "(растёт R0 и e max) или уменьшить Ø тела")
     d_root = d_pitch + d + 2 * ecc
     rg, rerr = ring(d_root, holes, fast, lim)
     r.errors += rerr
@@ -281,11 +295,12 @@ def calc(u, body_id, body, lim, holes, fast):
         r.errors.append(f"генератор Ø{d_gen:.1f} < {lim.gen_bore_min:g}: мал для подшипника/вала")
     if lim.rows != len(lim.row_phases):
         r.errors.append("число рядов не совпадает с фазировкой")
-    ph = phasing(u, n, holes, lim)
+    ph = phasing(z, n, holes, lim)
     for row in ph["rows"]:
         row["s_arc_mm"] = round(row["s"] * math.pi * rg["d_bc"] / 360, 3)
-    r.n_bodies, r.z_ring, r.ecc = n, u, round(ecc, 3)
+    r.n_bodies, r.z_ring, r.ecc = n, z, round(ecc, 3)
     r.d_pitch, r.d_root = round(d_pitch, 2), round(d_root, 2)
+    r.d_tip = round(d_pitch + d - 2 * ecc, 2)
     r.holes, r.d_bc, r.t_hold = rg["label"], rg["d_bc"], rg["t_hold"]
     r.ring_variants, r.phasing = ph["variants"], ph["rows"]
     r.parts = ring_parts(r.id, ph)
@@ -295,9 +310,20 @@ def calc(u, body_id, body, lim, holes, fast):
     return r
 
 
-def sweep(bodies, lim, holes, fast):
-    return [calc(u, bid, b, lim, holes, fast) for u in lim.u_list
-            for bid, b in bodies.items() if not bid.startswith("_")]
+def sweep(bodies, lim, mounts, fast, mode="first_ok"):
+    """Д-33: для каждой пары (u, тело) — все крепления (all) или первое прошедшее (first_ok)."""
+    out = []
+    for u in lim.u_list:
+        for bid, b in bodies.items():
+            if bid.startswith("_"):
+                continue
+            rs = []
+            for key, h in mounts.items():
+                r = calc(u, bid, b, lim, h, fast)
+                r.mount = key
+                rs.append(r)
+            out += rs if mode == "all" else [next((r for r in rs if r.ok), rs[0])]
+    return out
 
 
 def two_stage(u, lim):
@@ -332,12 +358,12 @@ def phasing_table(lim, holes):
     head = (f"Сверловка венца: {holes.n}×{holes.bolt} через {360 / max(holes.n, 1):g}°{pins}; "
             f"порядок симметрии сверловки N = {order} (σ = {360 / order:g}°). "
             "Не зависит от тела качения, поэтому дана по u.")
-    rows = ["| u = z | p, ° | g, ° | Венцов | Ряд | φ, ° | δ/p | s, ° | Сепаратор, ° | Вариант |",
+    rows = ["| u (z = u + 1) | p, ° | g, ° | Венцов | Ряд | φ, ° | δ/p | s, ° | Сепаратор, ° | Вариант |",
             "|---|---|---|---|---|---|---|---|---|---|"]
     for u in lim.u_list:
         if not 2 <= u <= lim.u_max:
             continue
-        ph = phasing(u, u - 1, holes, lim)
+        ph = phasing(u + 1, u, holes, lim)
         for i, row in enumerate(ph["rows"]):
             lead = (f"| {u} | {ph['pitch']:g} | {ph['g']:g} | {ph['variants']} |"
                     if i == 0 else "| | | | |")
@@ -365,9 +391,10 @@ def torque_estimate(r: PtkResult, q_allow=None):
     return round(q * loaded * (r.d_pitch / 2000.0) * 4, 1)  # Н·м, 4 ряда
 
 
-def to_rows(results, holes):
+def to_rows(results, mounts):
     out = []
     for r in results:
+        holes = mounts.get(r.mount) or next(iter(mounts.values()))
         row = asdict(r)
         m = torque_estimate(r) if r.ok else None
         row["torque_Nm_est"] = m
@@ -390,11 +417,12 @@ def self_test():
         return calc(u, "t", b, lim, h, fast)
 
     assert not c(100).ok
-    r = c(20)
+    r = c(19)                                             # z = 20 кратно 4
     assert r.ok, r.errors
-    assert abs(r.d_out - 67.28) < 0.05, r.d_out           # 42.275 + 4·6.25
-    assert 107.0 < r.t_hold < 109.0, r.t_hold             # 8·4.1·0.12·27.39
-    assert r.ring_variants == 1, r.phasing                # z = 20 кратно 4
+    assert r.z_ring == 20 and r.n_bodies == 19            # Д-31: u = n = z − 1
+    assert 0 < r.ecc <= r.e_max and abs(r.d_root - r.d_tip - 4 * r.ecc) < 0.02
+    assert 55.0 < r.d_out < 75.0, r.d_out
+    assert r.ring_variants == 1, r.phasing
     assert not c(5).ok
     r = c(120)
     assert not r.ok and "двухступенчат" in r.errors[0]
@@ -423,9 +451,9 @@ def self_test():
     assert c(20, RingHoles(pin_d=5.0)).id != r.id                 # геометрия
     assert calc(20, "t", b, PtkLimits(gap_k=1.2), holes, fast).id != r.id
     assert body_code({"type": "ball", "d": 2.5}) == "B2_5"
-    assert [p["id"] for p in c(63).parts] == [c(63).id + ".01A", c(63).id + ".01B"]
-    rows = [asdict(c(20)), asdict(c(63))]
-    assert find(rows, c(63).id + ".01B")["u"] == 63
+    assert [p["id"] for p in c(62).parts] == [c(62).id + ".01A", c(62).id + ".01B"]  # z = 63
+    rows = [asdict(c(20)), asdict(c(62))]
+    assert find(rows, c(62).id + ".01B")["u"] == 62
     return True
 
 
