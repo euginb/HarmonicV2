@@ -45,7 +45,9 @@ TEXT_EXT = {
  Базовые правила исключения (действуют всегда): правило .gitignore → обоснование
 """
 SKIP_FILES = {
-    "docs/HG-Series-Catalog_opt.pdf": "Пропущен так-как vendor based, out of scope by review process"
+    "docs/HG-Series-Catalog_opt.pdf": "Пропущен так-как vendor based, out of scope by review process",
+    "specs/consolidation.md": "Рабочие запросы к ИИ по консолидации информации",
+    "specs/repository-review.md": "Рабочие запросы к ИИ по аудиту информации"
 }
 
 """
@@ -57,6 +59,7 @@ PROFILES = {
         "без каталогов производителя и производных БД каталога",
         {
             "docs/": "справочные материалы и каталоги производителей; источник БД — INS-20",
+            "reports/catalog_*.md": "отчет о парсинге docs/HG-Series-Catalog_opt.md",
             "specs/catalog_*.json": "code-first БД каталога, производная от docs/ (egm/catalog.py)",
         },
     ),
