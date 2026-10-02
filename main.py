@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from egm import catalog, naming, products, ptk
+from egm.cad import ptk_ring
 
 ROOT = Path(__file__).resolve().parent
 SPECS, REPORTS, TPL = ROOT / "specs", ROOT / "reports", ROOT / "templates"
@@ -91,7 +92,8 @@ def main(argv):
         shutil.rmtree(OUT / kind, ignore_errors=True)
     fails = []
     for name, test in (("ptk", ptk.self_test), ("naming", naming.self_test),
-                       ("catalog", catalog.self_test), ("products", products.self_test)):
+                       ("catalog", catalog.self_test), ("products", products.self_test),
+                       ("cad", ptk_ring.self_test)):
         try:
             test()
         except AssertionError as e:

@@ -15,6 +15,20 @@ class Drawing:
     def circle(self, x, y, r, kind):
         self.items.append(f'<circle cx="{x:g}" cy="{-y:g}" r="{r:g}" {STYLE[kind]}/>')
 
+    def path(self, segs, kind):
+        """Замкнутый контур из сегментов 'arc' (p0, p1, r, large) и 'line' (p0, p1).
+
+        Обход против часовой стрелки на виде; ось y SVG направлена вниз и
+        переворачивается, поэтому sweep-flag = 0 (Д-30)."""
+        pt = lambda p: f"{p[0]:.4f},{-p[1]:.4f}"
+        cmd = [f"M{pt(segs[0]['p0'])}"]
+        for s in segs:
+            if s["kind"] == "arc":
+                cmd.append(f"A{s['r']:.4f},{s['r']:.4f} 0 {int(s['large'])} 0 {pt(s['p1'])}")
+            else:
+                cmd.append(f"L{pt(s['p1'])}")
+        self.items.append(f'<path d="{" ".join(cmd)} Z" {STYLE[kind]}/>')
+
     def dia(self, d, level, fmt):
         """Горизонтальный размер диаметра под видом, уровень level."""
         y = self.r + 8 + 7 * level

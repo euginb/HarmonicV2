@@ -269,9 +269,13 @@ def calc(u, body_id, body, lim, holes, fast):
     d_root = d_pitch + d + 2 * ecc
     rg, rerr = ring(d_root, holes, fast, lim)
     r.errors += rerr
+    band = _band(holes, fast, lim)
+    r.d_body_max = round((lim.d_out_max - 4 * band)
+                         / (n * lim.gap_k / math.pi + 1 + 2 * lim.ecc_k), 2)
     if rg["d_out"] > lim.d_out_max:
         r.errors.append(f"Øнар {rg['d_out']:.1f} > {lim.d_out_max:g}: тела Ø{d:g} при n={n} "
-                        f"с отверстиями {rg['label']} не вмещаются")
+                        f"с отверстиями {rg['label']} не вмещаются; макс. Ø тела "
+                        f"{r.d_body_max:g} мм (OQ-05)")
     d_gen = d_pitch - d - 2 * ecc
     if d_gen < lim.gen_bore_min:
         r.errors.append(f"генератор Ø{d_gen:.1f} < {lim.gen_bore_min:g}: мал для подшипника/вала")
@@ -280,7 +284,6 @@ def calc(u, body_id, body, lim, holes, fast):
     ph = phasing(u, n, holes, lim)
     for row in ph["rows"]:
         row["s_arc_mm"] = round(row["s"] * math.pi * rg["d_bc"] / 360, 3)
-    band = _band(holes, fast, lim)
     r.n_bodies, r.z_ring, r.ecc = n, u, round(ecc, 3)
     r.d_pitch, r.d_root = round(d_pitch, 2), round(d_root, 2)
     r.holes, r.d_bc, r.t_hold = rg["label"], rg["d_bc"], rg["t_hold"]
@@ -288,8 +291,6 @@ def calc(u, body_id, body, lim, holes, fast):
     r.parts = ring_parts(r.id, ph)
     r.d_out = round(rg["d_out"], 2)
     r.width = round(lim.rows * body["l"] + (lim.rows + 1) * lim.row_gap, 1)
-    r.d_body_max = round((lim.d_out_max - 4 * band)
-                         / (n * lim.gap_k / math.pi + 1 + 2 * lim.ecc_k), 2)
     r.ok = not r.errors
     return r
 
