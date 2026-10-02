@@ -14,13 +14,14 @@
 |---|---|---|
 | `specs/` | спецификации (spec-first и code-first), БД JSON, входные параметры `*_input.json` | заказчик; code-first — перенос из `out/specs/` |
 | `reports/` | отчёты прогона: сводка проверок, разбор каталогов | перенос из `out/reports/` (Д-14) |
-| `instructions/` | инструкции к code-first спецификациям: входные файлы, параметры, обозначения (Д-17) | правятся напрямую |
+| `instructions/` | инструкции: к code-first спецификациям, режимы работы с ИИ, подготовка контекста; реестр — `instructions/README.md` (Д-17, Д-25) | правятся напрямую |
 | `templates/` | шаблоны code-first спецификаций | код |
 | `egm/` | пакет расчётов на Python | код |
 | `docs/` | каталоги производителей, справочные материалы | заказчик |
 | `archive/` | архив решений | журнал |
-| `tools/` | служебные утилиты (`fix_diff.py`) | — |
+| `tools/` | служебные утилиты: `fix_diff.py` (Д-13), `context_bundle.py`, `make_audit_bundle.py` (INS-90) | — |
 | `out/` | выход прогона, в git не хранится | `main.py` |
+| `HarmonicV2-workflow.md` | референсная копия порядка работы Super Agent; актуальная — в AI Drive (`instructions/README.md` §1) | заказчик |
 
 ## Правила работы с репозиторием
 
@@ -36,7 +37,13 @@
 
 ## Правила взаимодействия с ИИ
 
-1. ИИ не запускает код и не пишет в репозиторий: изменения — unified diff.
+Здесь — правила GitHub, коммитов и патчей, общие для всех режимов. Режимы
+работы с ИИ (Super Agent, AI Chat + GitHub, AI Chat без GitHub), чтение
+репозитория и подготовка контекста — [instructions/README.md](instructions/README.md).
+
+1. ИИ не пишет в репозиторий: изменения — только unified diff; заказчик
+   проверяет, применяет, коммитит и пушит; закрывающий прогон `main.py` — у
+   заказчика (Д-01).
 2. Каждый файл: `diff --git a/<путь> b/<путь>`; новый — `new file mode 100644`,
    `--- /dev/null`, один hunk `@@ -0,0 +1,N @@`, все строки с `+`.
 3. Правки существующих файлов — только от текущего коммита; первая строка
@@ -44,14 +51,8 @@
    `tools/fix_diff.py` добирает его до 3 строк по рабочему дереву (Д-13).
 4. UTF-8 без BOM, LF, перевод строки в конце; `--recount` не используется.
 5. Перед наложением: `python tools/fix_diff.py p.diff` → `git apply --check`.
-6. В начале сессии ИИ читает README, DECISIONS, CODE_PLAN, `reports/` и нужные
-   spec от последнего коммита способами Д-12, Д-15.
-7. Контекст задачи собирается детерминированно (Д-20): зеркало в AI Drive,
-   `python tools/context_bundle.py --sha <base> <ключи и пути>`; задача
-   открывается указанием базового sha; патч — файлом в AI Drive
-   (`/HarmonicV2-patches/`). Механизм действует в инфраструктуре Genspark
-   при подключённом AI Drive; вне её — способы Д-12, Д-15 (резервный
-   путь): зеркало, синхронизация и канал патчей — функции AI Drive.
+6. Коммит — с префиксом ревизии (`[rev-NN] …`); пункт `CP-##` закрывается
+   в CODE_PLAN после прогона `main.py` (код выхода 0).
 
 ## Реестр спецификаций
 
@@ -74,9 +75,6 @@
 | [specs/catalog_hiwin_hg_pairs.json](specs/catalog_hiwin_hg_pairs.json) | code-first (БД) | `egm/catalog.py`, Д-10, INS-20 | rev 1 |
 | [reports/checks.md](reports/checks.md) | отчёт | `main.py` | каждый прогон |
 | [reports/catalog_report.md](reports/catalog_report.md) | отчёт | `egm/catalog.py` | каждый прогон |
-| [instructions/README.md](instructions/README.md) | инструкция | INS-00 | rev 1 |
-| [instructions/INS-10_PTK_CALC.md](instructions/INS-10_PTK_CALC.md) | инструкция | к SPEC-10 | rev 1 |
-| [instructions/INS-20_CATALOG.md](instructions/INS-20_CATALOG.md) | инструкция | к catalog_* | rev 1 |
 
 ## Описание спецификаций
 
@@ -97,6 +95,9 @@
 | catalog_hiwin_hg_pairs.json | совместимые пары рельс+каретка с нашими каталожными номерами EGC | номер пары используется в спецификациях станков (INS-20) |
 | reports/checks.md | сводка проверок прогона | «все пройдены» = код выхода 0 |
 | reports/catalog_report.md | итог разбора каталога, ошибки, нераспознанные таблицы | после изменения каталога или парсера |
+
+Инструкции (`INS-##`) в этот реестр не входят: их реестр, назначение и
+правило поддержания — [instructions/README.md](instructions/README.md) (Д-25).
 
 ## Запуск
 

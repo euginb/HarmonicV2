@@ -15,6 +15,7 @@ specs/init.md
 *.diff
 *.fixed.diff
 AUDIT_BUNDLE.md
+CONTEXT_BUNDLE.md
 dist/
 patch/
 out/

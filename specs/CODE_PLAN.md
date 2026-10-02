@@ -38,5 +38,6 @@ code-first перегенерируются только прогоном.
 | CP-18 | AUDIT_BUNDLE: регистрация скрипта формирования, инструкции INS-90 (применение — только при одновременной недоступности GitHub и AI Drive) и места результатов review | tools/make_audit_bundle.py, instructions/INS-90_AUDIT_BUNDLE.md, specs/DECISIONS.md, review_reports/ | Д-21 | — | закрыт (прогон OK, c563a6a) |
 | CP-19 | ПТК: ID исполнения конфигураций, снимок `geom`, детали-венцы `.01<вар>`, `ptk.find()`, проверка дубликатов; колонка ID в SPEC-10 | egm/ptk.py, main.py, templates/, instructions/INS-10, specs/SPEC-01 | Д-22 | CP-16 | закрыт (прогон OK, 39b6569, REV6) |
 | CP-20 | Реестр изделий и номенклатура (products.json, SPEC-03), генератор 3D/2D по ID: венец .01 (STEP, SVG с размерами); далее .02/.03/.05 | egm/products.py, egm/cad/, main.py, specs/products.json | Д-24 | CP-19 | закрыт (прогон OK, 4dc721fb, REV6) |
+| CP-21 | Документация процесса: реестр инструкций и режимы работы с ИИ в `instructions/README.md`, INS-90 — ручная подготовка контекста (`context_bundle.py` с правилами ключей, `make_audit_bundle.py`), главный README — только проект, структура, GitHub/коммиты/патчи; `CONTEXT_BUNDLE.md` в `.gitignore` | instructions/README.md, instructions/INS-90_AUDIT_BUNDLE.md, README.md, .gitignore, specs/DECISIONS.md, specs/CANCELLED.md | Д-25, Д-26 | CP-18 | патч |
 
 
