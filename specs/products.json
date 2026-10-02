@@ -1,0 +1,22 @@
+{
+  "_comment": "Реестр изделий и номенклатура деталей (spec-first, Д-24, SPEC-03). kind: make — изготавливаемая, buy — покупная; variant: none | ring_phase | row; cad — имя генератора egm/cad или null",
+  "PTK": {
+    "name": "Волновой редуктор с промежуточными телами качения",
+    "id_rule": "Д-22",
+    "parts": {
+      "01": {"name": "венец (жёсткое колесо)", "kind": "make", "variant": "ring_phase", "qty": "rows", "cad": "ptk_ring"},
+      "02": {"name": "сепаратор", "kind": "make", "variant": "none", "qty": 1, "cad": null},
+      "03": {"name": "эксцентрик генератора", "kind": "make", "variant": "row", "qty": "rows", "cad": null},
+      "04": {"name": "тело качения", "kind": "buy", "variant": "none", "qty": "rows*n_bodies", "cad": null},
+      "05": {"name": "межрядная шайба", "kind": "make", "variant": "none", "qty": "rows+1", "cad": null},
+      "06": {"name": "корпус", "kind": "make", "variant": "none", "qty": 1, "cad": null},
+      "07": {"name": "крышка", "kind": "make", "variant": "none", "qty": 2, "cad": null},
+      "08": {"name": "подшипник генератора", "kind": "buy", "variant": "none", "qty": "rows", "cad": null}
+    }
+  },
+  "HD": {
+    "name": "Волновой редуктор с гибким колесом (ГК)",
+    "id_rule": "TODO(CP-09)",
+    "parts": {}
+  }
+}

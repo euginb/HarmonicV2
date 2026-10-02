@@ -9,7 +9,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from egm import catalog, naming, ptk
+from egm import catalog, naming, products, ptk
 
 ROOT = Path(__file__).resolve().parent
 SPECS, REPORTS, TPL = ROOT / "specs", ROOT / "reports", ROOT / "templates"
@@ -91,13 +91,16 @@ def main(argv):
         shutil.rmtree(OUT / kind, ignore_errors=True)
     fails = []
     for name, test in (("ptk", ptk.self_test), ("naming", naming.self_test),
-                       ("catalog", catalog.self_test)):
+                       ("catalog", catalog.self_test), ("products", products.self_test)):
         try:
             test()
         except AssertionError as e:
             fails.append(f"{name}.self_test: {e!r}")
     prices = load_json("vendor_prices.json")
     fails += run_ptk(prices)
+    cfg_path = OUT / "specs" / "ptk_configs.json"
+    if cfg_path.exists():
+        fails += products.check(load_json("products.json"), json.loads(cfg_path.read_text(encoding="utf-8")))
     fails += run_catalog(prices)
     # TODO(CP-03): cost.report(); TODO(CP-04): машины по naming.MACHINES (HMC + VMC)
     write("reports", "checks.md", "# Проверки прогона (code-first, НЕ ПРАВИТЬ РУКАМИ)\n\n"
