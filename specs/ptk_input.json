@@ -7,21 +7,19 @@
     "wall_min": 4.0,
     "gap_k": 1.15,
     "ecc_k": 0.25,
+    "e_margin": 0.8,
     "gen_bore_min": 18.0,
     "row_gap": 1.0,
     "rows": 4,
     "row_phases": [0, 90, 180, 270],
     "u_list": [10, 16, 20, 25, 32, 40, 50, 63, 80, 100]
   },
-  "ring_holes": {
-    "bolt": "M4",
-    "n": 8,
-    "pins": 2,
-    "pin_d": 4.0,
-    "head_margin": 0.5,
-    "web_min": 1.0,
-    "mu": 0.12,
-    "safety": 1.5
+  "mount_mode": "first_ok",
+  "ring_mounts": {
+    "_comment": "Д-33: крепления венца в порядке приоритета; first_ok — первое прошедшее проверки, all — все. Поля — instructions/INS-10_PTK_CALC.md",
+    "M4x8P2": {"bolt": "M4", "n": 8, "pins": 2, "pin_d": 4.0, "head_margin": 0.5, "web_min": 1.0, "mu": 0.12, "safety": 1.5},
+    "M3x8P2": {"bolt": "M3", "n": 8, "pins": 2, "pin_d": 3.0, "head_margin": 0.5, "web_min": 1.0, "mu": 0.12, "safety": 1.5},
+    "M3x6P2": {"bolt": "M3", "n": 6, "pins": 2, "pin_d": 3.0, "head_margin": 0.5, "web_min": 1.0, "mu": 0.12, "safety": 1.5}
   },
   "fasteners": {
     "_comment": "d_clear — отверстие ISO 273 средний ряд, мм; dk — Ø головки ISO 4762, мм; F_M — ориентировочная сила затяжки, кл. 8.8, резьба μ=0.12 (VDI 2230), кН. Сверить со своим справочником",
