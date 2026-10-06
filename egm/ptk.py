@@ -24,7 +24,13 @@ class PtkLimits:
     u_min: int = 10               # диапазон одноступенчатого u (Д-08, Д-11)
     u_max: int = 100
     wall_min: float = 4.0         # мин. стенка венца, мм
-    gap_k: float = 1.15           # шаг тел по окружности / Ø тела
+    gap_k_min: float = 1.0        # диапазон подбора gap_k = шаг тел / Ø тела (Д-34)
+    gap_k_max: float = 3.0
+    gamma_min: float = 25.0       # мин. наибольший угол профиля γ max, град (Д-34)
+    mu_ring: float = 0.08         # трение тело/венец (заклинивание при γ ≤ arctg mu_ring)
+    mu_slot: float = 0.1          # трение тело/паз сепаратора
+    d_bc_step: float = 0.1        # округление вверх Ø окр. отв., мм (Д-35)
+    d_out_step: float = 1.0       # округление вверх Øнар, мм (Д-35)
     ecc_k: float = 0.25           # эксцентриситет / Ø тела
     gen_bore_min: float = 18.0    # мин. Ø под генератор (подшипник + вал), мм
     row_gap: float = 1.0          # осевой зазор (шайба) между рядами, мм
@@ -56,6 +62,10 @@ class PtkResult:
     z_ring: int = 0
     ecc: float = 0.0
     e_max: float = 0.0
+    gap_k: float = 0.0
+    gamma_max: float = 0.0
+    eta: float = 0.0
+    fr_ft: float = None
     d_pitch: float = 0.0
     d_root: float = 0.0
     d_tip: float = 0.0
@@ -98,6 +108,11 @@ def _band(holes, fast, lim):
     if f is None:
         return lim.wall_min
     return max(lim.wall_min + f["d_clear"] / 2, f["dk"] / 2 + holes.head_margin)
+
+
+def _ceil(x, step):
+    """Округление вверх до шага (Д-35)."""
+    return round(math.ceil(x / step - 1e-9) * step, 6) if step else x
 
 
 def _deg(x):
@@ -155,9 +170,10 @@ def ring(d_root, holes, fast, lim):
     err = []
     f = fast.get(holes.bolt)
     band = _band(holes, fast, lim)
-    r_bc = d_root / 2 + band
+    r_bc = _ceil(d_root + 2 * band, lim.d_bc_step) / 2
     pins = f"+{holes.pins}шт Ø{holes.pin_d:g}" if holes.pins else ""
-    res = {"d_bc": round(2 * r_bc, 2), "d_out": 2 * (r_bc + band), "t_hold": 0.0,
+    res = {"d_bc": round(2 * r_bc, 2), "d_out": _ceil(2 * (r_bc + band), lim.d_out_step),
+           "t_hold": 0.0,
            "label": f"{holes.n}×{holes.bolt}{pins}"}
     if f is None:
         return res, [f"крепёж {holes.bolt} отсутствует в таблице fasteners"]
@@ -184,8 +200,9 @@ def ring(d_root, holes, fast, lim):
 
 # Д-22: маркировка конфигураций. GEOM_REV повышается при смене формул геометрии
 # (CP-08 и далее) — тогда меняются все ID, старые чертежи остаются при старых ID.
-GEOM_REV = 2                       # Д-31: z = u + 1, точный профиль, e по подрезу
-GEOM_LIMITS = ("gap_k", "ecc_k", "e_margin", "wall_min", "row_gap", "rows", "row_phases")
+GEOM_REV = 3                       # Д-34: gap_k подбирается по γ; Д-35: округление
+GEOM_LIMITS = ("gap_k_min", "gap_k_max", "gamma_min", "ecc_k", "e_margin", "wall_min",
+               "row_gap", "rows", "row_phases", "d_bc_step", "d_out_step")
 GEOM_HOLES = ("bolt", "n", "pins", "pin_d", "head_margin")
 BODY_TYPES = {"roller": "R", "ball": "B"}
 
@@ -271,21 +288,26 @@ def calc(u, body_id, body, lim, holes, fast):
     if u < 2:
         return r
     z, n = u + 1, u                      # Д-31: венец неподвижен, выход — сепаратор
-    d_pitch = n * lim.gap_k * d / math.pi
-    e_max = ptk_profile.e_max(round(d_pitch / 2, 6), d / 2, z)
-    ecc = min(lim.ecc_k * d, lim.e_margin * e_max)
-    r.e_max = round(e_max, 3)
+    gk, (R0, _, ecc, gmax), found = ptk_profile.select_gap_k(
+        n, z, d, lim.gap_k_min, lim.gap_k_max, lim.ecc_k, lim.e_margin, lim.gamma_min)
+    d_pitch = 2 * R0
+    e_max = ptk_profile.e_max(round(R0, 6), d / 2, z)        # численно по всему шагу
+    r.gap_k, r.e_max, r.gamma_max = round(gk, 3), round(e_max, 3), round(gmax, 1)
+    r.eta = round(ptk_profile.efficiency(gmax, lim.mu_ring, lim.mu_slot), 3)
+    r.fr_ft = round(1 / math.tan(math.radians(gmax)), 2) if gmax > 0 else None
     if ecc > e_max:
         r.errors.append(f"подрез профиля венца: e={ecc:.3f} > e max={e_max:.3f} мм (Д-31)")
-    if 2 * ecc < 0.05 * d:
-        r.warnings.append(f"глубина волны 2e={2 * ecc:.3f} мм < 5% Ø тела: увеличить gap_k "
-                          "(растёт R0 и e max) или уменьшить Ø тела")
+    if not found:
+        r.errors.append(f"угол профиля γ max {gmax:.1f}° < {lim.gamma_min:g}° при gap_k ≤ "
+                        f"{lim.gap_k_max:g} (Д-34): больше ecc_k или меньше gamma_min")
+    if r.eta == 0:
+        r.errors.append(f"заклинивание: γ max {gmax:.1f}° ≤ arctg mu_ring (Д-34)")
     d_root = d_pitch + d + 2 * ecc
     rg, rerr = ring(d_root, holes, fast, lim)
     r.errors += rerr
     band = _band(holes, fast, lim)
     r.d_body_max = round((lim.d_out_max - 4 * band)
-                         / (n * lim.gap_k / math.pi + 1 + 2 * lim.ecc_k), 2)
+                         / (n * gk / math.pi + 1 + 2 * ecc / d), 2)
     if rg["d_out"] > lim.d_out_max:
         r.errors.append(f"Øнар {rg['d_out']:.1f} > {lim.d_out_max:g}: тела Ø{d:g} при n={n} "
                         f"с отверстиями {rg['label']} не вмещаются; макс. Ø тела "
@@ -348,6 +370,17 @@ def two_stage_table(lim, u_list=(101, 120, 150, 200, 300, 500, 1000, 2500)):
     return (f"Одноступенчатый ПТК считается только для u ≤ {lim.u_max} (Д-11). Для больших u "
             "применяется двухступенчатая схема; каждая ступень рассчитывается этим же "
             "калькулятором как самостоятельный редуктор.\n\n" + "\n".join(rows))
+
+
+def force_table(rows):
+    """Д-34: передача усилия по исполнениям (раздел SPEC-10)."""
+    t = ["### Передача усилия по исполнениям (Д-34)", "",
+         "| ID | gap_k | e | γ max, ° | Fr/Ft | η | Статус |", "|---|---|---|---|---|---|---|"]
+    for r in rows:
+        if r["z_ring"]:
+            t.append(f"| {r['id']} | {r['gap_k']} | {r['ecc']} | {r['gamma_max']} | "
+                     f"{r['fr_ft'] or '—'} | {r['eta']} | {'OK' if r['ok'] else 'нет'} |")
+    return "\n".join(t)
 
 
 def phasing_table(lim, holes):
@@ -421,7 +454,8 @@ def self_test():
     assert r.ok, r.errors
     assert r.z_ring == 20 and r.n_bodies == 19            # Д-31: u = n = z − 1
     assert 0 < r.ecc <= r.e_max and abs(r.d_root - r.d_tip - 4 * r.ecc) < 0.02
-    assert 55.0 < r.d_out < 75.0, r.d_out
+    assert 75.0 < r.d_out < 100.0 and r.d_out == int(r.d_out), r.d_out   # Д-35
+    assert r.gamma_max >= lim.gamma_min - 0.05 and r.eta > 0.6, (r.gamma_max, r.eta)
     assert r.ring_variants == 1, r.phasing
     assert not c(5).ok
     r = c(120)
@@ -449,7 +483,7 @@ def self_test():
     assert c(20, RingHoles(safety=3.0, mu=0.2)).id == r.id        # не геометрия
     assert c(20, RingHoles(pin_d=4)).id == r.id                   # 4 == 4.0
     assert c(20, RingHoles(pin_d=5.0)).id != r.id                 # геометрия
-    assert calc(20, "t", b, PtkLimits(gap_k=1.2), holes, fast).id != r.id
+    assert calc(20, "t", b, PtkLimits(gamma_min=20.0), holes, fast).id != r.id
     assert body_code({"type": "ball", "d": 2.5}) == "B2_5"
     assert [p["id"] for p in c(62).parts] == [c(62).id + ".01A", c(62).id + ".01B"]  # z = 63
     rows = [asdict(c(20)), asdict(c(62))]

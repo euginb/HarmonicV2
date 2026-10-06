@@ -70,7 +70,8 @@ def run_ptk(prices):
     phasing = "\n\n".join(f"### Крепление `{k}`\n\n" + ptk.phasing_table(lim, h)
                           for k, h in mounts.items())
     write("specs", "SPEC-10_PTK_CALC.md", tpl.format(
-        params=params, rows="\n".join(table), profile=ptk_profile.theory_md(),
+        params=params, rows="\n".join(table),
+        profile=ptk_profile.theory_md() + "\n\n" + ptk.force_table(rows),
         errors="\n".join(errs) or "нет", warnings="\n".join(warns) or "нет",
         n_ok=sum(r["ok"] for r in rows), n_all=len(rows),
         two_stage=ptk.two_stage_table(lim), phasing=phasing))
