@@ -38,7 +38,7 @@ OUT = ROOT / "AUDIT_BUNDLE.md"
 TEXT_EXT = {
     ".md", ".py", ".json", ".toml", ".yaml", ".yml", ".txt",
     ".cfg", ".ini", ".j2", ".jinja", ".jinja2", ".csv", ".tsv",
-    ".svg",
+    ".svg", ".tmpl"
 }
 
 """
