@@ -1,208 +1,138 @@
-"""Точный профиль венца ПТК и передача усилия (CP-08, Д-31, Д-34).
+"""Профиль венца ПТК и нагрузки в контактах (Д-37, Д-38).
 
-Тело в радиальном пазу сепаратора прижато к эксцентрику; центр тела в системе
-венца: r(t) = e·cos(zt) + √(R0² − e²·sin²(zt)), R0 = Ø дел./2 (радиус эксцентрика
-+ радиус тела). t = 0 — впадина 0 (наибольший радиус). Профиль венца — эквидистанта
-траектории наружу на ρ = Ø тела/2. Подреза нет, пока на участках, выпуклых внутрь,
-радиус кривизны траектории ≥ ρ — отсюда e max. Угол профиля γ (касательная к
-траектории — окружность), tg γ = |r′|/r, определяет передачу усилия (Д-34).
+Методика: Янгулов В.С., «Силовой расчёт ВППТК…» (docs/Силовой расчет ПТК), эталон
+профиля — egm/calc_vptc.py. Обозначения: a_w = a_ω — эксцентриситет генератора;
+R_sum = R_Σ = 0.5(D_г + D_ш); Drol = D_ш; z — впадин венца (z = u + 1, Д-31);
+φ — угол эксцентрика относительно оси тела. Тело на угле t венца: φ = z·t.
+Центр тела: Y = a_ω·cos φ + √(R_Σ² − a_ω²·sin²φ)  (6). Профиль — эквидистанта на
+D_ш/2; нормаль отклонена от радиуса на α: tg α = z·a_ω·sin φ / √(R_Σ² − a_ω²·sin²φ)
+(у Янгулова в числителе u — схема с вращающимся венцом, u = z).
 """
 import math
 from functools import lru_cache
 
 
-def radius(t, e, R0, z):
-    s = e * math.sin(z * t)
-    return e * math.cos(z * t) + math.sqrt(R0 * R0 - s * s)
+def S(phi, a_w, R_sum):
+    return math.sqrt(R_sum * R_sum - (a_w * math.sin(phi)) ** 2)
 
 
-def dradius(t, e, R0, z):
-    """dr/dt траектории центра тела."""
-    w = z * t
-    S = math.sqrt(R0 * R0 - (e * math.sin(w)) ** 2)
-    return -e * z * math.sin(w) * (1 + e * math.cos(w) / S)
+def Y(phi, a_w, R_sum):
+    """(6): расстояние центра тела от центра венца."""
+    return a_w * math.cos(phi) + S(phi, a_w, R_sum)
 
 
-def curv_radius_min(e, R0, z, k=200):
-    """Наименьший радиус кривизны там, где центр кривизны снаружи; inf — нигде."""
+def alpha(phi, a_w, R_sum, z):
+    """Угол передачи движения профилю, рад: tg α = V^R / V^τ."""
+    return math.atan2(z * a_w * math.sin(phi), S(phi, a_w, R_sum))
+
+
+def alpha_max(a_w, R_sum, z):
+    """Наибольший α, град (φ = 90°): tg α max = z·a_ω / √(R_Σ² − a_ω²)."""
+    return math.degrees(math.atan2(z * a_w, math.sqrt(R_sum ** 2 - a_w ** 2)))
+
+
+def psi(phi, a_w, R_sum):
+    """(4) при номинале: sin ψ = a_ω·sin φ / R_Σ."""
+    return math.asin(a_w * math.sin(phi) / R_sum)
+
+
+def contact_ratios(phi, a_w, R_sum, z):
+    """(8), (9) без трения: (R_о/R, R_в/R) — сепаратор и венец на 1 Н реакции генератора."""
+    al, ps = alpha(phi, a_w, R_sum, z), psi(phi, a_w, R_sum)
+    return abs(math.sin(al - ps)) / math.cos(al), math.cos(ps) / math.cos(al)
+
+
+def curv_radius_min(a_w, R_sum, z, k=200):
+    """Наименьший радиус кривизны траектории центра тела на выступах венца; inf — нет."""
     h, best = 1e-4 / z, math.inf
     for i in range(k + 1):
         t = math.pi / z * i / k                       # полшага: профиль симметричен
-        r0, rp, rm = (radius(x, e, R0, z) for x in (t, t + h, t - h))
+        r0, rp, rm = (Y(z * x, a_w, R_sum) for x in (t, t + h, t - h))
         d1, d2 = (rp - rm) / (2 * h), (rp - 2 * r0 + rm) / (h * h)
-        num = r0 * r0 + 2 * d1 * d1 - r0 * d2         # знак кривизны в полярных коорд.
+        num = r0 * r0 + 2 * d1 * d1 - r0 * d2
         if num < 0:
             best = min(best, (r0 * r0 + d1 * d1) ** 1.5 / -num)
     return best
 
 
 @lru_cache(maxsize=None)
-def e_max(R0, rho, z):
-    """Наибольший e без подреза эквидистанты (бисекция, проверка по всему шагу)."""
-    lo, hi = 0.0, 0.5 * R0
-    if curv_radius_min(hi, R0, z) >= rho:
-        return hi
-    for _ in range(50):
+def r_sum_undercut(a_w, rho_req, z):
+    """Наименьший R_Σ без подреза: ρк min ≥ rho_req (= D_ш/2 + r_tip_min)."""
+    ok = lambda R: curv_radius_min(a_w, R, z) >= rho_req
+    lo = hi = 2 * a_w + rho_req
+    while not ok(hi):
+        lo, hi = hi, hi * 1.5
+    for _ in range(40):
         mid = (lo + hi) / 2
-        lo, hi = (mid, hi) if curv_radius_min(mid, R0, z) >= rho else (lo, mid)
-    return lo
+        lo, hi = (lo, mid) if ok(mid) else (mid, hi)
+    return hi
 
 
-@lru_cache(maxsize=None)
-def e_max_tip(R0, rho, z):
-    """e max по вершине t = π/z: r = R0 − e, r′ = 0, r″ = e·z²(1 − e/R0),
-    ρк = r²/(r″ − r) ≥ ρ. Быстрый вариант e_max для подбора gap_k (Д-34)."""
-    f = lambda e: e * z * z * (1 - e / R0) - (R0 - e) * (1 + (R0 - e) / rho)
-    lo, hi = 0.0, 0.5 * R0
-    if f(hi) <= 0:
-        return hi
-    for _ in range(60):
-        mid = (lo + hi) / 2
-        lo, hi = (mid, hi) if f(mid) <= 0 else (lo, mid)
-    return lo
-
-
-def gamma_deg(t, e, R0, z):
-    """Угол профиля γ в точке t, град: tg γ = |r′|/r."""
-    return math.degrees(math.atan2(abs(dradius(t, e, R0, z)), radius(t, e, R0, z)))
-
-
-def gamma_max(e, R0, z, k=120):
-    """Наибольший угол профиля на полушаге, град."""
-    return max(gamma_deg(math.pi / z * i / k, e, R0, z) for i in range(k + 1))
-
-
-def flank_share(e, R0, z, gamma_lim, k=120):
-    """Доля положений тела на полушаге, где γ ≥ gamma_lim."""
-    return sum(gamma_deg(math.pi / z * (i + 0.5) / k, e, R0, z) >= gamma_lim
-               for i in range(k)) / k
-
-
-def efficiency(gamma, mu_ring, mu_slot):
-    """КПД тела при угле профиля γ, град (квазистатика, Д-34):
-    η = tg(γ − φ) / (tg γ·(1 + mu_slot·tg(γ − φ))), φ = arctg mu_ring; 0 — заклинивание."""
-    phi = math.degrees(math.atan(mu_ring))
-    if gamma <= phi:
-        return 0.0
-    g, gp = math.radians(gamma), math.radians(gamma - phi)
-    return math.tan(gp) / (math.tan(g) * (1 + mu_slot * math.tan(gp)))
-
-
-def wave(gk, n, z, d, ecc_k, e_margin):
-    """Волна при шаге gap_k: (R0, e max, e, γ max)."""
-    R0 = n * gk * d / (2 * math.pi)
-    em = e_max_tip(round(R0, 6), d / 2, z)
-    e = min(ecc_k * d, e_margin * em)
-    return R0, em, e, gamma_max(e, R0, z)
-
-
-def select_gap_k(n, z, d, gk_min, gk_max, ecc_k, e_margin, gamma_min, step=0.05):
-    """Д-34: наименьший gap_k ∈ [gk_min, gk_max] с γ max ≥ gamma_min -> (gap_k, wave, найден).
-    γ растёт с gap_k, пока e ограничен подрезом, и падает, когда e упирается в
-    ecc_k·Ø тела. Нет решения — gap_k с наибольшим γ и найден = False."""
-    w = lambda gk: wave(gk, n, z, d, ecc_k, e_margin)
-    best, prev, gk = None, None, gk_min
-    while True:
-        cur = w(gk)
-        if best is None or cur[3] > best[1][3]:
-            best = (gk, cur)
-        if cur[3] >= gamma_min:
-            if prev is None:
-                return gk, cur, True
-            lo, hi = prev, gk
-            for _ in range(20):
-                mid = (lo + hi) / 2
-                lo, hi = (mid, hi) if w(mid)[3] < gamma_min else (lo, mid)
-            g3 = math.ceil(hi * 1000 - 1e-9) / 1000
-            c3 = w(g3)
-            return (g3, c3, True) if c3[3] >= gamma_min else (hi, w(hi), True)
-        if gk >= gk_max:
-            return best[0], best[1], False
-        prev, gk = gk, min(gk + step, gk_max)
-
-
-def profile_points(e, R0, rho, z, k=24):
-    """Контур впадин: z·k точек против часовой стрелки, замкнутый."""
-    N, h, pts = z * k, 1e-6, []
-    pol = lambda t: (radius(t, e, R0, z) * math.cos(t), radius(t, e, R0, z) * math.sin(t))
+def profile_points(a_w, R_sum, Drol, z, k=24):
+    """Контур венца: z·k точек против часовой стрелки (как egm/calc_vptc.py)."""
+    N, r, pts = z * k, Drol / 2, []
     for i in range(N):
         t = 2 * math.pi * i / N
-        (x, y), (x1, y1), (x0, y0) = pol(t), pol(t + h), pol(t - h)
-        tx, ty = x1 - x0, y1 - y0
-        L = math.hypot(tx, ty)
-        pts.append((x + rho * ty / L, y - rho * tx / L))   # наружная нормаль
+        phi = z * t
+        y, al = Y(phi, a_w, R_sum), alpha(phi, a_w, R_sum, z)
+        pts.append((y * math.cos(t) + r * math.cos(t + al),
+                    y * math.sin(t) + r * math.sin(t + al)))
     return pts
 
 
 def theory_md():
-    return """## Профиль венца и кинематика (Д-31, CP-08)
+    return r"""## Профиль венца и порядок расчёта (Д-38)
 
-Схема Д-11: венец неподвижен, вход — эксцентрик генератора, выход — сепаратор с
-радиальными пазами; тело в пазу движется строго по радиусу и прижато к эксцентрику.
+Источники: Янгулов В.С. «Силовой расчёт ВППТК» (`docs/Силовой расчет ПТК`), эталон
+`egm/calc_vptc.py`. Обозначения — Д-37. Венец неподвижен, вход — генератор, выход —
+сепаратор: $z = u + 1$, $n = u$.
 
-| Обозначение | Смысл |
-|---|---|
-| R0 | Ø дел./2 = радиус наружного кольца эксцентрика + ρ |
-| ρ | Ø тела/2 |
-| e | эксцентриситет генератора |
-| φ, ψ | углы поворота эксцентрика (вход) и сепаратора (выход) |
-| t | угол в системе венца от впадины 0 |
-| γ | угол профиля: между касательной к траектории и окружностью |
+| Обозначение | Код | Смысл |
+|---|---|---|
+| $D_\text{ш}$ | `Drol` | диаметр тела качения |
+| $a_\omega$ | `a_w` | эксцентриситет генератора волн |
+| $D_\text{г}$ | `Dgen` | диаметр генератора (поверхность качения тел) |
+| $R_\Sigma = 0.5(D_\text{г} + D_\text{ш})$ | `R_sum` | радиус центров тел при $a_\omega = 0$ |
+| $\varphi$ | — | угол эксцентрика от оси тела |
+| $Y$ | — | расстояние центра тела от центра венца |
+| $\alpha$ | `alpha_max` | угол передачи движения профилю |
+| $\psi$ | — | угол между осью тела и линией центр тела — центр генератора |
 
-Расстояние центра тела от оси: ρc = e·cos(α − φ) + √(R0² − e²·sin²(α − φ)),
-α — угол тела. Профиль венца с z впадинами r(α) = F(z·α) держит контакт со всеми
-телами при любом φ, если z·α ≡ α − φ для каждого тела, отсюда:
-
-- n = z − 1, ψ = −φ/n, **u = n = z − 1** (вращение обратное); для заданного u
-  калькулятор берёт z = u + 1 (u = z — схема с неподвижным сепаратором и выходом
-  на венец, X-06);
-- траектория центра тела в системе венца: **r(t) = e·cos(z·t) + √(R0² − e²·sin²(z·t))**;
-- профиль венца — эквидистанта траектории наружу на ρ;
-  Ø впадин = 2(R0 + e + ρ), Ø вершин = 2(R0 − e + ρ), глубина волны 2e;
-- ход тела в пазу сепаратора 2e, длина паза ≥ Ø тела + 2e;
-- подрез: на вершинах (выступах внутрь) радиус кривизны траектории
-  ρк = (r² + r′²)^{3/2} / |r² + 2r′² − r·r″| должен быть ≥ ρ. На вершине
-  r″ = e·z²(1 − e/R0), ρк = r²/(r″ − r), откуда **e max ≈ (R0 − e)(1 + (R0 − e)/ρ) / z²**;
-  итоговая геометрия проверяется численно по всему шагу;
-- принято **e = min(ecc_k·Ø тела, e_margin·e max)**; радиус вершины венца ρк − ρ,
-  при e → e max он стремится к 0, поэтому e_margin < 1.
-
-### Передача усилия и подбор gap_k (Д-34)
-
-Эксцентрик толкает тело по радиусу, склон профиля отклоняет его, паз сепаратора
-принимает касательную силу Ft. **tg γ = |r′(t)|/r(t)**; γ = 0 во впадине и на
-вершине, наибольший на середине склона: **tg γ max ≈ e·z/R0**. На одно тело:
-
-- Fr = Ft/tg γ — радиальная сила на эксцентрик и подшипник генератора;
-- N = Ft/sin γ — нормальная сила в контакте с венцом (вход контакта Герца, CP-08);
-- **η = tg(γ − φ) / (tg γ·(1 + mu_slot·tg(γ − φ)))**, φ = arctg mu_ring; γ ≤ φ — заклинивание.
-
-При e по подрезу **tg γ max ≈ e_margin·gap_k/π**: угол задаёт шаг тел, а не u.
-gap_k — результат: наименьший из [gap_k_min; gap_k_max] с γ max ≥ gamma_min,
-оценка **gap_k ≈ π·tg(gamma_min)/e_margin**. Рост γ ограничен ecc_k: при
-gap_k* ≈ π·√(2·ecc_k/e_margin) e упирается в ecc_k·Ø тела, дальше γ падает;
-предел tg γ ≈ e_margin·gap_k*/π (≈ 32° при ecc_k = 0.25, e_margin = 0.8).
-Цена угла — диаметр: Ø дел. = n·gap_k·Ø тела/π.
-
-Контакт Герца и момент — CP-08, открыто."""
+1. $a_\omega = a_k D_\text{ш}$ (эталон: 0.2) или `a_w` тела.
+2. $R_\Sigma$ — наименьший из трёх условий (поле `R_by`):
+   подрез — радиус кривизны траектории на выступе $\rho_\text{к} \ge D_\text{ш}/2 + r_{tip,min}$
+   (на вершине $\rho_\text{к} = Y^2/(Y'' - Y)$, $Y'' = a_\omega z^2 (1 - a_\omega/R_\Sigma)$, проверка численно по шагу);
+   сепаратор — $2(R_\Sigma - 1.1a_\omega)\sin(\pi/n) - D_\text{ш} \ge$ `sep_web_min` (кольцо $2.2a_\omega$, эталон);
+   генератор — $D_\text{г} = 2R_\Sigma - D_\text{ш} \ge$ `Dgen_min`.
+3. Траектория центра тела, угол тела $t$, $\varphi = z t$:
+   $Y = a_\omega\cos\varphi + \sqrt{R_\Sigma^2 - a_\omega^2\sin^2\varphi}$ (6).
+4. Профиль — точка центра, сдвинутая на $D_\text{ш}/2$ по нормали под углом $\alpha$ к радиусу:
+   $\operatorname{tg}\alpha = z a_\omega\sin\varphi / \sqrt{R_\Sigma^2 - a_\omega^2\sin^2\varphi}$
+   (у Янгулова — $u$: там вращается венец и $u = z$).
+5. $D_\text{В} = 2(R_\Sigma + a_\omega) + D_\text{ш}$, $D_\text{верш} = 2(R_\Sigma - a_\omega) + D_\text{ш}$, ход тела в пазу $2a_\omega$.
+6. $\operatorname{tg}\alpha_{max} = z a_\omega / \sqrt{R_\Sigma^2 - a_\omega^2}$. Если $R_\Sigma$ задал подрез,
+   $\operatorname{tg}\alpha_{max} \approx \sqrt{a_\omega/(D_\text{ш}/2 + r_{tip,min})} \approx \sqrt{2a_k}$ (≈ 32° при 0.2):
+   угол — следствие $a_k$, не параметр. Размер: $D_\text{В} \approx z D_\text{ш}\sqrt{2a_k}$.
+7. Нагрузки без трения (8), (9): $R_\text{о} = R\sin(\alpha - \psi)/\cos\alpha$, $R_\text{в} = R\cos\psi/\cos\alpha$,
+   $\sin\psi = a_\omega\sin\varphi/R_\Sigma$. Равновесие генератора (5), (7), трение (11), скорости (12),
+   момент и износ — CP-08."""
 
 
 def self_test():
-    em = e_max(18.3, 2.5, 21)
-    assert 0.25 < em < 0.42, em                       # ≈ 0.335 по приближению
-    assert curv_radius_min(0.9 * em, 18.3, 21) >= 2.5
-    assert curv_radius_min(1.2 * em, 18.3, 21) < 2.5
-    assert abs(e_max_tip(18.3, 2.5, 21) - em) < 0.05 * em   # вершина — худшая точка
-    e = 0.8 * em
-    pts = profile_points(e, 18.3, 2.5, 21)
+    a, D, z = 0.4, 2.0, 33
+    R = r_sum_undercut(a, D / 2, z)
+    assert 19.0 < R < 22.5, R                                   # ≈ 20.6 по вершине
+    assert curv_radius_min(a, R * 1.001, z) >= D / 2
+    assert curv_radius_min(a, R * 0.98, z) < D / 2
+    tg = math.tan(math.radians(alpha_max(a, R, z)))
+    assert abs(tg - math.tan(alpha(math.pi / 2, a, R, z))) < 1e-9
+    assert abs(tg - math.sqrt(2 * a / D)) < 0.1 * tg, tg        # ≈ √(2·a_k)
+    R2 = 1.1 * R
+    pts = profile_points(a, R2, D, z)
     rs = [math.hypot(*p) for p in pts]
-    assert len(pts) == 21 * 24
-    assert abs(max(rs) - (18.3 + e + 2.5)) < 1e-6 and abs(min(rs) - (18.3 - e + 2.5)) < 1e-3
-    # Д-34: угол профиля, КПД, подбор gap_k
-    g = gamma_max(e, 18.3, 21)
-    assert abs(math.tan(math.radians(g)) - e * 21 / 18.3) < 0.15 * e * 21 / 18.3, g
-    assert efficiency(5.0, 0.1, 0.1) == 0.0 and 0.6 < efficiency(25.0, 0.08, 0.1) < 0.9
-    gk, w, ok = select_gap_k(32, 33, 2.0, 1.0, 3.0, 0.25, 0.8, 25.0)
-    assert ok and w[3] >= 25.0 and 1.5 < gk < 2.2, (gk, w)
-    assert not select_gap_k(32, 33, 2.0, 1.0, 3.0, 0.25, 0.8, 45.0)[2]   # предел ecc_k
+    assert len(pts) == z * 24
+    assert abs(max(rs) - (R2 + a + D / 2)) < 1e-6
+    assert abs(min(rs) - (R2 - a + D / 2)) < 1e-3
+    ro, rv = contact_ratios(math.pi / 2, a, R, z)
+    assert 1.0 < rv < 1.4 and 0.0 < ro < 1.0, (ro, rv)
     return True

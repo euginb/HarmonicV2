@@ -50,18 +50,18 @@ def run_ptk(prices):
         lim, mounts, fast, mode = ptk.load_config(load_json("ptk_input.json"))
     except (KeyError, ValueError, TypeError) as e:
         return [f"ptk_input.json: {e!r}"]
-    rows = ptk.to_rows(ptk.sweep(prices["bodies"], lim, mounts, fast, mode), mounts)
+    rows = ptk.to_rows(ptk.sweep(prices["rollers"], lim, mounts, fast, mode), mounts)
     write("specs", "ptk_configs.json", json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
     table, errs, warns = [], [], []
     for r in rows:
         m = r["torque_Nm_est"] if r["ok"] else "—"
-        table.append(f"| {r['id']} | {r['u']} | {r['body']} | {r['d_body']} | {r['d_body_max']} | "
-                     f"{r['n_bodies']} | {r['z_ring']} | {r['ecc']} | {r['d_pitch']} | "
-                     f"{r['d_root']} | {(r['holes'] + ' (' + r['mount'] + ')') if r['holes'] else '—'} | "
-                     f"{r['ring_variants'] or '—'} | "
-                     f"{r['d_bc']} | {r['d_out']} | "
+        table.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['Drol']} | {r['Drol_max']} | "
+                     f"{r['n']} | {r['z']} | {r['a_w']} | {r['Dgen'] or '—'} | {r['d_root']} | "
+                     f"{r['alpha_max'] or '—'} | "
+                     f"{(r['holes'] + ' (' + r['mount'] + ')') if r['holes'] else '—'} | "
+                     f"{r['ring_variants'] or '—'} | {r['d_bc']} | {r['d_out']} | "
                      f"{r['width']} | {m} | {r['t_hold']} | {'OK' if r['ok'] else 'нет'} |")
-        tag = f"- u={r['u']}, {r['body']}: "
+        tag = f"- u={r['u']}, {r['roller']}: "
         errs += [tag + e for e in r["errors"]]
         warns += [tag + w for w in r["warnings"]]
     tpl = (TPL / "SPEC-10_PTK_CALC.md.tmpl").read_text(encoding="utf-8")
@@ -71,7 +71,7 @@ def run_ptk(prices):
                           for k, h in mounts.items())
     write("specs", "SPEC-10_PTK_CALC.md", tpl.format(
         params=params, rows="\n".join(table),
-        profile=ptk_profile.theory_md() + "\n\n" + ptk.force_table(rows),
+        profile=ptk_profile.theory_md() + "\n\n" + ptk.profile_table(rows),
         errors="\n".join(errs) or "нет", warnings="\n".join(warns) or "нет",
         n_ok=sum(r["ok"] for r in rows), n_all=len(rows),
         two_stage=ptk.two_stage_table(lim), phasing=phasing))

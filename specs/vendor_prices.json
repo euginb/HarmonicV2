@@ -13,10 +13,10 @@
     "ROLLER_D3x8": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
     "BALL_D3": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""}
   },
-  "bodies": {
-    "_comment": "Тела вращения ПТК, доступные к закупке: type roller|ball, d, l (для ролика), мм",
-    "ROLLER_D3x8": {"type": "roller", "d": 3.0, "l": 8.0},
-    "ROLLER_D2x4": {"type": "roller", "d": 2.0, "l": 4.2},
-    "BALL_D3": {"type": "ball", "d": 3.0, "l": 3.0}
+  "rollers": {
+    "_comment": "Тела качения ПТК (Д-37): type roller|ball, d = Dш, l — длина, мм; необязательно: a_w (мм), wall_min (мм) — переопределяют limits",
+    "R_D3x8": {"type": "roller", "d": 3.0, "l": 8.0},
+    "R_D2x4": {"type": "roller", "d": 2.0, "l": 4.2},
+    "B_D3": {"type": "ball", "d": 3.0, "l": 3.0}
   }
 }

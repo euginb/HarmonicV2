@@ -48,10 +48,18 @@ def build(arg, configs, prods, phase=None, row=None):
         (out / f"{name}.svg").write_text(svg.render(model), encoding="utf-8", newline="\n")
         print(f"svg: {out / (name + '.svg')}")
         try:
+            import cadquery  # noqa: F401
+        except Exception as e:   # не только ImportError: DLL OCP, numpy, другой venv
+            print(f"step: пропущен — cadquery не импортируется в {sys.executable}: "
+                  f"{type(e).__name__}: {e}")
+            continue
+        try:
             step.export(model, out / f"{name}.step")
             print(f"step: {out / (name + '.step')}")
-        except ImportError:
-            print("step: пропущен — нет cadquery (pip install cadquery)")
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            raise ValueError(f"{part['id']}: ошибка построения STEP (traceback выше)")
 
 
 def main(argv):
