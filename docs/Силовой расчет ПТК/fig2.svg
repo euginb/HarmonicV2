@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1040" width="900" height="1040">
+  <title>Рис. 2. Схема ВППТК с адаптивным генератором</title>
+  <desc>Ов — центр венца жёсткого колеса (начало координат XY). A — точка, смещённая от Ов на ℓ под углом θ к оси Y.
+        Oг — центр генератора: AOг = aω под углом φ; OвOг = ãω под углом φ̃. Oш — центр шарика на оси Y.
+        Сплошная дуга — наружная поверхность генератора, штриховая — окружность радиуса RΣ (центры шариков).
+        R̄ — реакция от шарика на генератор, направлена по OшOг. Углы отсчитываются от оси Y по часовой стрелке.</desc>
+
+  <defs>
+    <marker id="ax" viewBox="0 0 12 10" refX="11" refY="5" markerWidth="14" markerHeight="12"
+            orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,1 L12,5 L0,9 z" fill="#000"/>
+    </marker>
+    <marker id="dim" viewBox="0 0 10 8" refX="9.5" refY="4" markerWidth="11" markerHeight="9"
+            orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+      <path d="M0,0.5 L10,4 L0,7.5 z" fill="#000"/>
+    </marker>
+  </defs>
+
+  <!-- ===== Оси координат ===== -->
+  <g stroke="#000" fill="none">
+    <!-- ось X (штрихпунктир) -->
+    <line x1="250" y1="945" x2="850" y2="945" stroke-width="1.2"
+          stroke-dasharray="30 5 4 5" marker-end="url(#ax)"/>
+    <!-- ось Y: Oв → Oш и выше -->
+    <line x1="297" y1="945" x2="297" y2="15" stroke-width="1.2" marker-end="url(#ax)"/>
+    <!-- вертикаль через A (параллельна Y, база для угла φ) -->
+    <line x1="396.5" y1="935.1" x2="396.5" y2="15" stroke-width="1"/>
+  </g>
+
+  <!-- ===== Шарик и поверхности ===== -->
+  <g fill="none" stroke="#000">
+    <!-- шарик, центр Oш -->
+    <circle cx="297" cy="228.5" r="128" stroke-width="2.6"/>
+    <!-- наружная поверхность генератора, центр Oг, радиус Dг/2 -->
+    <path d="M145,493 A558,558 0 0 1 565,302" stroke-width="2.8"/>
+    <!-- окружность радиуса RΣ вокруг Oг (траектория центров шариков) -->
+    <path d="M75,380 A686,686 0 0 1 565,174" stroke-width="2.2" stroke-dasharray="20 10"/>
+  </g>
+
+  <!-- ===== Построение Oв → A → Oг ===== -->
+  <g stroke="#000" fill="none">
+    <!-- направление θ: Oв → A (ℓ) и продолжение -->
+    <line x1="297" y1="945" x2="850" y2="890" stroke-width="1"/>
+    <!-- направление φ: A → Oг (aω) и продолжение -->
+    <line x1="396.5" y1="935.1" x2="830" y2="742" stroke-width="1"/>
+    <!-- направление φ̃: Oв → Oг (ãω) -->
+    <line x1="297" y1="945" x2="565" y2="860" stroke-width="1.5" stroke-dasharray="8 5"/>
+    <line x1="565" y1="860" x2="830" y2="776" stroke-width="2.6" marker-end="url(#ax)"/>
+    <!-- линия действия реакции: Oш → Oг и продолжение -->
+    <line x1="297" y1="228.5" x2="624" y2="1000" stroke-width="1"/>
+    <!-- вектор R̄ -->
+    <line x1="297" y1="228.5" x2="381" y2="426.5" stroke-width="2" marker-end="url(#ax)"/>
+  </g>
+
+  <!-- ===== Точки ===== -->
+  <g fill="#000">
+    <circle cx="297"   cy="945"   r="3.5"/>  <!-- Oв -->
+    <circle cx="396.5" cy="935.1" r="4.5"/>  <!-- A (без подписи) -->
+    <circle cx="565"   cy="860"   r="3"/>    <!-- Oг -->
+    <circle cx="297"   cy="228.5" r="3"/>    <!-- Oш -->
+  </g>
+
+  <!-- ===== Угловые размеры ===== -->
+  <g stroke="#000" stroke-width="1.2" fill="none">
+    <!-- ψ: при Oш, между осью Y и OшOг -->
+    <path d="M297,518.5 A290,290 0 0 0 410.3,495.5" marker-start="url(#dim)" marker-end="url(#dim)"/>
+    <!-- φ̃: при Oв, от оси Y до OвOг -->
+    <path d="M297,795 A150,150 0 0 1 440,899.6" marker-start="url(#dim)" marker-end="url(#dim)"/>
+    <!-- θ: при Oв, от оси Y до OвA -->
+    <path d="M297,880 A65,65 0 0 1 361.7,938.6" marker-start="url(#dim)" marker-end="url(#dim)"/>
+    <!-- φ: при A, от вертикали до AOг -->
+    <path d="M396.5,820.1 A115,115 0 0 1 501.6,888.3" marker-start="url(#dim)" marker-end="url(#dim)"/>
+    <!-- γ: при Oв, между OвOг и OвA -->
+    <path d="M749.7,801.3 A475,475 0 0 1 769.7,897.8" marker-start="url(#dim)" marker-end="url(#dim)"/>
+    <!-- φ̃+ψ: при Oг, между продолжением OвOг и направлением на Oш -->
+    <path d="M518.1,749.5 A120,120 0 0 1 679.4,823.7" marker-start="url(#dim)" marker-end="url(#dim)"/>
+  </g>
+
+  <!-- ===== Выноски ===== -->
+  <g stroke="#000" stroke-width="1" fill="none">
+    <line x1="340" y1="846" x2="375" y2="935"/>                <!-- ℓ → отрезок OвA -->
+    <polyline points="380,920 400,1018 445,1018"/>            <!-- ãω → отрезок OвOг -->
+    <polyline points="430,920 560,1018 598,1018"/>            <!-- aω → отрезок AOг -->
+  </g>
+
+  <!-- ===== Подписи (индексы и тильды — отдельные элементы) ===== -->
+  <g fill="#000" font-family="Times New Roman, Liberation Serif, DejaVu Serif, serif">
+    <!-- оси -->
+    <text x="310" y="35"  font-size="24">Y</text>
+    <text x="820" y="928" font-size="24">X</text>
+
+    <!-- Oш -->
+    <text x="303" y="190" font-size="24">O</text>
+    <text x="321" y="197" font-size="16">ш</text>
+    <!-- Oв -->
+    <text x="283" y="990" font-size="24">O</text>
+    <text x="301" y="997" font-size="16">в</text>
+    <!-- Oг -->
+    <text x="560" y="826" font-size="24">O</text>
+    <text x="578" y="833" font-size="16">г</text>
+
+    <!-- R̄ -->
+    <text x="398" y="450" font-size="24">R</text>
+
+    <!-- ψ -->
+    <text x="330" y="505" font-size="26" font-style="italic">ψ</text>
+
+    <!-- φ̃ (у дуги при Oв) -->
+    <text x="310" y="782" font-size="26" font-style="italic">φ</text>
+    <text x="311" y="765" font-size="20">~</text>
+
+    <!-- aω (выноска к AOг) -->
+    <text x="568" y="1010" font-size="24" font-style="italic">a</text>
+    <text x="581" y="1017" font-size="16" font-style="italic">ω</text>
+
+    <!-- θ -->
+    <text x="318" y="926" font-size="22" font-style="italic">θ</text>
+
+    <!-- φ -->
+    <text x="445" y="820" font-size="26" font-style="italic">φ</text>
+
+    <!-- γ -->
+    <text x="785" y="862" font-size="26" font-style="italic">γ</text>
+
+    <!-- φ̃ + ψ -->
+    <text x="583" y="712" font-size="26" font-style="italic">φ</text>
+    <text x="584" y="695" font-size="20">~</text>
+    <text x="605" y="712" font-size="24">+</text>
+    <text x="627" y="712" font-size="26" font-style="italic">ψ</text>
+
+    <!-- ãω -->
+    <text x="405" y="1008" font-size="24" font-style="italic">a</text>
+    <text x="418" y="1014" font-size="16" font-style="italic">ω</text>
+
+    <text x="406" y="991"  font-size="20">~</text>
+
+    <!-- ℓ (выноска к OвA) -->
+    <text x="324" y="840" font-size="24" font-style="italic">ℓ</text>
+
+  </g>
+
+  <!-- черта над R (вектор) -->
+  <line x1="398" y1="428" x2="414" y2="428" stroke="#000" stroke-width="1.2"/>
+</svg>
