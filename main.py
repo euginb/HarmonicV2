@@ -5,6 +5,7 @@ out/reports/ — отчёты прогона               -> переносят
 --publish    — скопировать самому: reports — всегда, specs — только при коде 0.
 """
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -27,6 +28,25 @@ def write(kind, name, text):
     d = OUT / kind
     d.mkdir(parents=True, exist_ok=True)
     (d / name).write_text(text, encoding="utf-8", newline="\n")
+
+
+FIELD_RE = re.compile(r"\{([A-Za-z_]\w*)\}")
+
+
+def fill(tpl, **kw):
+    """Подстановка полей {name} шаблона за один проход -> (текст, отсутствующие поля).
+
+    Не str.format: в шаблоне LaTeX ($D_\\text{ш}$), его скобки — не поля. Заменяются
+    только переданные ключи; прочие {…} и скобки в подставленных значениях не трогаются."""
+    missing = sorted(k for k in kw if "{" + k + "}" not in tpl)
+    text = FIELD_RE.sub(lambda m: str(kw[m[1]]) if m[1] in kw else m[0], tpl)
+    return text, missing
+
+
+def fill_self_test():
+    t, miss = fill(r"$D_\text{ш}$ {a} {b} {x}", a=1, b="{a}", c=0)
+    assert t == r"$D_\text{ш}$ 1 {a} {x}" and miss == ["c"], (t, miss)
+    return True
 
 
 def publish(ok):
@@ -69,16 +89,21 @@ def run_ptk(prices):
                          for k, h in mounts.items())
     phasing = "\n\n".join(f"### Крепление `{k}`\n\n" + ptk.phasing_table(lim, h)
                           for k, h in mounts.items())
-    write("specs", "SPEC-10_PTK_CALC.md", tpl.format(
+    text, missing = fill(
+        tpl,
         params=params, rows="\n".join(table),
         profile=ptk_profile.theory_md() + "\n\n" + ptk.profile_table(rows),
         errors="\n".join(errs) or "нет", warnings="\n".join(warns) or "нет",
         n_ok=sum(r["ok"] for r in rows), n_all=len(rows),
-        two_stage=ptk.two_stage_table(lim), phasing=phasing))
+        two_stage=ptk.two_stage_table(lim), phasing=phasing)
+    write("specs", "SPEC-10_PTK_CALC.md", text)
+    bad = [f"SPEC-10: в шаблоне нет полей {missing}"] if missing else []
     ids = [r["id"] for r in rows]
     dup = sorted({i for i in ids if ids.count(i) > 1})
-    return ([f"ptk: одинаковые ID {dup} — одно тело под разными ключами "
-             "vendor_prices.json → bodies (Д-22)"] if dup else [])
+    if dup:
+        bad.append(f"ptk: одинаковые ID {dup} — одно тело под разными ключами "
+                   "vendor_prices.json → rollers (Д-22)")
+    return bad
 
 
 def run_catalog(prices):
@@ -99,7 +124,8 @@ def main(argv):
     fails = []
     for name, test in (("ptk", ptk.self_test), ("naming", naming.self_test),
                        ("catalog", catalog.self_test), ("products", products.self_test),
-                       ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test)):
+                       ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test),
+                       ("fill", fill_self_test)):
         try:
             test()
         except AssertionError as e:

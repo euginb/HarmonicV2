@@ -9,9 +9,9 @@
     "HGW20CC": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
     "HGH25CA": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
     "HGR25R": {"unit": "m", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
-    "ROLLER_D2x4": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
-    "ROLLER_D3x8": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
-    "BALL_D3": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""}
+    "R_D2x4": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
+    "R_D3x8": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""},
+    "B_D3": {"unit": "pcs", "price": null, "available": null, "lead_days": null, "supplier": "", "date": ""}
   },
   "rollers": {
     "_comment": "Тела качения ПТК (Д-37): type roller|ball, d = Dш, l — длина, мм; необязательно: a_w (мм), wall_min (мм) — переопределяют limits",
