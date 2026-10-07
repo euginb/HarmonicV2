@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from egm import catalog, naming, products, ptk, ptk_profile
-from egm.cad import ptk_ring
+from egm.cad import ptk_ring, step as cad_step
 
 ROOT = Path(__file__).resolve().parent
 SPECS, REPORTS, TPL = ROOT / "specs", ROOT / "reports", ROOT / "templates"
@@ -125,7 +125,7 @@ def main(argv):
     for name, test in (("ptk", ptk.self_test), ("naming", naming.self_test),
                        ("catalog", catalog.self_test), ("products", products.self_test),
                        ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test),
-                       ("fill", fill_self_test)):
+                       ("fill", fill_self_test), ("step", cad_step.self_test)):
         try:
             test()
         except AssertionError as e:
