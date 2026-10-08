@@ -3,7 +3,7 @@
     "u": 10,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-010-R3X8-8M4P2-A517FE",
+    "id": "PTK-010-R3X8-8M4P2-BC5FBE",
     "n": 10,
     "z": 11,
     "a_w": 0.6,
@@ -69,7 +69,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-010-R3X8-8M4P2-A517FE.01A",
+        "id": "PTK-010-R3X8-8M4P2-BC5FBE.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -80,13 +80,60 @@
         ]
       },
       {
-        "id": "PTK-010-R3X8-8M4P2-A517FE.01B",
+        "id": "PTK-010-R3X8-8M4P2-BC5FBE.01B",
         "name": "венец",
         "variant": "B",
         "s": 8.1818,
         "s_arc_mm": 2.763,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-010-R3X8-8M4P2-BC5FBE.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-010-R3X8-8M4P2-BC5FBE.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-010-R3X8-8M4P2-BC5FBE.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-010-R3X8-8M4P2-BC5FBE.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-010-R3X8-8M4P2-BC5FBE.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -124,7 +171,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -140,15 +197,101 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": [],
+    "warnings": [
+      "эксцентрик: остаток дисбаланса 4.87 из 4.9 г·мм — отверстия балансировки не помещаются (Д-46)",
+      "ряд 3: стенка эксцентрика у паза шпонки 0.56 < ecc_wall_min 1 мм — изменить key_angle (Д-46)",
+      "ряд 4: стенка эксцентрика у паза шпонки 0.56 < ecc_wall_min 1 мм — изменить key_angle (Д-46)"
+    ],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 10,
+      "r_in": 10.34,
+      "r_out": 11.66,
+      "w": 3.05,
+      "h": 8.05,
+      "length": 37.0,
+      "web": 3.34,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 18.0,
+          "z0": 9.975
+        },
+        {
+          "row": 3,
+          "cage": 18.0,
+          "z0": 18.975
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 27.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 10.0,
+      "t": 5.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 2.8,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 1.85,
+        "brg": 1.69,
+        "bodies": 1.33,
+        "sum": 4.87
+      },
+      "bal": {
+        "n": 0,
+        "d": 0.0,
+        "r": 0.0,
+        "U_rem": 0.0,
+        "res": 4.87,
+        "holes": []
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 1.41
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 1.41
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 0.56
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 0.56
+        }
+      ]
+    }
   },
   {
     "u": 10,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-010-R3X8-8M4P2-723930",
+    "id": "PTK-010-R3X8-8M4P2-F243D6",
     "n": 10,
     "z": 11,
     "a_w": 0.6,
@@ -214,7 +357,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-010-R3X8-8M4P2-723930.01A",
+        "id": "PTK-010-R3X8-8M4P2-F243D6.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -225,13 +368,60 @@
         ]
       },
       {
-        "id": "PTK-010-R3X8-8M4P2-723930.01B",
+        "id": "PTK-010-R3X8-8M4P2-F243D6.01B",
         "name": "венец",
         "variant": "B",
         "s": 8.1818,
         "s_arc_mm": 2.642,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-010-R3X8-8M4P2-F243D6.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-010-R3X8-8M4P2-F243D6.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-010-R3X8-8M4P2-F243D6.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-010-R3X8-8M4P2-F243D6.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-010-R3X8-8M4P2-F243D6.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -265,7 +455,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -281,17 +481,114 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": [],
+    "warnings": [
+      "эксцентрик: остаток дисбаланса 2.06 из 10.2 г·мм — отверстия балансировки не помещаются (Д-46)"
+    ],
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 10,
+      "r_in": 9.49,
+      "r_out": 10.81,
+      "w": 3.05,
+      "h": 8.05,
+      "length": 37.0,
+      "web": 2.815,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 18.0,
+          "z0": 9.975
+        },
+        {
+          "row": 3,
+          "cage": 18.0,
+          "z0": 18.975
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 27.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 17.3,
+      "t": 8.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 8.86,
+        "brg": 0.0,
+        "bodies": 1.33,
+        "sum": 10.19
+      },
+      "bal": {
+        "n": 3,
+        "d": 3.1,
+        "r": 6.57,
+        "U_rem": 8.13,
+        "res": 2.06,
+        "holes": [
+          [
+            5.291,
+            -3.895
+          ],
+          [
+            6.57,
+            0.0
+          ],
+          [
+            5.291,
+            3.895
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 5.06
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 5.06
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 4.22
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 4.22
+        }
+      ]
+    }
   },
   {
     "u": 10,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-010-R2X4_2-8M4P2-AA9D5E",
+    "id": "PTK-010-R2X4_2-8M4P2-2957CC",
     "n": 10,
     "z": 11,
     "a_w": 0.4,
@@ -357,7 +654,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-010-R2X4_2-8M4P2-AA9D5E.01A",
+        "id": "PTK-010-R2X4_2-8M4P2-2957CC.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -368,13 +665,60 @@
         ]
       },
       {
-        "id": "PTK-010-R2X4_2-8M4P2-AA9D5E.01B",
+        "id": "PTK-010-R2X4_2-8M4P2-2957CC.01B",
         "name": "венец",
         "variant": "B",
         "s": 8.1818,
         "s_arc_mm": 2.592,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-010-R2X4_2-8M4P2-2957CC.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-010-R2X4_2-8M4P2-2957CC.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-010-R2X4_2-8M4P2-2957CC.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-010-R2X4_2-8M4P2-2957CC.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-010-R2X4_2-8M4P2-2957CC.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -412,7 +756,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -428,15 +782,101 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": [],
+    "warnings": [
+      "эксцентрик: остаток дисбаланса 2.57 из 2.6 г·мм — отверстия балансировки не помещаются (Д-46)",
+      "ряд 3: стенка эксцентрика у паза шпонки 0.71 < ecc_wall_min 1 мм — изменить key_angle (Д-46)",
+      "ряд 4: стенка эксцентрика у паза шпонки 0.71 < ecc_wall_min 1 мм — изменить key_angle (Д-46)"
+    ],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 10,
+      "r_in": 10.06,
+      "r_out": 10.94,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 25.0,
+      "web": 4.167,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 1.375
+        },
+        {
+          "row": 2,
+          "cage": 18.0,
+          "z0": 7.375
+        },
+        {
+          "row": 3,
+          "cage": 18.0,
+          "z0": 13.375
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 19.375
+        }
+      ]
+    },
+    "ecc": {
+      "De": 10.0,
+      "t": 5.0,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 2.8,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 1.23,
+        "brg": 1.13,
+        "bodies": 0.21,
+        "sum": 2.57
+      },
+      "bal": {
+        "n": 0,
+        "d": 0.0,
+        "r": 0.0,
+        "U_rem": 0.0,
+        "res": 2.57,
+        "holes": []
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 1.27
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 1.27
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 0.71
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 0.71
+        }
+      ]
+    }
   },
   {
     "u": 10,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-010-R2X4_2-8M3P2-E8C29A",
+    "id": "PTK-010-R2X4_2-8M3P2-2F4341",
     "n": 10,
     "z": 11,
     "a_w": 0.4,
@@ -502,7 +942,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-010-R2X4_2-8M3P2-E8C29A.01A",
+        "id": "PTK-010-R2X4_2-8M3P2-2F4341.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -513,13 +953,60 @@
         ]
       },
       {
-        "id": "PTK-010-R2X4_2-8M3P2-E8C29A.01B",
+        "id": "PTK-010-R2X4_2-8M3P2-2F4341.01B",
         "name": "венец",
         "variant": "B",
         "s": 8.1818,
         "s_arc_mm": 1.992,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-010-R2X4_2-8M3P2-2F4341.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-010-R2X4_2-8M3P2-2F4341.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-010-R2X4_2-8M3P2-2F4341.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-010-R2X4_2-8M3P2-2F4341.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-010-R2X4_2-8M3P2-2F4341.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -553,7 +1040,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M3",
@@ -569,17 +1066,101 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": [],
+    "warnings": [
+      "эксцентрик: остаток дисбаланса 1.63 из 1.6 г·мм — отверстия балансировки не помещаются (Д-46)"
+    ],
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 10,
+      "r_in": 6.41,
+      "r_out": 7.29,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 21.8,
+      "web": 1.912,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 18.0,
+          "z0": 6.175
+        },
+        {
+          "row": 3,
+          "cage": 18.0,
+          "z0": 11.375
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 16.575
+        }
+      ]
+    },
+    "ecc": {
+      "De": 11.7,
+      "t": 4.2,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 1.42,
+        "brg": 0.0,
+        "bodies": 0.21,
+        "sum": 1.63
+      },
+      "bal": {
+        "n": 0,
+        "d": 0.0,
+        "r": 0.0,
+        "U_rem": 0.0,
+        "res": 1.63,
+        "holes": []
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 2.13
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 2.13
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 1.56
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 1.56
+        }
+      ]
+    }
   },
   {
     "u": 10,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-010-B3-8M4P2-7DFF8D",
+    "id": "PTK-010-B3-8M4P2-C97B1E",
     "n": 10,
     "z": 11,
     "a_w": 0.0,
@@ -636,7 +1217,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -656,13 +1247,15 @@
     "tech": [
       "Т1"
     ],
-    "excluded": "Т1"
+    "excluded": "Т1",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 10,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-010-B3-8M4P2-EA76DC",
+    "id": "PTK-010-B3-8M4P2-2BEF4C",
     "n": 10,
     "z": 11,
     "a_w": 0.6,
@@ -728,7 +1321,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-010-B3-8M4P2-EA76DC.01A",
+        "id": "PTK-010-B3-8M4P2-2BEF4C.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -739,13 +1332,60 @@
         ]
       },
       {
-        "id": "PTK-010-B3-8M4P2-EA76DC.01B",
+        "id": "PTK-010-B3-8M4P2-2BEF4C.01B",
         "name": "венец",
         "variant": "B",
         "s": 8.1818,
         "s_arc_mm": 2.642,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-010-B3-8M4P2-2BEF4C.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-010-B3-8M4P2-2BEF4C.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-010-B3-8M4P2-2BEF4C.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-010-B3-8M4P2-2BEF4C.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-010-B3-8M4P2-2BEF4C.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -779,7 +1419,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -795,19 +1445,116 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": [],
+    "warnings": [
+      "эксцентрик: остаток дисбаланса 0.61 из 3.7 г·мм — отверстия балансировки не помещаются (Д-46)"
+    ],
     "tech": [
       "Т2",
       "Т3",
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 10,
+      "r_in": 9.49,
+      "r_out": 10.81,
+      "w": 3.05,
+      "h": 3.05,
+      "length": 17.0,
+      "web": 2.815,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 18.0,
+          "z0": 4.975
+        },
+        {
+          "row": 3,
+          "cage": 18.0,
+          "z0": 8.975
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 12.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 17.3,
+      "t": 3.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": 1.56,
+      "U": {
+        "disk": 3.32,
+        "brg": 0.0,
+        "bodies": 0.33,
+        "sum": 3.65
+      },
+      "bal": {
+        "n": 3,
+        "d": 3.1,
+        "r": 6.57,
+        "U_rem": 3.05,
+        "res": 0.61,
+        "holes": [
+          [
+            5.291,
+            -3.895
+          ],
+          [
+            6.57,
+            0.0
+          ],
+          [
+            5.291,
+            3.895
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 5.06
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 5.06
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 4.22
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 4.22
+        }
+      ]
+    }
   },
   {
     "u": 16,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-016-R3X8-8M4P2-20EB18",
+    "id": "PTK-016-R3X8-8M4P2-4597D2",
     "n": 16,
     "z": 17,
     "a_w": 0.6,
@@ -873,7 +1620,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-016-R3X8-8M4P2-20EB18.01A",
+        "id": "PTK-016-R3X8-8M4P2-4597D2.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -884,13 +1631,60 @@
         ]
       },
       {
-        "id": "PTK-016-R3X8-8M4P2-20EB18.01B",
+        "id": "PTK-016-R3X8-8M4P2-4597D2.01B",
         "name": "венец",
         "variant": "B",
         "s": 5.2941,
         "s_arc_mm": 2.389,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-016-R3X8-8M4P2-4597D2.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-016-R3X8-8M4P2-4597D2.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-016-R3X8-8M4P2-4597D2.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-016-R3X8-8M4P2-4597D2.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-016-R3X8-8M4P2-4597D2.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -928,7 +1722,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -944,15 +1748,112 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": [],
+    "warnings": [
+      "эксцентрик: остаток дисбаланса 3.42 из 18.1 г·мм — отверстия балансировки не помещаются (Д-46)"
+    ],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 16,
+      "r_in": 16.84,
+      "r_out": 18.16,
+      "w": 3.05,
+      "h": 8.05,
+      "length": 37.0,
+      "web": 3.521,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 11.25,
+          "z0": 9.975
+        },
+        {
+          "row": 3,
+          "cage": 11.25,
+          "z0": 18.975
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 27.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 20.0,
+      "t": 7.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 9.4,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 10.36,
+        "brg": 5.66,
+        "bodies": 2.13,
+        "sum": 18.14
+      },
+      "bal": {
+        "n": 3,
+        "d": 4.4,
+        "r": 7.22,
+        "U_rem": 14.72,
+        "res": 3.42,
+        "holes": [
+          [
+            5.201,
+            -5.008
+          ],
+          [
+            7.22,
+            0.0
+          ],
+          [
+            5.201,
+            5.008
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 6.42
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 6.42
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 5.57
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 5.57
+        }
+      ]
+    }
   },
   {
     "u": 16,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-016-R3X8-8M4P2-628884",
+    "id": "PTK-016-R3X8-8M4P2-35F7E6",
     "n": 16,
     "z": 17,
     "a_w": 0.6,
@@ -1018,7 +1919,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-016-R3X8-8M4P2-628884.01A",
+        "id": "PTK-016-R3X8-8M4P2-35F7E6.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -1029,13 +1930,60 @@
         ]
       },
       {
-        "id": "PTK-016-R3X8-8M4P2-628884.01B",
+        "id": "PTK-016-R3X8-8M4P2-35F7E6.01B",
         "name": "венец",
         "variant": "B",
         "s": 5.2941,
         "s_arc_mm": 2.245,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-016-R3X8-8M4P2-35F7E6.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-016-R3X8-8M4P2-35F7E6.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-016-R3X8-8M4P2-35F7E6.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-016-R3X8-8M4P2-35F7E6.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-016-R3X8-8M4P2-35F7E6.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -1069,7 +2017,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -1089,13 +2047,108 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 16,
+      "r_in": 15.29,
+      "r_out": 16.61,
+      "w": 3.05,
+      "h": 8.05,
+      "length": 37.0,
+      "web": 2.916,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 11.25,
+          "z0": 9.975
+        },
+        {
+          "row": 3,
+          "cage": 11.25,
+          "z0": 18.975
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 27.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 28.9,
+      "t": 8.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 24.72,
+        "brg": 0.0,
+        "bodies": 2.13,
+        "sum": 26.85
+      },
+      "bal": {
+        "n": 3,
+        "d": 4.0,
+        "r": 11.99,
+        "U_rem": 26.74,
+        "res": 0.11,
+        "holes": [
+          [
+            10.947,
+            -4.89
+          ],
+          [
+            11.99,
+            0.0
+          ],
+          [
+            10.947,
+            4.89
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 10.87
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 10.87
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 10.02
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 10.02
+        }
+      ]
+    }
   },
   {
     "u": 16,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-016-R2X4_2-8M4P2-24105C",
+    "id": "PTK-016-R2X4_2-8M4P2-797C78",
     "n": 16,
     "z": 17,
     "a_w": 0.4,
@@ -1161,7 +2214,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-016-R2X4_2-8M4P2-24105C.01A",
+        "id": "PTK-016-R2X4_2-8M4P2-797C78.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -1172,13 +2225,60 @@
         ]
       },
       {
-        "id": "PTK-016-R2X4_2-8M4P2-24105C.01B",
+        "id": "PTK-016-R2X4_2-8M4P2-797C78.01B",
         "name": "венец",
         "variant": "B",
         "s": 5.2941,
         "s_arc_mm": 1.769,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-016-R2X4_2-8M4P2-797C78.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-016-R2X4_2-8M4P2-797C78.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-016-R2X4_2-8M4P2-797C78.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-016-R2X4_2-8M4P2-797C78.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-016-R2X4_2-8M4P2-797C78.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -1216,7 +2316,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -1232,15 +2342,99 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": [],
+    "warnings": [
+      "эксцентрик: остаток дисбаланса 3.39 из 3.4 г·мм — отверстия балансировки не помещаются (Д-46)"
+    ],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 16,
+      "r_in": 11.06,
+      "r_out": 11.94,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 25.0,
+      "web": 2.265,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 1.375
+        },
+        {
+          "row": 2,
+          "cage": 11.25,
+          "z0": 7.375
+        },
+        {
+          "row": 3,
+          "cage": 11.25,
+          "z0": 13.375
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 19.375
+        }
+      ]
+    },
+    "ecc": {
+      "De": 12.0,
+      "t": 5.0,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 3.2,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 1.78,
+        "brg": 1.28,
+        "bodies": 0.33,
+        "sum": 3.39
+      },
+      "bal": {
+        "n": 0,
+        "d": 0.0,
+        "r": 0.0,
+        "U_rem": 0.0,
+        "res": 3.39,
+        "holes": []
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 2.28
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 2.28
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 1.71
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 1.71
+        }
+      ]
+    }
   },
   {
     "u": 16,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-016-R2X4_2-8M4P2-09DFE1",
+    "id": "PTK-016-R2X4_2-8M4P2-2E4483",
     "n": 16,
     "z": 17,
     "a_w": 0.4,
@@ -1306,7 +2500,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-016-R2X4_2-8M4P2-09DFE1.01A",
+        "id": "PTK-016-R2X4_2-8M4P2-2E4483.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -1317,13 +2511,60 @@
         ]
       },
       {
-        "id": "PTK-016-R2X4_2-8M4P2-09DFE1.01B",
+        "id": "PTK-016-R2X4_2-8M4P2-2E4483.01B",
         "name": "венец",
         "variant": "B",
         "s": 5.2941,
         "s_arc_mm": 1.696,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-016-R2X4_2-8M4P2-2E4483.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-016-R2X4_2-8M4P2-2E4483.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-016-R2X4_2-8M4P2-2E4483.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-016-R2X4_2-8M4P2-2E4483.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-016-R2X4_2-8M4P2-2E4483.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -1357,7 +2598,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -1377,13 +2628,104 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 16,
+      "r_in": 10.26,
+      "r_out": 11.14,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 21.8,
+      "web": 1.953,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 11.25,
+          "z0": 6.175
+        },
+        {
+          "row": 3,
+          "cage": 11.25,
+          "z0": 11.375
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 16.575
+        }
+      ]
+    },
+    "ecc": {
+      "De": 19.4,
+      "t": 4.2,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 3.9,
+        "brg": 0.0,
+        "bodies": 0.33,
+        "sum": 4.23
+      },
+      "bal": {
+        "n": 2,
+        "d": 3.4,
+        "r": 7.38,
+        "U_rem": 4.22,
+        "res": 0.01,
+        "holes": [
+          [
+            7.044,
+            -2.2
+          ],
+          [
+            7.044,
+            2.2
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 5.98
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 5.98
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 5.41
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 5.41
+        }
+      ]
+    }
   },
   {
     "u": 16,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-016-B3-8M4P2-9EF289",
+    "id": "PTK-016-B3-8M4P2-6D4791",
     "n": 16,
     "z": 17,
     "a_w": 0.0,
@@ -1440,7 +2782,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -1460,13 +2812,15 @@
     "tech": [
       "Т1"
     ],
-    "excluded": "Т1"
+    "excluded": "Т1",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 16,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-016-B3-8M4P2-427E66",
+    "id": "PTK-016-B3-8M4P2-80179C",
     "n": 16,
     "z": 17,
     "a_w": 0.6,
@@ -1532,7 +2886,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-016-B3-8M4P2-427E66.01A",
+        "id": "PTK-016-B3-8M4P2-80179C.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -1543,13 +2897,60 @@
         ]
       },
       {
-        "id": "PTK-016-B3-8M4P2-427E66.01B",
+        "id": "PTK-016-B3-8M4P2-80179C.01B",
         "name": "венец",
         "variant": "B",
         "s": 5.2941,
         "s_arc_mm": 2.245,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-016-B3-8M4P2-80179C.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-016-B3-8M4P2-80179C.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-016-B3-8M4P2-80179C.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-016-B3-8M4P2-80179C.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-016-B3-8M4P2-80179C.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -1583,7 +2984,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -1605,13 +3016,100 @@
       "Т3",
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 16,
+      "r_in": 15.29,
+      "r_out": 16.61,
+      "w": 3.05,
+      "h": 3.05,
+      "length": 17.0,
+      "web": 2.916,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 11.25,
+          "z0": 4.975
+        },
+        {
+          "row": 3,
+          "cage": 11.25,
+          "z0": 8.975
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 12.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 28.9,
+      "t": 3.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": 1.56,
+      "U": {
+        "disk": 9.27,
+        "brg": 0.0,
+        "bodies": 0.53,
+        "sum": 9.8
+      },
+      "bal": {
+        "n": 1,
+        "d": 7.1,
+        "r": 10.5,
+        "U_rem": 9.79,
+        "res": 0.01,
+        "holes": [
+          [
+            10.5,
+            0.0
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 10.87
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 10.87
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 10.02
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 10.02
+        }
+      ]
+    }
   },
   {
     "u": 20,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-020-R3X8-8M4P2-9FB8AE",
+    "id": "PTK-020-R3X8-8M4P2-A93145",
     "n": 20,
     "z": 21,
     "a_w": 0.6,
@@ -1677,7 +3175,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-020-R3X8-8M4P2-9FB8AE.01A",
+        "id": "PTK-020-R3X8-8M4P2-A93145.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -1688,13 +3186,60 @@
         ]
       },
       {
-        "id": "PTK-020-R3X8-8M4P2-9FB8AE.01B",
+        "id": "PTK-020-R3X8-8M4P2-A93145.01B",
         "name": "венец",
         "variant": "B",
         "s": 4.2857,
         "s_arc_mm": 2.121,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-020-R3X8-8M4P2-A93145.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-020-R3X8-8M4P2-A93145.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-020-R3X8-8M4P2-A93145.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-020-R3X8-8M4P2-A93145.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-020-R3X8-8M4P2-A93145.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -1732,7 +3277,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -1750,13 +3305,108 @@
     "errors": [],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 20,
+      "r_in": 19.34,
+      "r_out": 20.66,
+      "w": 3.05,
+      "h": 8.05,
+      "length": 37.0,
+      "web": 3.001,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 9.0,
+          "z0": 9.975
+        },
+        {
+          "row": 3,
+          "cage": 9.0,
+          "z0": 18.975
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 27.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 25.0,
+      "t": 7.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 11.2,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 16.18,
+        "brg": 6.74,
+        "bodies": 2.66,
+        "sum": 25.59
+      },
+      "bal": {
+        "n": 3,
+        "d": 4.9,
+        "r": 9.53,
+        "U_rem": 25.84,
+        "res": -0.25,
+        "holes": [
+          [
+            7.704,
+            -5.61
+          ],
+          [
+            9.53,
+            0.0
+          ],
+          [
+            7.704,
+            5.61
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 8.92
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 8.92
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 8.07
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 8.07
+        }
+      ]
+    }
   },
   {
     "u": 20,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-020-R3X8-8M4P2-EDB560",
+    "id": "PTK-020-R3X8-8M4P2-BF6E3E",
     "n": 20,
     "z": 21,
     "a_w": 0.6,
@@ -1822,7 +3472,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-020-R3X8-8M4P2-EDB560.01A",
+        "id": "PTK-020-R3X8-8M4P2-BF6E3E.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -1833,13 +3483,60 @@
         ]
       },
       {
-        "id": "PTK-020-R3X8-8M4P2-EDB560.01B",
+        "id": "PTK-020-R3X8-8M4P2-BF6E3E.01B",
         "name": "венец",
         "variant": "B",
         "s": 4.2857,
         "s_arc_mm": 2.106,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-020-R3X8-8M4P2-BF6E3E.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-020-R3X8-8M4P2-BF6E3E.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-020-R3X8-8M4P2-BF6E3E.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-020-R3X8-8M4P2-BF6E3E.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-020-R3X8-8M4P2-BF6E3E.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -1873,7 +3570,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -1893,13 +3600,100 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 20,
+      "r_in": 19.14,
+      "r_out": 20.46,
+      "w": 3.05,
+      "h": 8.05,
+      "length": 37.0,
+      "web": 2.938,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 9.0,
+          "z0": 9.975
+        },
+        {
+          "row": 3,
+          "cage": 9.0,
+          "z0": 18.975
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 27.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 36.6,
+      "t": 8.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 39.64,
+        "brg": 0.0,
+        "bodies": 2.66,
+        "sum": 42.31
+      },
+      "bal": {
+        "n": 1,
+        "d": 7.8,
+        "r": 14.0,
+        "U_rem": 42.01,
+        "res": 0.29,
+        "holes": [
+          [
+            14.0,
+            0.0
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 14.72
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 14.72
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 13.87
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 13.87
+        }
+      ]
+    }
   },
   {
     "u": 20,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-020-R2X4_2-8M4P2-2F2207",
+    "id": "PTK-020-R2X4_2-8M4P2-A400EF",
     "n": 20,
     "z": 21,
     "a_w": 0.4,
@@ -1965,7 +3759,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-020-R2X4_2-8M4P2-2F2207.01A",
+        "id": "PTK-020-R2X4_2-8M4P2-A400EF.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -1976,13 +3770,60 @@
         ]
       },
       {
-        "id": "PTK-020-R2X4_2-8M4P2-2F2207.01B",
+        "id": "PTK-020-R2X4_2-8M4P2-A400EF.01B",
         "name": "венец",
         "variant": "B",
         "s": 4.2857,
         "s_arc_mm": 1.619,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-020-R2X4_2-8M4P2-A400EF.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-020-R2X4_2-8M4P2-A400EF.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-020-R2X4_2-8M4P2-A400EF.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-020-R2X4_2-8M4P2-A400EF.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-020-R2X4_2-8M4P2-A400EF.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -2020,7 +3861,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -2036,15 +3887,112 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": [],
+    "warnings": [
+      "эксцентрик: остаток дисбаланса 1.54 из 5.6 г·мм — отверстия балансировки не помещаются (Д-46)"
+    ],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 20,
+      "r_in": 13.56,
+      "r_out": 14.44,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 25.0,
+      "web": 2.193,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 1.375
+        },
+        {
+          "row": 2,
+          "cage": 9.0,
+          "z0": 7.375
+        },
+        {
+          "row": 3,
+          "cage": 9.0,
+          "z0": 13.375
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 19.375
+        }
+      ]
+    },
+    "ecc": {
+      "De": 17.0,
+      "t": 5.0,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 4.2,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 3.56,
+        "brg": 1.67,
+        "bodies": 0.41,
+        "sum": 5.65
+      },
+      "bal": {
+        "n": 3,
+        "d": 2.8,
+        "r": 6.42,
+        "U_rem": 4.11,
+        "res": 1.54,
+        "holes": [
+          [
+            5.295,
+            -3.63
+          ],
+          [
+            6.42,
+            0.0
+          ],
+          [
+            5.295,
+            3.63
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 4.78
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 4.78
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 4.21
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 4.21
+        }
+      ]
+    }
   },
   {
     "u": 20,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-020-R2X4_2-8M4P2-5D352B",
+    "id": "PTK-020-R2X4_2-8M4P2-C4601E",
     "n": 20,
     "z": 21,
     "a_w": 0.4,
@@ -2110,7 +4058,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-020-R2X4_2-8M4P2-5D352B.01A",
+        "id": "PTK-020-R2X4_2-8M4P2-C4601E.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -2121,13 +4069,60 @@
         ]
       },
       {
-        "id": "PTK-020-R2X4_2-8M4P2-5D352B.01B",
+        "id": "PTK-020-R2X4_2-8M4P2-C4601E.01B",
         "name": "венец",
         "variant": "B",
         "s": 4.2857,
         "s_arc_mm": 1.567,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-020-R2X4_2-8M4P2-C4601E.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-020-R2X4_2-8M4P2-C4601E.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-020-R2X4_2-8M4P2-C4601E.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-020-R2X4_2-8M4P2-C4601E.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-020-R2X4_2-8M4P2-C4601E.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -2161,7 +4156,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -2181,13 +4186,108 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 20,
+      "r_in": 12.86,
+      "r_out": 13.74,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 21.8,
+      "web": 1.973,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 9.0,
+          "z0": 6.175
+        },
+        {
+          "row": 3,
+          "cage": 9.0,
+          "z0": 11.375
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 16.575
+        }
+      ]
+    },
+    "ecc": {
+      "De": 24.6,
+      "t": 4.2,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 6.27,
+        "brg": 0.0,
+        "bodies": 0.41,
+        "sum": 6.68
+      },
+      "bal": {
+        "n": 3,
+        "d": 3.0,
+        "r": 10.16,
+        "U_rem": 6.74,
+        "res": -0.05,
+        "holes": [
+          [
+            9.373,
+            -3.922
+          ],
+          [
+            10.16,
+            0.0
+          ],
+          [
+            9.373,
+            3.922
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 8.58
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 8.58
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 8.01
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 8.01
+        }
+      ]
+    }
   },
   {
     "u": 20,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-020-B3-8M4P2-466254",
+    "id": "PTK-020-B3-8M4P2-8F8703",
     "n": 20,
     "z": 21,
     "a_w": 0.0,
@@ -2244,7 +4344,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -2264,13 +4374,15 @@
     "tech": [
       "Т1"
     ],
-    "excluded": "Т1"
+    "excluded": "Т1",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 20,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-020-B3-8M4P2-7D1A16",
+    "id": "PTK-020-B3-8M4P2-C936ED",
     "n": 20,
     "z": 21,
     "a_w": 0.6,
@@ -2336,7 +4448,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-020-B3-8M4P2-7D1A16.01A",
+        "id": "PTK-020-B3-8M4P2-C936ED.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -2347,13 +4459,60 @@
         ]
       },
       {
-        "id": "PTK-020-B3-8M4P2-7D1A16.01B",
+        "id": "PTK-020-B3-8M4P2-C936ED.01B",
         "name": "венец",
         "variant": "B",
         "s": 4.2857,
         "s_arc_mm": 2.106,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-020-B3-8M4P2-C936ED.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-020-B3-8M4P2-C936ED.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-020-B3-8M4P2-C936ED.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-020-B3-8M4P2-C936ED.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-020-B3-8M4P2-C936ED.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -2387,7 +4546,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -2409,13 +4578,108 @@
       "Т3",
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 20,
+      "r_in": 19.14,
+      "r_out": 20.46,
+      "w": 3.05,
+      "h": 3.05,
+      "length": 17.0,
+      "web": 2.938,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 9.0,
+          "z0": 4.975
+        },
+        {
+          "row": 3,
+          "cage": 9.0,
+          "z0": 8.975
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 12.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 36.6,
+      "t": 3.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": 1.56,
+      "U": {
+        "disk": 14.87,
+        "brg": 0.0,
+        "bodies": 0.67,
+        "sum": 15.53
+      },
+      "bal": {
+        "n": 3,
+        "d": 4.3,
+        "r": 15.71,
+        "U_rem": 15.51,
+        "res": 0.03,
+        "holes": [
+          [
+            14.816,
+            -5.224
+          ],
+          [
+            15.71,
+            0.0
+          ],
+          [
+            14.816,
+            5.224
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 14.72
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 14.72
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 13.87
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 13.87
+        }
+      ]
+    }
   },
   {
     "u": 25,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-025-R3X8-8M4P2-0FC682",
+    "id": "PTK-025-R3X8-8M4P2-F7D220",
     "n": 25,
     "z": 26,
     "a_w": 0.6,
@@ -2481,7 +4745,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-025-R3X8-8M4P2-0FC682.01A",
+        "id": "PTK-025-R3X8-8M4P2-F7D220.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -2492,13 +4756,60 @@
         ]
       },
       {
-        "id": "PTK-025-R3X8-8M4P2-0FC682.01B",
+        "id": "PTK-025-R3X8-8M4P2-F7D220.01B",
         "name": "венец",
         "variant": "B",
         "s": 6.9231,
         "s_arc_mm": 4.03,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-025-R3X8-8M4P2-F7D220.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-025-R3X8-8M4P2-F7D220.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-025-R3X8-8M4P2-F7D220.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-025-R3X8-8M4P2-F7D220.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-025-R3X8-8M4P2-F7D220.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -2536,7 +4847,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -2554,13 +4875,100 @@
     "errors": [],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 25,
+      "r_in": 24.34,
+      "r_out": 25.66,
+      "w": 3.05,
+      "h": 8.05,
+      "length": 37.0,
+      "web": 3.051,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 3.6,
+          "z0": 9.975
+        },
+        {
+          "row": 3,
+          "cage": 7.2,
+          "z0": 18.975
+        },
+        {
+          "row": 4,
+          "cage": 10.8,
+          "z0": 27.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 35.0,
+      "t": 7.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 14.9,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 31.72,
+        "brg": 8.92,
+        "bodies": 3.33,
+        "sum": 43.97
+      },
+      "bal": {
+        "n": 1,
+        "d": 9.0,
+        "r": 12.6,
+        "U_rem": 44.05,
+        "res": -0.08,
+        "holes": [
+          [
+            12.6,
+            0.0
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 13.92
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 13.92
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 13.07
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 13.07
+        }
+      ]
+    }
   },
   {
     "u": 25,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-025-R3X8-8M4P2-1A54DD",
+    "id": "PTK-025-R3X8-8M4P2-E30F7E",
     "n": 25,
     "z": 26,
     "a_w": 0.6,
@@ -2626,7 +5034,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-025-R3X8-8M4P2-1A54DD.01A",
+        "id": "PTK-025-R3X8-8M4P2-E30F7E.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -2637,13 +5045,60 @@
         ]
       },
       {
-        "id": "PTK-025-R3X8-8M4P2-1A54DD.01B",
+        "id": "PTK-025-R3X8-8M4P2-E30F7E.01B",
         "name": "венец",
         "variant": "B",
         "s": 6.9231,
         "s_arc_mm": 3.987,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-025-R3X8-8M4P2-E30F7E.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-025-R3X8-8M4P2-E30F7E.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-025-R3X8-8M4P2-E30F7E.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-025-R3X8-8M4P2-E30F7E.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-025-R3X8-8M4P2-E30F7E.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -2677,7 +5132,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -2697,13 +5162,104 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 25,
+      "r_in": 23.99,
+      "r_out": 25.31,
+      "w": 3.05,
+      "h": 8.05,
+      "length": 37.0,
+      "web": 2.963,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 3.6,
+          "z0": 9.975
+        },
+        {
+          "row": 3,
+          "cage": 7.2,
+          "z0": 18.975
+        },
+        {
+          "row": 4,
+          "cage": 10.8,
+          "z0": 27.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 46.3,
+      "t": 8.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 63.44,
+        "brg": 0.0,
+        "bodies": 3.33,
+        "sum": 66.77
+      },
+      "bal": {
+        "n": 2,
+        "d": 5.9,
+        "r": 19.79,
+        "U_rem": 66.92,
+        "res": -0.15,
+        "holes": [
+          [
+            19.487,
+            -3.45
+          ],
+          [
+            19.487,
+            3.45
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 19.57
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 19.57
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 18.72
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 18.72
+        }
+      ]
+    }
   },
   {
     "u": 25,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-025-R2X4_2-8M4P2-82203A",
+    "id": "PTK-025-R2X4_2-8M4P2-3D114D",
     "n": 25,
     "z": 26,
     "a_w": 0.4,
@@ -2769,7 +5325,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-025-R2X4_2-8M4P2-82203A.01A",
+        "id": "PTK-025-R2X4_2-8M4P2-3D114D.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -2780,13 +5336,60 @@
         ]
       },
       {
-        "id": "PTK-025-R2X4_2-8M4P2-82203A.01B",
+        "id": "PTK-025-R2X4_2-8M4P2-3D114D.01B",
         "name": "венец",
         "variant": "B",
         "s": 6.9231,
         "s_arc_mm": 2.978,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-025-R2X4_2-8M4P2-3D114D.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-025-R2X4_2-8M4P2-3D114D.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-025-R2X4_2-8M4P2-3D114D.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-025-R2X4_2-8M4P2-3D114D.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-025-R2X4_2-8M4P2-3D114D.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -2824,7 +5427,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -2842,13 +5455,108 @@
     "errors": [],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 25,
+      "r_in": 16.56,
+      "r_out": 17.44,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 33.0,
+      "web": 2.101,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 2.375
+        },
+        {
+          "row": 2,
+          "cage": 3.6,
+          "z0": 10.375
+        },
+        {
+          "row": 3,
+          "cage": 7.2,
+          "z0": 18.375
+        },
+        {
+          "row": 4,
+          "cage": 10.8,
+          "z0": 26.375
+        }
+      ]
+    },
+    "ecc": {
+      "De": 20.0,
+      "t": 7.0,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 9.4,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 6.91,
+        "brg": 3.77,
+        "bodies": 0.52,
+        "sum": 11.19
+      },
+      "bal": {
+        "n": 3,
+        "d": 3.6,
+        "r": 7.52,
+        "U_rem": 11.04,
+        "res": 0.15,
+        "holes": [
+          [
+            6.113,
+            -4.38
+          ],
+          [
+            7.52,
+            0.0
+          ],
+          [
+            6.113,
+            4.38
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 6.28
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 6.28
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 5.71
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 5.71
+        }
+      ]
+    }
   },
   {
     "u": 25,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-025-R2X4_2-8M4P2-BDD17D",
+    "id": "PTK-025-R2X4_2-8M4P2-BEEE19",
     "n": 25,
     "z": 26,
     "a_w": 0.4,
@@ -2914,7 +5622,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-025-R2X4_2-8M4P2-BDD17D.01A",
+        "id": "PTK-025-R2X4_2-8M4P2-BEEE19.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -2925,13 +5633,60 @@
         ]
       },
       {
-        "id": "PTK-025-R2X4_2-8M4P2-BDD17D.01B",
+        "id": "PTK-025-R2X4_2-8M4P2-BEEE19.01B",
         "name": "венец",
         "variant": "B",
         "s": 6.9231,
         "s_arc_mm": 2.924,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-025-R2X4_2-8M4P2-BEEE19.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-025-R2X4_2-8M4P2-BEEE19.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-025-R2X4_2-8M4P2-BEEE19.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-025-R2X4_2-8M4P2-BEEE19.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-025-R2X4_2-8M4P2-BEEE19.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -2965,7 +5720,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -2985,13 +5750,104 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 25,
+      "r_in": 16.11,
+      "r_out": 16.99,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 21.8,
+      "web": 1.988,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 3.6,
+          "z0": 6.175
+        },
+        {
+          "row": 3,
+          "cage": 7.2,
+          "z0": 11.375
+        },
+        {
+          "row": 4,
+          "cage": 10.8,
+          "z0": 16.575
+        }
+      ]
+    },
+    "ecc": {
+      "De": 31.1,
+      "t": 4.2,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 10.02,
+        "brg": 0.0,
+        "bodies": 0.52,
+        "sum": 10.54
+      },
+      "bal": {
+        "n": 2,
+        "d": 4.0,
+        "r": 12.94,
+        "U_rem": 10.52,
+        "res": 0.02,
+        "holes": [
+          [
+            12.696,
+            -2.5
+          ],
+          [
+            12.696,
+            2.5
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 11.83
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 11.83
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 11.26
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 11.26
+        }
+      ]
+    }
   },
   {
     "u": 25,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-025-B3-8M4P2-5B06F7",
+    "id": "PTK-025-B3-8M4P2-E773E3",
     "n": 25,
     "z": 26,
     "a_w": 0.0,
@@ -3048,7 +5904,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -3068,13 +5934,15 @@
     "tech": [
       "Т1"
     ],
-    "excluded": "Т1"
+    "excluded": "Т1",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 25,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-025-B3-8M4P2-F08363",
+    "id": "PTK-025-B3-8M4P2-1A058B",
     "n": 25,
     "z": 26,
     "a_w": 0.6,
@@ -3140,7 +6008,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-025-B3-8M4P2-F08363.01A",
+        "id": "PTK-025-B3-8M4P2-1A058B.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -3151,13 +6019,60 @@
         ]
       },
       {
-        "id": "PTK-025-B3-8M4P2-F08363.01B",
+        "id": "PTK-025-B3-8M4P2-1A058B.01B",
         "name": "венец",
         "variant": "B",
         "s": 6.9231,
         "s_arc_mm": 3.987,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-025-B3-8M4P2-1A058B.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-025-B3-8M4P2-1A058B.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-025-B3-8M4P2-1A058B.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-025-B3-8M4P2-1A058B.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-025-B3-8M4P2-1A058B.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -3191,7 +6106,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -3213,13 +6138,100 @@
       "Т3",
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 25,
+      "r_in": 23.99,
+      "r_out": 25.31,
+      "w": 3.05,
+      "h": 3.05,
+      "length": 17.0,
+      "web": 2.963,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 3.6,
+          "z0": 4.975
+        },
+        {
+          "row": 3,
+          "cage": 7.2,
+          "z0": 8.975
+        },
+        {
+          "row": 4,
+          "cage": 10.8,
+          "z0": 12.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 46.3,
+      "t": 3.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": 1.56,
+      "U": {
+        "disk": 23.79,
+        "brg": 0.0,
+        "bodies": 0.83,
+        "sum": 24.62
+      },
+      "bal": {
+        "n": 1,
+        "d": 8.5,
+        "r": 18.5,
+        "U_rem": 24.72,
+        "res": -0.1,
+        "holes": [
+          [
+            18.5,
+            0.0
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 19.57
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 19.57
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 18.72
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 18.72
+        }
+      ]
+    }
   },
   {
     "u": 32,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-032-R3X8-8M4P2-0B6ED4",
+    "id": "PTK-032-R3X8-8M4P2-602642",
     "n": 32,
     "z": 33,
     "a_w": 0.6,
@@ -3285,7 +6297,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-032-R3X8-8M4P2-0B6ED4.01A",
+        "id": "PTK-032-R3X8-8M4P2-602642.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -3296,13 +6308,60 @@
         ]
       },
       {
-        "id": "PTK-032-R3X8-8M4P2-0B6ED4.01B",
+        "id": "PTK-032-R3X8-8M4P2-602642.01B",
         "name": "венец",
         "variant": "B",
         "s": 2.7273,
         "s_arc_mm": 2.016,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-032-R3X8-8M4P2-602642.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-032-R3X8-8M4P2-602642.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-032-R3X8-8M4P2-602642.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-032-R3X8-8M4P2-602642.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-032-R3X8-8M4P2-602642.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -3340,7 +6399,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -3358,13 +6427,100 @@
     "errors": [],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 32,
+      "r_in": 33.34,
+      "r_out": 34.66,
+      "w": 3.05,
+      "h": 8.05,
+      "length": 37.0,
+      "web": 3.486,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 5.625,
+          "z0": 9.975
+        },
+        {
+          "row": 3,
+          "cage": 5.625,
+          "z0": 18.975
+        },
+        {
+          "row": 4,
+          "cage": 11.25,
+          "z0": 27.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 50.0,
+      "t": 7.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 26.1,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 64.74,
+        "brg": 15.63,
+        "bodies": 4.26,
+        "sum": 84.63
+      },
+      "bal": {
+        "n": 1,
+        "d": 10.0,
+        "r": 19.6,
+        "U_rem": 84.59,
+        "res": 0.04,
+        "holes": [
+          [
+            19.6,
+            0.0
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 21.42
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 21.42
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 20.57
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 20.57
+        }
+      ]
+    }
   },
   {
     "u": 32,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-032-R3X8-8M4P2-A729A2",
+    "id": "PTK-032-R3X8-8M4P2-060323",
     "n": 32,
     "z": 33,
     "a_w": 0.6,
@@ -3430,7 +6586,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-032-R3X8-8M4P2-A729A2.01A",
+        "id": "PTK-032-R3X8-8M4P2-060323.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -3441,13 +6597,60 @@
         ]
       },
       {
-        "id": "PTK-032-R3X8-8M4P2-A729A2.01B",
+        "id": "PTK-032-R3X8-8M4P2-060323.01B",
         "name": "венец",
         "variant": "B",
         "s": 2.7273,
         "s_arc_mm": 1.892,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-032-R3X8-8M4P2-060323.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-032-R3X8-8M4P2-060323.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-032-R3X8-8M4P2-060323.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-032-R3X8-8M4P2-060323.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-032-R3X8-8M4P2-060323.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -3481,7 +6684,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -3501,13 +6714,100 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 32,
+      "r_in": 30.74,
+      "r_out": 32.06,
+      "w": 3.05,
+      "h": 8.05,
+      "length": 37.0,
+      "web": 2.976,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 5.625,
+          "z0": 9.975
+        },
+        {
+          "row": 3,
+          "cage": 5.625,
+          "z0": 18.975
+        },
+        {
+          "row": 4,
+          "cage": 11.25,
+          "z0": 27.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 59.8,
+      "t": 8.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 105.83,
+        "brg": 0.0,
+        "bodies": 4.26,
+        "sum": 110.09
+      },
+      "bal": {
+        "n": 1,
+        "d": 9.5,
+        "r": 24.75,
+        "U_rem": 110.17,
+        "res": -0.08,
+        "holes": [
+          [
+            24.75,
+            0.0
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 26.32
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 26.32
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 25.47
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 25.47
+        }
+      ]
+    }
   },
   {
     "u": 32,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-032-R2X4_2-8M4P2-AE86CB",
+    "id": "PTK-032-R2X4_2-8M4P2-0516AB",
     "n": 32,
     "z": 33,
     "a_w": 0.4,
@@ -3573,7 +6873,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-032-R2X4_2-8M4P2-AE86CB.01A",
+        "id": "PTK-032-R2X4_2-8M4P2-0516AB.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -3584,13 +6884,60 @@
         ]
       },
       {
-        "id": "PTK-032-R2X4_2-8M4P2-AE86CB.01B",
+        "id": "PTK-032-R2X4_2-8M4P2-0516AB.01B",
         "name": "венец",
         "variant": "B",
         "s": 2.7273,
         "s_arc_mm": 1.411,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-032-R2X4_2-8M4P2-0516AB.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-032-R2X4_2-8M4P2-0516AB.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-032-R2X4_2-8M4P2-0516AB.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-032-R2X4_2-8M4P2-0516AB.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-032-R2X4_2-8M4P2-0516AB.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -3628,7 +6975,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -3646,13 +7003,100 @@
     "errors": [],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 32,
+      "r_in": 21.56,
+      "r_out": 22.44,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 33.0,
+      "web": 2.176,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 2.375
+        },
+        {
+          "row": 2,
+          "cage": 5.625,
+          "z0": 10.375
+        },
+        {
+          "row": 3,
+          "cage": 5.625,
+          "z0": 18.375
+        },
+        {
+          "row": 4,
+          "cage": 11.25,
+          "z0": 26.375
+        }
+      ]
+    },
+    "ecc": {
+      "De": 30.0,
+      "t": 7.0,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 13.1,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 15.54,
+        "brg": 5.22,
+        "bodies": 0.66,
+        "sum": 21.42
+      },
+      "bal": {
+        "n": 1,
+        "d": 6.7,
+        "r": 11.05,
+        "U_rem": 21.41,
+        "res": 0.01,
+        "holes": [
+          [
+            11.05,
+            0.0
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 11.28
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 11.28
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 10.71
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 10.71
+        }
+      ]
+    }
   },
   {
     "u": 32,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-032-R2X4_2-8M4P2-B1617E",
+    "id": "PTK-032-R2X4_2-8M4P2-E5E348",
     "n": 32,
     "z": 33,
     "a_w": 0.4,
@@ -3718,7 +7162,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-032-R2X4_2-8M4P2-B1617E.01A",
+        "id": "PTK-032-R2X4_2-8M4P2-E5E348.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -3729,13 +7173,60 @@
         ]
       },
       {
-        "id": "PTK-032-R2X4_2-8M4P2-B1617E.01B",
+        "id": "PTK-032-R2X4_2-8M4P2-E5E348.01B",
         "name": "венец",
         "variant": "B",
         "s": 2.7273,
         "s_arc_mm": 1.369,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-032-R2X4_2-8M4P2-E5E348.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-032-R2X4_2-8M4P2-E5E348.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-032-R2X4_2-8M4P2-E5E348.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-032-R2X4_2-8M4P2-E5E348.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-032-R2X4_2-8M4P2-E5E348.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -3769,7 +7260,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -3789,13 +7290,108 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 32,
+      "r_in": 20.66,
+      "r_out": 21.54,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 21.8,
+      "web": 2.0,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 5.625,
+          "z0": 6.175
+        },
+        {
+          "row": 3,
+          "cage": 5.625,
+          "z0": 11.375
+        },
+        {
+          "row": 4,
+          "cage": 11.25,
+          "z0": 16.575
+        }
+      ]
+    },
+    "ecc": {
+      "De": 40.2,
+      "t": 4.2,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 16.74,
+        "brg": 0.0,
+        "bodies": 0.66,
+        "sum": 17.4
+      },
+      "bal": {
+        "n": 3,
+        "d": 3.6,
+        "r": 17.68,
+        "U_rem": 17.4,
+        "res": 0.0,
+        "holes": [
+          [
+            17.082,
+            -4.561
+          ],
+          [
+            17.68,
+            0.0
+          ],
+          [
+            17.082,
+            4.561
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 16.38
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 16.38
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 15.82
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 15.82
+        }
+      ]
+    }
   },
   {
     "u": 32,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-032-B3-8M4P2-C75215",
+    "id": "PTK-032-B3-8M4P2-0A472B",
     "n": 32,
     "z": 33,
     "a_w": 0.0,
@@ -3852,7 +7448,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -3872,13 +7478,15 @@
     "tech": [
       "Т1"
     ],
-    "excluded": "Т1"
+    "excluded": "Т1",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 32,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-032-B3-8M4P2-CC50FA",
+    "id": "PTK-032-B3-8M4P2-0A4BA2",
     "n": 32,
     "z": 33,
     "a_w": 0.6,
@@ -3944,7 +7552,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-032-B3-8M4P2-CC50FA.01A",
+        "id": "PTK-032-B3-8M4P2-0A4BA2.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -3955,13 +7563,60 @@
         ]
       },
       {
-        "id": "PTK-032-B3-8M4P2-CC50FA.01B",
+        "id": "PTK-032-B3-8M4P2-0A4BA2.01B",
         "name": "венец",
         "variant": "B",
         "s": 2.7273,
         "s_arc_mm": 1.892,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-032-B3-8M4P2-0A4BA2.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-032-B3-8M4P2-0A4BA2.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-032-B3-8M4P2-0A4BA2.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-032-B3-8M4P2-0A4BA2.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-032-B3-8M4P2-0A4BA2.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -3995,7 +7650,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -4017,13 +7682,104 @@
       "Т3",
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 32,
+      "r_in": 30.74,
+      "r_out": 32.06,
+      "w": 3.05,
+      "h": 3.05,
+      "length": 17.0,
+      "web": 2.976,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 5.625,
+          "z0": 4.975
+        },
+        {
+          "row": 3,
+          "cage": 5.625,
+          "z0": 8.975
+        },
+        {
+          "row": 4,
+          "cage": 11.25,
+          "z0": 12.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 59.8,
+      "t": 3.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": 1.56,
+      "U": {
+        "disk": 39.69,
+        "brg": 0.0,
+        "bodies": 1.07,
+        "sum": 40.75
+      },
+      "bal": {
+        "n": 2,
+        "d": 6.5,
+        "r": 26.24,
+        "U_rem": 40.59,
+        "res": 0.16,
+        "holes": [
+          [
+            25.971,
+            -3.75
+          ],
+          [
+            25.971,
+            3.75
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 26.32
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 26.32
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 25.47
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 25.47
+        }
+      ]
+    }
   },
   {
     "u": 40,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-040-R3X8-8M3P2-5211DC",
+    "id": "PTK-040-R3X8-8M3P2-C4643C",
     "n": 40,
     "z": 41,
     "a_w": 0.6,
@@ -4089,7 +7845,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-040-R3X8-8M3P2-5211DC.01A",
+        "id": "PTK-040-R3X8-8M3P2-C4643C.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -4100,13 +7856,60 @@
         ]
       },
       {
-        "id": "PTK-040-R3X8-8M3P2-5211DC.01B",
+        "id": "PTK-040-R3X8-8M3P2-C4643C.01B",
         "name": "венец",
         "variant": "B",
         "s": 2.1951,
         "s_arc_mm": 1.85,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-040-R3X8-8M3P2-C4643C.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-040-R3X8-8M3P2-C4643C.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-040-R3X8-8M3P2-C4643C.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-040-R3X8-8M3P2-C4643C.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-040-R3X8-8M3P2-C4643C.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -4144,7 +7947,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M3",
@@ -4162,13 +7975,100 @@
     "errors": [],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 40,
+      "r_in": 39.84,
+      "r_out": 41.16,
+      "w": 3.05,
+      "h": 8.05,
+      "length": 45.0,
+      "web": 3.202,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 1.975
+        },
+        {
+          "row": 2,
+          "cage": 4.5,
+          "z0": 12.975
+        },
+        {
+          "row": 3,
+          "cage": 4.5,
+          "z0": 23.975
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 34.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 60.0,
+      "t": 10.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 53.6,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 133.17,
+        "brg": 32.16,
+        "bodies": 5.33,
+        "sum": 170.66
+      },
+      "bal": {
+        "n": 1,
+        "d": 10.7,
+        "r": 24.25,
+        "U_rem": 171.17,
+        "res": -0.51,
+        "holes": [
+          [
+            24.25,
+            0.0
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 26.42
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 26.42
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 25.57
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 25.57
+        }
+      ]
+    }
   },
   {
     "u": 40,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-040-R3X8-8M4P2-067439",
+    "id": "PTK-040-R3X8-8M4P2-1D50CF",
     "n": 40,
     "z": 41,
     "a_w": 0.6,
@@ -4234,7 +8134,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-040-R3X8-8M4P2-067439.01A",
+        "id": "PTK-040-R3X8-8M4P2-1D50CF.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -4245,13 +8145,60 @@
         ]
       },
       {
-        "id": "PTK-040-R3X8-8M4P2-067439.01B",
+        "id": "PTK-040-R3X8-8M4P2-1D50CF.01B",
         "name": "венец",
         "variant": "B",
         "s": 2.1951,
         "s_arc_mm": 1.818,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-040-R3X8-8M4P2-1D50CF.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-040-R3X8-8M4P2-1D50CF.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-040-R3X8-8M4P2-1D50CF.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-040-R3X8-8M4P2-1D50CF.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-040-R3X8-8M4P2-1D50CF.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -4285,7 +8232,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -4305,13 +8262,100 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 40,
+      "r_in": 38.44,
+      "r_out": 39.76,
+      "w": 3.05,
+      "h": 8.05,
+      "length": 37.0,
+      "web": 2.982,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 4.5,
+          "z0": 9.975
+        },
+        {
+          "row": 3,
+          "cage": 4.5,
+          "z0": 18.975
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 27.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 75.2,
+      "t": 8.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 167.35,
+        "brg": 0.0,
+        "bodies": 5.33,
+        "sum": 172.68
+      },
+      "bal": {
+        "n": 1,
+        "d": 10.5,
+        "r": 31.95,
+        "U_rem": 173.74,
+        "res": -1.06,
+        "holes": [
+          [
+            31.95,
+            0.0
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 34.02
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 34.02
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 33.17
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 33.17
+        }
+      ]
+    }
   },
   {
     "u": 40,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-040-R2X4_2-8M4P2-D654B6",
+    "id": "PTK-040-R2X4_2-8M4P2-D5B9BA",
     "n": 40,
     "z": 41,
     "a_w": 0.4,
@@ -4377,7 +8421,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-040-R2X4_2-8M4P2-D654B6.01A",
+        "id": "PTK-040-R2X4_2-8M4P2-D5B9BA.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -4388,13 +8432,60 @@
         ]
       },
       {
-        "id": "PTK-040-R2X4_2-8M4P2-D654B6.01B",
+        "id": "PTK-040-R2X4_2-8M4P2-D5B9BA.01B",
         "name": "венец",
         "variant": "B",
         "s": 2.1951,
         "s_arc_mm": 1.328,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-040-R2X4_2-8M4P2-D5B9BA.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-040-R2X4_2-8M4P2-D5B9BA.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-040-R2X4_2-8M4P2-D5B9BA.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-040-R2X4_2-8M4P2-D5B9BA.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-040-R2X4_2-8M4P2-D5B9BA.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -4432,7 +8523,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -4450,13 +8551,108 @@
     "errors": [],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 40,
+      "r_in": 26.56,
+      "r_out": 27.44,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 33.0,
+      "web": 2.118,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 2.375
+        },
+        {
+          "row": 2,
+          "cage": 4.5,
+          "z0": 10.375
+        },
+        {
+          "row": 3,
+          "cage": 4.5,
+          "z0": 18.375
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 26.375
+        }
+      ]
+    },
+    "ecc": {
+      "De": 40.0,
+      "t": 7.0,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 16.7,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 27.62,
+        "brg": 6.67,
+        "bodies": 0.83,
+        "sum": 35.12
+      },
+      "bal": {
+        "n": 3,
+        "d": 4.0,
+        "r": 17.38,
+        "U_rem": 35.01,
+        "res": 0.11,
+        "holes": [
+          [
+            16.661,
+            -4.948
+          ],
+          [
+            17.38,
+            0.0
+          ],
+          [
+            16.661,
+            4.948
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 16.28
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 16.28
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 15.72
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 15.72
+        }
+      ]
+    }
   },
   {
     "u": 40,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-040-R2X4_2-8M4P2-0A7A97",
+    "id": "PTK-040-R2X4_2-8M4P2-163E32",
     "n": 40,
     "z": 41,
     "a_w": 0.4,
@@ -4522,7 +8718,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-040-R2X4_2-8M4P2-0A7A97.01A",
+        "id": "PTK-040-R2X4_2-8M4P2-163E32.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -4533,13 +8729,60 @@
         ]
       },
       {
-        "id": "PTK-040-R2X4_2-8M4P2-0A7A97.01B",
+        "id": "PTK-040-R2X4_2-8M4P2-163E32.01B",
         "name": "венец",
         "variant": "B",
         "s": 2.1951,
         "s_arc_mm": 1.299,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-040-R2X4_2-8M4P2-163E32.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-040-R2X4_2-8M4P2-163E32.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-040-R2X4_2-8M4P2-163E32.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-040-R2X4_2-8M4P2-163E32.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-040-R2X4_2-8M4P2-163E32.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -4573,7 +8816,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -4593,13 +8846,104 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 40,
+      "r_in": 25.81,
+      "r_out": 26.69,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 21.8,
+      "web": 2.0,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 4.5,
+          "z0": 6.175
+        },
+        {
+          "row": 3,
+          "cage": 4.5,
+          "z0": 11.375
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 16.575
+        }
+      ]
+    },
+    "ecc": {
+      "De": 50.5,
+      "t": 4.2,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 26.42,
+        "brg": 0.0,
+        "bodies": 0.83,
+        "sum": 27.24
+      },
+      "bal": {
+        "n": 2,
+        "d": 4.9,
+        "r": 22.19,
+        "U_rem": 27.35,
+        "res": -0.1,
+        "holes": [
+          [
+            21.993,
+            -2.95
+          ],
+          [
+            21.993,
+            2.95
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 21.53
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 21.53
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 20.97
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 20.97
+        }
+      ]
+    }
   },
   {
     "u": 40,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-040-B3-8M4P2-9EF811",
+    "id": "PTK-040-B3-8M4P2-10BE51",
     "n": 40,
     "z": 41,
     "a_w": 0.0,
@@ -4656,7 +9000,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -4676,13 +9030,15 @@
     "tech": [
       "Т1"
     ],
-    "excluded": "Т1"
+    "excluded": "Т1",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 40,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-040-B3-8M4P2-400A66",
+    "id": "PTK-040-B3-8M4P2-15A1F8",
     "n": 40,
     "z": 41,
     "a_w": 0.6,
@@ -4748,7 +9104,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-040-B3-8M4P2-400A66.01A",
+        "id": "PTK-040-B3-8M4P2-15A1F8.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -4759,13 +9115,60 @@
         ]
       },
       {
-        "id": "PTK-040-B3-8M4P2-400A66.01B",
+        "id": "PTK-040-B3-8M4P2-15A1F8.01B",
         "name": "венец",
         "variant": "B",
         "s": 2.1951,
         "s_arc_mm": 1.818,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-040-B3-8M4P2-15A1F8.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-040-B3-8M4P2-15A1F8.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-040-B3-8M4P2-15A1F8.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-040-B3-8M4P2-15A1F8.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-040-B3-8M4P2-15A1F8.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -4799,7 +9202,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -4821,13 +9234,100 @@
       "Т3",
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 40,
+      "r_in": 38.44,
+      "r_out": 39.76,
+      "w": 3.05,
+      "h": 3.05,
+      "length": 17.0,
+      "web": 2.982,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 4.5,
+          "z0": 4.975
+        },
+        {
+          "row": 3,
+          "cage": 4.5,
+          "z0": 8.975
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 12.975
+        }
+      ]
+    },
+    "ecc": {
+      "De": 75.2,
+      "t": 3.0,
+      "a": 0.6000000000000001,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": 1.56,
+      "U": {
+        "disk": 62.76,
+        "brg": 0.0,
+        "bodies": 1.33,
+        "sum": 64.09
+      },
+      "bal": {
+        "n": 1,
+        "d": 10.4,
+        "r": 32.0,
+        "U_rem": 64.02,
+        "res": 0.07,
+        "holes": [
+          [
+            32.0,
+            0.0
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 34.02
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 34.02
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 33.17
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 33.17
+        }
+      ]
+    }
   },
   {
     "u": 50,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-050-R3X8-8M4P2-B4D33D",
+    "id": "PTK-050-R3X8-8M4P2-DC0A65",
     "n": 50,
     "z": 51,
     "a_w": 0.6,
@@ -4893,7 +9393,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-050-R3X8-8M4P2-B4D33D.01A",
+        "id": "PTK-050-R3X8-8M4P2-DC0A65.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -4904,7 +9404,7 @@
         ]
       },
       {
-        "id": "PTK-050-R3X8-8M4P2-B4D33D.01B",
+        "id": "PTK-050-R3X8-8M4P2-DC0A65.01B",
         "name": "венец",
         "variant": "B",
         "s": 1.7647,
@@ -4948,7 +9448,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -4968,13 +9478,15 @@
     ],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 50,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-050-R3X8-8M4P2-5AED7E",
+    "id": "PTK-050-R3X8-8M4P2-0E47FC",
     "n": 50,
     "z": 51,
     "a_w": 0.6,
@@ -5040,7 +9552,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-050-R3X8-8M4P2-5AED7E.01A",
+        "id": "PTK-050-R3X8-8M4P2-0E47FC.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -5051,7 +9563,7 @@
         ]
       },
       {
-        "id": "PTK-050-R3X8-8M4P2-5AED7E.01B",
+        "id": "PTK-050-R3X8-8M4P2-0E47FC.01B",
         "name": "венец",
         "variant": "B",
         "s": 1.7647,
@@ -5091,7 +9603,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -5113,13 +9635,15 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 50,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-050-R2X4_2-8M4P2-F75B49",
+    "id": "PTK-050-R2X4_2-8M4P2-8BF8CD",
     "n": 50,
     "z": 51,
     "a_w": 0.4,
@@ -5185,7 +9709,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-050-R2X4_2-8M4P2-F75B49.01A",
+        "id": "PTK-050-R2X4_2-8M4P2-8BF8CD.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -5196,13 +9720,60 @@
         ]
       },
       {
-        "id": "PTK-050-R2X4_2-8M4P2-F75B49.01B",
+        "id": "PTK-050-R2X4_2-8M4P2-8BF8CD.01B",
         "name": "венец",
         "variant": "B",
         "s": 1.7647,
         "s_arc_mm": 1.267,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-8BF8CD.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-8BF8CD.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-8BF8CD.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-8BF8CD.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-8BF8CD.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -5240,7 +9811,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -5258,13 +9839,108 @@
     "errors": [],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 50,
+      "r_in": 33.06,
+      "r_out": 33.94,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 33.0,
+      "web": 2.102,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 2.375
+        },
+        {
+          "row": 2,
+          "cage": 3.6,
+          "z0": 10.375
+        },
+        {
+          "row": 3,
+          "cage": 3.6,
+          "z0": 18.375
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 26.375
+        }
+      ]
+    },
+    "ecc": {
+      "De": 50.0,
+      "t": 7.0,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 26.1,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 43.16,
+        "brg": 10.42,
+        "bodies": 1.04,
+        "sum": 54.62
+      },
+      "bal": {
+        "n": 3,
+        "d": 4.4,
+        "r": 22.18,
+        "U_rem": 54.5,
+        "res": 0.12,
+        "holes": [
+          [
+            21.523,
+            -5.36
+          ],
+          [
+            22.18,
+            0.0
+          ],
+          [
+            21.523,
+            5.36
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 21.28
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 21.28
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 20.72
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 20.72
+        }
+      ]
+    }
   },
   {
     "u": 50,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-050-R2X4_2-8M4P2-0C8F0B",
+    "id": "PTK-050-R2X4_2-8M4P2-27C528",
     "n": 50,
     "z": 51,
     "a_w": 0.4,
@@ -5330,7 +10006,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-050-R2X4_2-8M4P2-0C8F0B.01A",
+        "id": "PTK-050-R2X4_2-8M4P2-27C528.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -5341,13 +10017,60 @@
         ]
       },
       {
-        "id": "PTK-050-R2X4_2-8M4P2-0C8F0B.01B",
+        "id": "PTK-050-R2X4_2-8M4P2-27C528.01B",
         "name": "венец",
         "variant": "B",
         "s": 1.7647,
         "s_arc_mm": 1.244,
         "rows": [
           2,
+          4
+        ]
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-27C528.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-27C528.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-27C528.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-27C528.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-27C528.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -5381,7 +10104,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -5401,13 +10134,104 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 50,
+      "r_in": 32.31,
+      "r_out": 33.19,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 21.8,
+      "web": 2.008,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 3.6,
+          "z0": 6.175
+        },
+        {
+          "row": 3,
+          "cage": 3.6,
+          "z0": 11.375
+        },
+        {
+          "row": 4,
+          "cage": 0.0,
+          "z0": 16.575
+        }
+      ]
+    },
+    "ecc": {
+      "De": 63.5,
+      "t": 4.2,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 41.77,
+        "brg": 0.0,
+        "bodies": 1.04,
+        "sum": 42.8
+      },
+      "bal": {
+        "n": 2,
+        "d": 5.4,
+        "r": 28.44,
+        "U_rem": 42.68,
+        "res": 0.12,
+        "holes": [
+          [
+            28.259,
+            -3.2
+          ],
+          [
+            28.259,
+            3.2
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 28.03
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 28.03
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 27.47
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 27.47
+        }
+      ]
+    }
   },
   {
     "u": 50,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-050-B3-8M4P2-DE090D",
+    "id": "PTK-050-B3-8M4P2-752F0C",
     "n": 50,
     "z": 51,
     "a_w": 0.0,
@@ -5464,7 +10288,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -5484,13 +10318,15 @@
     "tech": [
       "Т1"
     ],
-    "excluded": "Т1"
+    "excluded": "Т1",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 50,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-050-B3-8M4P2-D20E84",
+    "id": "PTK-050-B3-8M4P2-9D0F60",
     "n": 50,
     "z": 51,
     "a_w": 0.6,
@@ -5556,7 +10392,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-050-B3-8M4P2-D20E84.01A",
+        "id": "PTK-050-B3-8M4P2-9D0F60.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -5567,7 +10403,7 @@
         ]
       },
       {
-        "id": "PTK-050-B3-8M4P2-D20E84.01B",
+        "id": "PTK-050-B3-8M4P2-9D0F60.01B",
         "name": "венец",
         "variant": "B",
         "s": 1.7647,
@@ -5607,7 +10443,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -5631,13 +10477,15 @@
       "Т3",
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 63,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-063-R3X8-8M4P2-F3B5A9",
+    "id": "PTK-063-R3X8-8M4P2-AD1A56",
     "n": 63,
     "z": 64,
     "a_w": 0.6,
@@ -5703,7 +10551,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-063-R3X8-8M4P2-F3B5A9.01A",
+        "id": "PTK-063-R3X8-8M4P2-AD1A56.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -5749,7 +10597,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -5769,13 +10627,15 @@
     ],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 63,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-063-R3X8-8M4P2-2D2C90",
+    "id": "PTK-063-R3X8-8M4P2-B5DFF5",
     "n": 63,
     "z": 64,
     "a_w": 0.6,
@@ -5841,7 +10701,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-063-R3X8-8M4P2-2D2C90.01A",
+        "id": "PTK-063-R3X8-8M4P2-B5DFF5.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -5883,7 +10743,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -5905,13 +10775,15 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 63,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-063-R2X4_2-8M4P2-EF85C9",
+    "id": "PTK-063-R2X4_2-8M4P2-B13044",
     "n": 63,
     "z": 64,
     "a_w": 0.4,
@@ -5977,7 +10849,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-063-R2X4_2-8M4P2-EF85C9.01A",
+        "id": "PTK-063-R2X4_2-8M4P2-B13044.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -6023,7 +10895,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -6043,13 +10925,15 @@
     ],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 63,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-063-R2X4_2-8M3P2-BE3303",
+    "id": "PTK-063-R2X4_2-8M3P2-E090C3",
     "n": 63,
     "z": 64,
     "a_w": 0.4,
@@ -6115,7 +10999,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-063-R2X4_2-8M3P2-BE3303.01A",
+        "id": "PTK-063-R2X4_2-8M3P2-E090C3.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -6124,6 +11008,53 @@
           1,
           2,
           3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-063-R2X4_2-8M3P2-E090C3.02",
+        "name": "сепаратор",
+        "variant": "",
+        "rows": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "id": "PTK-063-R2X4_2-8M3P2-E090C3.03A",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ]
+      },
+      {
+        "id": "PTK-063-R2X4_2-8M3P2-E090C3.03B",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ]
+      },
+      {
+        "id": "PTK-063-R2X4_2-8M3P2-E090C3.03C",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ]
+      },
+      {
+        "id": "PTK-063-R2X4_2-8M3P2-E090C3.03D",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
           4
         ]
       }
@@ -6157,7 +11088,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M3",
@@ -6177,13 +11118,104 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {
+      "n": 63,
+      "r_in": 40.76,
+      "r_out": 41.64,
+      "w": 2.05,
+      "h": 4.25,
+      "length": 21.8,
+      "web": 2.013,
+      "rows": [
+        {
+          "row": 1,
+          "cage": 0.0,
+          "z0": 0.975
+        },
+        {
+          "row": 2,
+          "cage": 4.2857,
+          "z0": 6.175
+        },
+        {
+          "row": 3,
+          "cage": 2.8571,
+          "z0": 11.375
+        },
+        {
+          "row": 4,
+          "cage": 1.4286,
+          "z0": 16.575
+        }
+      ]
+    },
+    "ecc": {
+      "De": 80.4,
+      "t": 4.2,
+      "a": 0.4,
+      "d_shaft": 6.0,
+      "key_b": 2.0,
+      "key_t2": 1.0,
+      "m_brg_g": 0.0,
+      "m_brg_est": false,
+      "groove_r": null,
+      "U": {
+        "disk": 66.95,
+        "brg": 0.0,
+        "bodies": 1.31,
+        "sum": 68.26
+      },
+      "bal": {
+        "n": 2,
+        "d": 6.0,
+        "r": 36.59,
+        "U_rem": 67.91,
+        "res": 0.35,
+        "holes": [
+          [
+            36.422,
+            -3.5
+          ],
+          [
+            36.422,
+            3.5
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 36.48
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 36.48
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 35.92
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 35.92
+        }
+      ]
+    }
   },
   {
     "u": 63,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-063-B3-8M4P2-63BA12",
+    "id": "PTK-063-B3-8M4P2-4EAAA2",
     "n": 63,
     "z": 64,
     "a_w": 0.0,
@@ -6240,7 +11272,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -6260,13 +11302,15 @@
     "tech": [
       "Т1"
     ],
-    "excluded": "Т1"
+    "excluded": "Т1",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 63,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-063-B3-8M4P2-86A8E9",
+    "id": "PTK-063-B3-8M4P2-0E69D7",
     "n": 63,
     "z": 64,
     "a_w": 0.6,
@@ -6332,7 +11376,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-063-B3-8M4P2-86A8E9.01A",
+        "id": "PTK-063-B3-8M4P2-0E69D7.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -6374,7 +11418,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -6398,13 +11452,15 @@
       "Т3",
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 80,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-080-R3X8-8M4P2-D5FA36",
+    "id": "PTK-080-R3X8-8M4P2-F4A5C4",
     "n": 80,
     "z": 81,
     "a_w": 0.6,
@@ -6470,7 +11526,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-080-R3X8-8M4P2-D5FA36.01A",
+        "id": "PTK-080-R3X8-8M4P2-F4A5C4.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -6481,7 +11537,7 @@
         ]
       },
       {
-        "id": "PTK-080-R3X8-8M4P2-D5FA36.01B",
+        "id": "PTK-080-R3X8-8M4P2-F4A5C4.01B",
         "name": "венец",
         "variant": "B",
         "s": 1.1111,
@@ -6521,7 +11577,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -6542,13 +11608,15 @@
     ],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 80,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-080-R3X8-8M4P2-DCC61F",
+    "id": "PTK-080-R3X8-8M4P2-615B26",
     "n": 80,
     "z": 81,
     "a_w": 0.6,
@@ -6614,7 +11682,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-080-R3X8-8M4P2-DCC61F.01A",
+        "id": "PTK-080-R3X8-8M4P2-615B26.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -6625,7 +11693,7 @@
         ]
       },
       {
-        "id": "PTK-080-R3X8-8M4P2-DCC61F.01B",
+        "id": "PTK-080-R3X8-8M4P2-615B26.01B",
         "name": "венец",
         "variant": "B",
         "s": 1.1111,
@@ -6665,7 +11733,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -6687,13 +11765,15 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 80,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-080-R2X4_2-8M4P2-FC6069",
+    "id": "PTK-080-R2X4_2-8M4P2-E74A65",
     "n": 80,
     "z": 81,
     "a_w": 0.4,
@@ -6759,7 +11839,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-080-R2X4_2-8M4P2-FC6069.01A",
+        "id": "PTK-080-R2X4_2-8M4P2-E74A65.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -6770,7 +11850,7 @@
         ]
       },
       {
-        "id": "PTK-080-R2X4_2-8M4P2-FC6069.01B",
+        "id": "PTK-080-R2X4_2-8M4P2-E74A65.01B",
         "name": "венец",
         "variant": "B",
         "s": 1.1111,
@@ -6814,7 +11894,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -6834,13 +11924,15 @@
     ],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 80,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-080-R2X4_2-8M4P2-1EFA83",
+    "id": "PTK-080-R2X4_2-8M4P2-A08C16",
     "n": 80,
     "z": 81,
     "a_w": 0.4,
@@ -6906,7 +11998,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-080-R2X4_2-8M4P2-1EFA83.01A",
+        "id": "PTK-080-R2X4_2-8M4P2-A08C16.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -6917,7 +12009,7 @@
         ]
       },
       {
-        "id": "PTK-080-R2X4_2-8M4P2-1EFA83.01B",
+        "id": "PTK-080-R2X4_2-8M4P2-A08C16.01B",
         "name": "венец",
         "variant": "B",
         "s": 1.1111,
@@ -6957,7 +12049,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -6979,13 +12081,15 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 80,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-080-B3-8M4P2-149642",
+    "id": "PTK-080-B3-8M4P2-278F1F",
     "n": 80,
     "z": 81,
     "a_w": 0.0,
@@ -7042,7 +12146,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -7062,13 +12176,15 @@
     "tech": [
       "Т1"
     ],
-    "excluded": "Т1"
+    "excluded": "Т1",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 80,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-080-B3-8M4P2-343A09",
+    "id": "PTK-080-B3-8M4P2-7E0405",
     "n": 80,
     "z": 81,
     "a_w": 0.6,
@@ -7134,7 +12250,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-080-B3-8M4P2-343A09.01A",
+        "id": "PTK-080-B3-8M4P2-7E0405.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -7145,7 +12261,7 @@
         ]
       },
       {
-        "id": "PTK-080-B3-8M4P2-343A09.01B",
+        "id": "PTK-080-B3-8M4P2-7E0405.01B",
         "name": "венец",
         "variant": "B",
         "s": 1.1111,
@@ -7185,7 +12301,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -7209,13 +12335,15 @@
       "Т3",
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 100,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-100-R3X8-8M4P2-9D3E65",
+    "id": "PTK-100-R3X8-8M4P2-40EA6E",
     "n": 100,
     "z": 101,
     "a_w": 0.6,
@@ -7281,7 +12409,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-100-R3X8-8M4P2-9D3E65.01A",
+        "id": "PTK-100-R3X8-8M4P2-40EA6E.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -7292,7 +12420,7 @@
         ]
       },
       {
-        "id": "PTK-100-R3X8-8M4P2-9D3E65.01B",
+        "id": "PTK-100-R3X8-8M4P2-40EA6E.01B",
         "name": "венец",
         "variant": "B",
         "s": 0.8911,
@@ -7332,7 +12460,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -7353,13 +12491,15 @@
     ],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 100,
     "roller": "R_D3x8",
     "Drol": 3.0,
-    "id": "PTK-100-R3X8-8M4P2-4FB059",
+    "id": "PTK-100-R3X8-8M4P2-0D6CFA",
     "n": 100,
     "z": 101,
     "a_w": 0.6,
@@ -7425,7 +12565,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-100-R3X8-8M4P2-4FB059.01A",
+        "id": "PTK-100-R3X8-8M4P2-0D6CFA.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -7436,7 +12576,7 @@
         ]
       },
       {
-        "id": "PTK-100-R3X8-8M4P2-4FB059.01B",
+        "id": "PTK-100-R3X8-8M4P2-0D6CFA.01B",
         "name": "венец",
         "variant": "B",
         "s": 0.8911,
@@ -7476,7 +12616,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -7498,13 +12648,15 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 100,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-100-R2X4_2-8M4P2-850157",
+    "id": "PTK-100-R2X4_2-8M4P2-62A96A",
     "n": 100,
     "z": 101,
     "a_w": 0.4,
@@ -7570,7 +12722,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-100-R2X4_2-8M4P2-850157.01A",
+        "id": "PTK-100-R2X4_2-8M4P2-62A96A.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -7581,7 +12733,7 @@
         ]
       },
       {
-        "id": "PTK-100-R2X4_2-8M4P2-850157.01B",
+        "id": "PTK-100-R2X4_2-8M4P2-62A96A.01B",
         "name": "венец",
         "variant": "B",
         "s": 0.8911,
@@ -7621,7 +12773,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -7642,13 +12804,15 @@
     ],
     "warnings": [],
     "tech": [],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 100,
     "roller": "R_D2x4",
     "Drol": 2.0,
-    "id": "PTK-100-R2X4_2-8M4P2-A41E1A",
+    "id": "PTK-100-R2X4_2-8M4P2-BB8AEC",
     "n": 100,
     "z": 101,
     "a_w": 0.4,
@@ -7714,7 +12878,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-100-R2X4_2-8M4P2-A41E1A.01A",
+        "id": "PTK-100-R2X4_2-8M4P2-BB8AEC.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -7725,7 +12889,7 @@
         ]
       },
       {
-        "id": "PTK-100-R2X4_2-8M4P2-A41E1A.01B",
+        "id": "PTK-100-R2X4_2-8M4P2-BB8AEC.01B",
         "name": "венец",
         "variant": "B",
         "s": 0.8911,
@@ -7765,7 +12929,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -7787,13 +12961,15 @@
     "tech": [
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 100,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-100-B3-8M4P2-C0E5B0",
+    "id": "PTK-100-B3-8M4P2-A6E263",
     "n": 100,
     "z": 101,
     "a_w": 0.0,
@@ -7850,7 +13026,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -7870,13 +13056,15 @@
     "tech": [
       "Т1"
     ],
-    "excluded": "Т1"
+    "excluded": "Т1",
+    "sep": {},
+    "ecc": {}
   },
   {
     "u": 100,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-100-B3-8M4P2-0DA7BD",
+    "id": "PTK-100-B3-8M4P2-39F2D3",
     "n": 100,
     "z": 101,
     "a_w": 0.6,
@@ -7942,7 +13130,7 @@
     ],
     "parts": [
       {
-        "id": "PTK-100-B3-8M4P2-0DA7BD.01A",
+        "id": "PTK-100-B3-8M4P2-39F2D3.01A",
         "name": "венец",
         "variant": "A",
         "s": 0.0,
@@ -7953,7 +13141,7 @@
         ]
       },
       {
-        "id": "PTK-100-B3-8M4P2-0DA7BD.01B",
+        "id": "PTK-100-B3-8M4P2-39F2D3.01B",
         "name": "венец",
         "variant": "B",
         "s": 0.8911,
@@ -7993,7 +13181,17 @@
         ],
         "d_bc_step": 0.1,
         "d_out_step": 1.0,
-        "dgen_step": 0.1
+        "dgen_step": 0.1,
+        "sep_gap": 0.05,
+        "rho": 7850.0,
+        "brg_mass_k": 0.35,
+        "shaft_key_b": 2.0,
+        "shaft_key_t2": 1.0,
+        "key_angle": 45.0,
+        "bal_wall": 1.0,
+        "bal_n_max": 3.0,
+        "bal_d_min": 1.0,
+        "bal_d_step": 0.1
       },
       "ring_holes": {
         "bolt": "M4",
@@ -8017,6 +13215,8 @@
       "Т3",
       "Т4"
     ],
-    "excluded": ""
+    "excluded": "",
+    "sep": {},
+    "ecc": {}
   }
 ]
