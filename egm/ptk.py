@@ -19,11 +19,12 @@ from fractions import Fraction
 from egm import ptk_force, ptk_profile
 
 SEP_K = 1.1    # полутолщина кольца сепаратора / a_ω (egm/calc_vptc.py: hc = 2.2·e)
+GEN_TYPES = ("bearing", "eccentric")   # Д-42: тела на наружном кольце подшипника | на эксцентрике
 
 
 @dataclass
 class PtkLimits:
-    d_out_max: float = 110.0      # D max — наружный Ø редуктора, мм (Д-08)
+    d_out_max: float = 110.0      # D max — наружный Ø редуктора, мм (Д-08); None — без предела (Д-43)
     u_min: int = 10               # диапазон одноступенчатого u (Д-08, Д-11)
     u_max: int = 100
     wall_min: float = 4.0         # стенка впадины–отверстие и отверстие–D, мм; у тела — своя
@@ -44,6 +45,8 @@ class PtkLimits:
     sigma_H_point: float = 3000.0  # допускаемое σ_H, точечный контакт (шарик), МПа (OQ-08)
     s0_brg: float = 1.0           # запас статической грузоподъёмности подшипника, C0/P0
     M_min: float = 0.0            # требуемый выходной момент, Н·м; 0 — не проверяется (Д-41)
+    gen_types: tuple = ("bearing", "eccentric")   # генераторы для расчёта (Д-42)
+    dgen_step: float = 0.1        # округление вверх D_г эксцентрика без подшипника, мм (Д-42)
 
 
 @dataclass
@@ -71,6 +74,7 @@ class PtkResult:
     R_by: str = ""                # что задало R_Σ: подрез | сепаратор | генератор
     Dgen: float = 0.0             # D_г
     bearing: str = ""             # подшипник генератора, ключ vendor_prices.json → bearings (Д-40)
+    gen: str = "bearing"          # тип генератора: bearing | eccentric (Д-42)
     d_root: float = 0.0           # D_В
     d_tip: float = 0.0            # D_верш
     alpha_max: float = 0.0        # α max, град
@@ -110,7 +114,11 @@ def load_config(cfg):
     fast = {k: v for k, v in cfg["fasteners"].items() if not k.startswith("_")}
     raw = cfg.get("ring_mounts") or {"default": cfg["ring_holes"]}
     mounts = {k: _load(RingHoles, v) for k, v in raw.items() if not k.startswith("_")}
-    return _load(PtkLimits, cfg["limits"]), mounts, fast, cfg.get("mount_mode", "first_ok")
+    lim = _load(PtkLimits, cfg["limits"])
+    bad = [g for g in lim.gen_types if g not in GEN_TYPES]
+    if bad or not lim.gen_types:
+        raise ValueError(f"limits.gen_types: {list(lim.gen_types)} — допустимы {GEN_TYPES} (Д-42)")
+    return lim, mounts, fast, cfg.get("mount_mode", "first_ok")
 
 
 def _band(holes, fast, wall):
@@ -207,9 +215,9 @@ def ring(d_root, holes, fast, lim, wall):
 
 
 # Д-22: маркировка. GEOM_REV повышается при смене формул геометрии — меняются все ID.
-GEOM_REV = 5                       # Д-40: D_г = D подшипника генератора, шаг ряда max(l, B)
+GEOM_REV = 6                       # Д-42: тип генератора bearing | eccentric в хэше
 GEOM_LIMITS = ("a_k", "r_tip_min", "sep_web_min", "shaft_d_min", "ecc_wall_min", "wall_min",
-               "row_gap", "rows", "row_phases", "d_bc_step", "d_out_step")
+               "row_gap", "rows", "row_phases", "d_bc_step", "d_out_step", "dgen_step")
 GEOM_HOLES = ("bolt", "n", "pins", "pin_d", "head_margin")
 GEOM_ROLLER = ("type", "d", "l", "a_w", "wall_min")
 GEOM_BEARING = ("d", "D", "B")     # Д-40
@@ -244,10 +252,10 @@ def holes_code(holes):
     return f"{holes.n}{holes.bolt}" + (f"P{holes.pins}" if holes.pins else "")
 
 
-def geom_params(u, rol, lim, holes, fast, brg=None):
+def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing"):
     """Все параметры, определяющие геометрию исполнения (вход хэша и CAD)."""
     f = fast.get(holes.bolt, {})
-    return _n({"rev": GEOM_REV, "u": u,
+    return _n({"rev": GEOM_REV, "u": u, "gen": gen,
                "roller": {k: rol.get(k) for k in GEOM_ROLLER},
                "bearing": {k: brg.get(k) for k in GEOM_BEARING} if brg else None,
                "limits": {k: getattr(lim, k) for k in GEOM_LIMITS},
@@ -255,9 +263,9 @@ def geom_params(u, rol, lim, holes, fast, brg=None):
                "fastener": {k: f.get(k) for k in ("d_clear", "dk")}})
 
 
-def config_id(u, rol, lim, holes, fast, brg=None):
+def config_id(u, rol, lim, holes, fast, brg=None, gen="bearing"):
     """ID исполнения PTK-<u>-<тело>-<отверстия>-<хэш> (Д-22) и снимок геометрии."""
-    g = geom_params(u, rol, lim, holes, fast, brg)
+    g = geom_params(u, rol, lim, holes, fast, brg, gen)
     raw = json.dumps(g, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
     h = hashlib.sha1(raw.encode("ascii")).hexdigest()[:6].upper()
     return f"PTK-{u:03d}-{roller_code(rol)}-{holes_code(holes)}-{h}", g
@@ -301,13 +309,14 @@ def bearing(D, R_min, a, bears, lim):
     return (fit[0][2] if fit else None), need_D, need_d
 
 
-def calc(u, rid, rol, lim, holes, fast, bears):
-    """Расчёт одной конфигурации. rol = {'type','d','l'[, 'a_w', 'wall_min']}."""
+def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
+    """Расчёт одной конфигурации. rol = {'type','d','l'[, 'a_w', 'wall_min']};
+    gen — bearing (тела на наружном кольце подшипника, Д-40) | eccentric (на эксцентрике, Д-42)."""
     D = rol["d"]
     wall = rol.get("wall_min", lim.wall_min)
     a = rol.get("a_w") or lim.a_k * D
-    r = PtkResult(u, rid, D)
-    r.id, r.geom = config_id(u, rol, lim, holes, fast)
+    r = PtkResult(u, rid, D, gen=gen)
+    r.id, r.geom = config_id(u, rol, lim, holes, fast, None, gen)
     if u > lim.u_max:
         s = two_stage(u, lim)
         r.errors.append(f"u={u} > {lim.u_max}: одноступенчатый ПТК не считается; рекомендуется "
@@ -319,15 +328,22 @@ def calc(u, rid, rol, lim, holes, fast, bears):
         return r
     z, n = u + 1, u                                     # Д-31
     R, by = r_sum(u, D, a, lim)
-    bk, need_D, need_d = bearing(D, R, a, bears, lim)
-    brg = bears.get(bk) if bk else None
-    if brg is None:
-        r.errors.append(f"нет подшипника генератора с D ≥ {need_D:.1f} и d ≥ {need_d:.1f} мм "
-                        f"в vendor_prices.json → bearings (Д-40)")
-    else:
-        R = (brg["D"] + D) / 2
-        r.bearing = bk
-        r.id, r.geom = config_id(u, rol, lim, holes, fast, brg)
+    brg = None
+    if gen == "bearing":
+        bk, need_D, need_d = bearing(D, R, a, bears, lim)
+        brg = bears.get(bk) if bk else None
+        if brg is None:
+            r.errors.append(f"нет подшипника генератора с D ≥ {need_D:.1f} и d ≥ {need_d:.1f} мм "
+                            f"в vendor_prices.json → bearings (Д-40)")
+        else:
+            R = (brg["D"] + D) / 2
+            r.bearing = bk
+            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen)
+    else:                                               # Д-42: D_г — наружный Ø эксцентрика
+        need_d = lim.shaft_d_min + 2 * (a + lim.ecc_wall_min)
+        if need_d > 2 * R - D + 1e-9:
+            by = "вал"
+        R = (_ceil(max(2 * R - D, need_d), lim.dgen_step) + D) / 2
     rho_k = ptk_profile.curv_radius_min(a, R, z)
     d_root = 2 * (R + a) + D
     r.n, r.z, r.a_w, r.R_sum, r.R_by = n, z, round(a, 3), round(R, 3), by
@@ -339,11 +355,12 @@ def calc(u, rid, rol, lim, holes, fast, bears):
     rg, rerr = ring(d_root, holes, fast, lim, wall)
     r.errors += rerr
     band = _band(holes, fast, wall)
-    r.Drol_max = math.floor((lim.d_out_max - 4 * band) / (d_root / D) * 100) / 100
-    if rg["d_out"] > lim.d_out_max:
-        r.errors.append(f"D {rg['d_out']:g} > {lim.d_out_max:g}: тела Dш {D:g} при n={n} "
-                        f"с отверстиями {rg['label']} не вмещаются; Dш max ≈ "
-                        f"{r.Drol_max:g} мм (OQ-05)")
+    if lim.d_out_max:                                   # None / 0 — без предела габарита (Д-43)
+        r.Drol_max = math.floor((lim.d_out_max - 4 * band) / (d_root / D) * 100) / 100
+        if rg["d_out"] > lim.d_out_max:
+            r.errors.append(f"D {rg['d_out']:g} > {lim.d_out_max:g}: тела Dш {D:g} при n={n} "
+                            f"с отверстиями {rg['label']} не вмещаются; Dш max ≈ "
+                            f"{r.Drol_max:g} мм (OQ-05)")
     if lim.rows != len(lim.row_phases):
         r.errors.append("число рядов не совпадает с фазировкой")
     ph = phasing(z, n, holes, lim)
@@ -355,12 +372,14 @@ def calc(u, rid, rol, lim, holes, fast, bears):
     r.d_out = round(rg["d_out"], 2)
     pitch = max(rol["l"], brg["B"]) if brg else rol["l"]          # Д-40: шаг ряда
     r.width = round(lim.rows * pitch + (lim.rows + 1) * lim.row_gap, 1)
-    if brg is not None and not r.errors:
+    if (brg is not None or gen == "eccentric") and not r.errors:
         t = ptk_force.torque(n, z, a, R, D, rol["l"], rol.get("type", "roller"), brg, lim,
                              lim.rows)
-        r.M_H, r.M_B = t["M_H"], t["M_B"]
-        r.M, r.M_by = min((r.M_H, "контакт"), (r.M_B, "подшипник"),
-                          (round(r.t_hold / holes.safety, 1), "крепление"))
+        r.M_H, r.M_B = t["M_H"], t["M_B"] or 0.0
+        cand = [(r.M_H, "контакт"), (round(r.t_hold / holes.safety, 1), "крепление")]
+        if brg is not None:
+            cand.append((r.M_B, "подшипник"))
+        r.M, r.M_by = min(cand)
         if r.M < lim.M_min:
             r.errors.append(f"M {r.M:g} < M_min {lim.M_min:g} Н·м, ограничивает: {r.M_by} (Д-41)")
     r.ok = not r.errors
@@ -368,18 +387,19 @@ def calc(u, rid, rol, lim, holes, fast, bears):
 
 
 def sweep(rollers, bears, lim, mounts, fast, mode="first_ok"):
-    """Д-33: для каждой пары (u, тело) — все крепления (all) или первое прошедшее (first_ok)."""
+    """Д-33, Д-42: для (u, тело, генератор) — все крепления (all) или первое прошедшее (first_ok)."""
     out = []
     for u in lim.u_list:
         for rid, rol in rollers.items():
             if rid.startswith("_"):
                 continue
-            rs = []
-            for key, h in mounts.items():
-                r = calc(u, rid, rol, lim, h, fast, bears)
-                r.mount = key
-                rs.append(r)
-            out += rs if mode == "all" else [next((r for r in rs if r.ok), rs[0])]
+            for gen in lim.gen_types:
+                rs = []
+                for key, h in mounts.items():
+                    r = calc(u, rid, rol, lim, h, fast, bears, gen)
+                    r.mount = key
+                    rs.append(r)
+                out += rs if mode == "all" else [next((r for r in rs if r.ok), rs[0])]
     return out
 
 
@@ -491,6 +511,19 @@ def self_test():
     assert not calc(19, "t", b, lim, holes, fast, {}).ok                         # нет подшипника
     assert c(19, rol={**b, "a_w": 0.5}).alpha_max < r.alpha_max   # меньше a_ω — меньше α
     assert c(19, rol={**b, "wall_min": 8.0}).d_out > r.d_out       # wall_min тела
+    e = calc(19, "t", b, lim, holes, fast, {}, "eccentric")      # Д-42: каталог не нужен
+    assert e.ok and not e.bearing and e.gen == "eccentric", e.errors
+    assert e.Dgen >= lim.shaft_d_min + 2 * (e.a_w + lim.ecc_wall_min) - 1e-9
+    assert abs(2 * e.R_sum - e.Dgen - e.Drol) < 1e-3 and e.M_B == 0.0
+    assert e.M_by in ("контакт", "крепление") and e.id != r.id, (e.M_by, e.id)
+    assert e.width == 4 * 8.0 + 5 * lim.row_gap
+    big = calc(100, "t", b, PtkLimits(d_out_max=None), holes, fast, {}, "eccentric")
+    assert big.ok and big.d_out > 110.0 and big.Drol_max == 0.0, big.errors   # Д-43
+    try:
+        load_config({"limits": {"gen_types": ["magnet"]}, "ring_mounts": {"x": {}}, "fasteners": {}})
+        raise AssertionError("неизвестный gen_types принят")
+    except ValueError:
+        pass
     rb = c(10, rol={"type": "ball", "d": 2.0, "l": 2.0})
     assert bears[rb.bearing]["d"] >= lim.shaft_d_min + 2 * (rb.a_w + lim.ecc_wall_min) - 1e-9
     assert r.ring_variants == 1, r.phasing

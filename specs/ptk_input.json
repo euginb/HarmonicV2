@@ -21,7 +21,9 @@
     "sigma_H_line": 2500.0,
     "sigma_H_point": 3000.0,
     "s0_brg": 1.0,
-    "M_min": 0.0
+    "M_min": 0.0,
+    "gen_types": ["bearing", "eccentric"],
+    "dgen_step": 0.1
   },
   "mount_mode": "first_ok",
   "ring_mounts": {

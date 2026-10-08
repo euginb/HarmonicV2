@@ -26,6 +26,14 @@ class Hole:
 
 
 @dataclass
+class Disk:
+    x: float
+    y: float
+    d: float
+    role: str = "roller"       # сборочный примитив (Д-44): roller | bearing | bore | ecc | shaft | sep
+
+
+@dataclass
 class Dim:
     d: float                   # размер диаметра
     label: str                 # обозначение колонки SPEC-10
@@ -51,3 +59,4 @@ class PartModel:
     marks: list = field(default_factory=list)
     notes: list = field(default_factory=list)
     legend: list = field(default_factory=list)   # [(обозначение SPEC-10, значение, смысл)]
+    prims: list = field(default_factory=list)    # сборочные примитивы Disk (Д-44): SVG, не STEP

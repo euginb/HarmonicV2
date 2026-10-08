@@ -59,8 +59,9 @@ def torque(n, z, a, R, D, l, kind, brg, lim, rows):
 
     Тело в фазе φ_i от направления эксцентрика нагружено при 0 < φ_i < π: R_i = R_max·sin φ_i.
     Выход: M_р = Σ R_i·(R_о/R)_i·Y_i; подшипник: R_max·|Σ sin φ_i·e_i| ≤ C0/s0_brg.
-    Худшее из K_PHASE положений генератора внутри шага тел."""
-    Fg, Fv = pair_limits(D, l, kind, 2 * R - D, brg["B"], lim)
+    Худшее из K_PHASE положений генератора внутри шага тел.
+    brg = None — тела на эксцентрике (Д-42): пара тело/эксцентрик на всей длине l, M_B нет."""
+    Fg, Fv = pair_limits(D, l, kind, 2 * R - D, brg["B"] if brg else l, lim)
     MH = MB = math.inf
     for j in range(K_PHASE):
         s_max = srv = mom = bx = by = 0.0
@@ -78,10 +79,11 @@ def torque(n, z, a, R, D, l, kind, brg, lim, rows):
         if mom <= 0:
             continue
         MH = min(MH, min(Fg / s_max, Fv / srv) * mom / 1000)
-        MB = min(MB, brg["C0"] * 1000 / (lim.s0_brg * math.hypot(bx, by)) * mom / 1000)
+        if brg:
+            MB = min(MB, brg["C0"] * 1000 / (lim.s0_brg * math.hypot(bx, by)) * mom / 1000)
     if math.isinf(MH):
         MH = MB = 0.0
-    return {"M_H": round(rows * MH, 1), "M_B": round(rows * MB, 1),
+    return {"M_H": round(rows * MH, 1), "M_B": round(rows * MB, 1) if brg else None,
             "F_g": round(Fg, 1), "F_v": round(Fv, 1)}
 
 
@@ -106,7 +108,12 @@ min(l, B подш.)), тело/венец $k = 2/D_\text{ш}$ (венец как
 $R_\text{max}$ = min($F_\text{г}$ / max sin φ, $F_\text{в}$ / max(sin φ · $R_\text{в}/R$)) → $M_H$;
 подшипник $R_\text{max} \lvert \sum \sin\varphi_i \vec e_i \rvert \le C_0 / s_0$ → $M_B$.
 M = min($M_H$, $M_B$, M крепл. / safety), в скобках — что ограничивает.
-Не учтены: трение (11), ресурс подшипника, контакт тело/паз сепаратора (OQ-08, CP-31)."""
+Генератор `eccentric` (Д-42): тела катятся прямо по эксцентрику, $D_\text{г}$ — его наружный
+диаметр (вверх до `dgen_step`, не меньше `shaft_d_min` + 2($a_\omega$ + `ecc_wall_min`)); пара
+тело/эксцентрик на всей длине тела, $M_B$ нет. В (12) $\omega_\text{к} = -\omega$ задана
+кинематически (кольцо — сам эксцентрик), а не из равновесия кольца: скольжение в $K_\text{г}$
+порядка $\omega D_\text{г}/2$, потери и износ выше, чем с подшипником (OQ-10).
+Не учтены: трение (11), (12), ресурс подшипника, контакт тело/паз сепаратора (OQ-08, CP-32)."""
 
 
 def self_test():
@@ -134,4 +141,6 @@ def self_test():
     t4 = torque(19, z, a, R, D, 8.0, "roller", brg, lim, 1)
     assert abs(4 * t4["M_H"] - t1["M_H"]) < 0.5
     assert torque(19, z, a, R, D, 5.0, "ball", brg, lim, 4)["M_H"] < t1["M_H"]
+    t5 = torque(19, z, a, R, D, 8.0, "roller", None, lim, 4)         # Д-42: эксцентрик
+    assert t5["M_B"] is None and t5["M_H"] >= t1["M_H"], (t5, t1)
     return True

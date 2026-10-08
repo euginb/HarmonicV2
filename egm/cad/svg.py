@@ -11,6 +11,12 @@ ST = {"part": 'stroke="black" stroke-width="0.35" fill="none"',
       "axis": 'stroke="black" stroke-width="0.18" stroke-dasharray="6,1.5,1,1.5" fill="none"',
       "thin": 'stroke="black" stroke-width="0.18" fill="none"',
       "mark": 'stroke="red" stroke-width="0.25" fill="none"'}
+PRIM = {"roller": 'stroke="blue" stroke-width="0.2" fill="none"',
+        "bearing": 'stroke="green" stroke-width="0.25" fill="none"',
+        "ecc": 'stroke="green" stroke-width="0.25" fill="none"',
+        "bore": 'stroke="green" stroke-width="0.18" stroke-dasharray="1.5,1" fill="none"',
+        "shaft": 'stroke="gray" stroke-width="0.18" stroke-dasharray="1.5,1" fill="none"',
+        "sep": 'stroke="gray" stroke-width="0.15" stroke-dasharray="3,1" fill="none"'}
 
 
 def _pt(x, y):
@@ -63,6 +69,8 @@ def render(m):
     o += [f'<circle cx="0" cy="0" r="{c.r:g}" {ST[c.role]}/>' for c in m.axes]
     o += [f'<circle cx="{hl.x:.4f}" cy="{-hl.y:.4f}" r="{hl.d / 2:g}" {ST["part"]}/>'
           for hl in m.holes]
+    o += [f'<circle cx="{p.x:.4f}" cy="{-p.y:.4f}" r="{p.d / 2:g}" '
+          f'{PRIM.get(p.role, ST["thin"])}/>' for p in m.prims]
     for k, x1, y1, xs, ys, side in lab:
         a = math.radians(k.angle)
         p0 = _pt(k.r0 * math.cos(a), k.r0 * math.sin(a))

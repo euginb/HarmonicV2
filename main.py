@@ -76,14 +76,16 @@ def run_ptk(prices):
     table, errs, warns = [], [], []
     for r in rows:
         m = f"{r['M']:g} ({r['M_by']})" if r["M"] else "—"
-        table.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['Drol']} | {r['Drol_max']} | "
-                     f"{r['n']} | {r['z']} | {r['a_w']} | {r['bearing'] or '—'} | "
+        gen = (r["bearing"] or "—") if r["gen"] == "bearing" else "эксцентрик"
+        table.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['Drol']} | "
+                     f"{r['Drol_max'] or '—'} | "
+                     f"{r['n']} | {r['z']} | {r['a_w']} | {gen} | "
                      f"{r['Dgen'] or '—'} | {r['d_root']} | "
                      f"{r['alpha_max'] or '—'} | "
                      f"{(r['holes'] + ' (' + r['mount'] + ')') if r['holes'] else '—'} | "
                      f"{r['ring_variants'] or '—'} | {r['d_bc']} | {r['d_out']} | "
                      f"{r['width']} | {m} | {r['t_hold']} | {'OK' if r['ok'] else 'нет'} |")
-        tag = f"- u={r['u']}, {r['roller']}: "
+        tag = f"- u={r['u']}, {r['roller']}, {r['gen']}: "
         errs += [tag + e for e in r["errors"]]
         warns += [tag + w for w in r["warnings"]]
     tpl = (TPL / "SPEC-10_PTK_CALC.md.tmpl").read_text(encoding="utf-8")

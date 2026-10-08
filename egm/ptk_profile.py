@@ -80,6 +80,20 @@ def profile_points(a_w, R_sum, Drol, z, k=24):
     return pts
 
 
+def bodies(a_w, R_sum, n, theta_e=0.0):
+    """Центры n тел ряда при эксцентрике на угле theta_e, град (система профиля, Д-44).
+
+    Тело k: t_k = (2πk − θe)/n, |центр| = Y(t_k − θe) — на окружности R_Σ генератора и,
+    при z = n + 1, на траектории (6): z·t_k ≡ t_k − θe (mod 2π)."""
+    te = math.radians(theta_e)
+    out = []
+    for k in range(n):
+        t = (2 * math.pi * k - te) / n
+        y = Y(t - te, a_w, R_sum)
+        out.append((y * math.cos(t), y * math.sin(t)))
+    return out
+
+
 def theory_md():
     return r"""## Профиль венца и порядок расчёта (Д-38)
 
@@ -135,4 +149,10 @@ def self_test():
     assert abs(min(rs) - (R2 - a + D / 2)) < 1e-3
     ro, rv = contact_ratios(math.pi / 2, a, R, z)
     assert 1.0 < rv < 1.4 and 0.0 < ro < 1.0, (ro, rv)
+    te = 37.0
+    ex, ey = a * math.cos(math.radians(te)), a * math.sin(math.radians(te))
+    for x, y in bodies(a, R2, z - 1, te):
+        t = math.atan2(y, x)
+        assert abs(math.hypot(x, y) - Y(z * t, a, R2)) < 1e-9          # на траектории (6)
+        assert abs(math.hypot(x - ex, y - ey) - R2) < 1e-9              # на генераторе R_Σ
     return True
