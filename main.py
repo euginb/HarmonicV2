@@ -10,7 +10,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from egm import catalog, naming, products, ptk, ptk_force, ptk_profile
+from egm import catalog, naming, products, ptk, ptk_force, ptk_parts, ptk_profile
 from egm.cad import ptk_ring, step as cad_step
 
 ROOT = Path(__file__).resolve().parent
@@ -105,6 +105,7 @@ def run_ptk(prices):
         errors="\n".join(errs) or "нет", warnings="\n".join(warns) or "нет",
         n_ok=sum(r["ok"] for r in rows), n_all=len(table), n_excl=len(excl),
         tech=ptk.tech_md(),
+        parts=ptk_parts.table(rows),
         excluded=("| ID | u | Тело | Генератор | Код |\n|---|---|---|---|---|\n" + "\n".join(excl))
                  if excl else "нет",
         two_stage=ptk.two_stage_table(lim), phasing=phasing)
@@ -139,6 +140,7 @@ def main(argv):
                        ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test),
                        ("fill", fill_self_test), ("step", cad_step.self_test),
                        ("force", ptk_force.self_test)):
+                       ("force", ptk_force.self_test), ("parts", ptk_parts.self_test)):
         try:
             test()
         except AssertionError as e:

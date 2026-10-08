@@ -16,7 +16,7 @@ import math
 from dataclasses import asdict, dataclass, field, fields
 from fractions import Fraction
 
-from egm import ptk_force, ptk_profile
+from egm import ptk_force, ptk_parts, ptk_profile
 
 SEP_K = 1.1    # полутолщина кольца сепаратора / a_ω (egm/calc_vptc.py: hc = 2.2·e)
 GEN_TYPES = ("bearing", "eccentric")   # Д-42: тела на наружном кольце подшипника | на эксцентрике
@@ -48,6 +48,16 @@ class PtkLimits:
     gen_types: tuple = ("bearing", "eccentric")   # генераторы для расчёта (Д-42)
     dgen_step: float = 0.1        # округление вверх D_г эксцентрика без подшипника, мм (Д-42)
     groove_f: float = 0.52        # жёлоб под шарик на эксцентрике: r = groove_f·D_ш, > 0.5 (Д-45)
+    sep_gap: float = 0.05         # зазор тела в окне сепаратора, мм (Д-46)
+    rho: float = 7850.0           # плотность стали эксцентрика, тел, колец, кг/м³
+    brg_mass_k: float = 0.35      # масса подшипника / сплошное кольцо D×d×B, если нет bearings.m
+    shaft_key_b: float = 2.0      # шпонка вала: ширина паза b, мм (DIN 6885 A — сверить)
+    shaft_key_t2: float = 1.0     # глубина паза в ступице t2, мм
+    key_angle: float = 45.0       # паз ряда 1 от эксцентриситета, град; ряд k: key_angle − φk
+    bal_wall: float = 1.0         # стенка у отверстий балансировки, мм
+    bal_n_max: int = 3            # наибольшее число отверстий балансировки
+    bal_d_min: float = 1.0        # Ø отверстий балансировки: от, мм
+    bal_d_step: float = 0.1       # шаг Ø (сверло), мм
 
 
 @dataclass
@@ -101,6 +111,8 @@ class PtkResult:
     warnings: list = field(default_factory=list)
     tech: list = field(default_factory=list)      # коды TECH (Д-45)
     excluded: str = ""                            # код TECH, по которому исключено из SPEC-10
+    sep: dict = field(default_factory=dict)       # сепаратор .02 (Д-46)
+    ecc: dict = field(default_factory=dict)       # эксцентрик .03 (Д-46)
 
 
 def _load(cls, d):
@@ -222,7 +234,9 @@ def ring(d_root, holes, fast, lim, wall):
 # Д-22: маркировка. GEOM_REV повышается при смене формул геометрии — меняются все ID.
 GEOM_REV = 6                       # Д-42: тип генератора bearing | eccentric в хэше
 GEOM_LIMITS = ("a_k", "r_tip_min", "sep_web_min", "shaft_d_min", "ecc_wall_min", "wall_min",
-               "row_gap", "rows", "row_phases", "d_bc_step", "d_out_step", "dgen_step")
+               "row_gap", "rows", "row_phases", "d_bc_step", "d_out_step", "dgen_step",
+               "sep_gap", "rho", "brg_mass_k", "shaft_key_b", "shaft_key_t2", "key_angle",
+               "bal_wall", "bal_n_max", "bal_d_min", "bal_d_step")
 GEOM_HOLES = ("bolt", "n", "pins", "pin_d", "head_margin")
 GEOM_ROLLER = ("type", "d", "l", "a_w", "wall_min")
 GEOM_BEARING = ("d", "D", "B")     # Д-40
@@ -402,6 +416,11 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
     r.d_out = round(rg["d_out"], 2)
     pitch = max(rol["l"], brg["B"]) if brg else rol["l"]          # Д-40: шаг ряда
     r.width = round(lim.rows * pitch + (lim.rows + 1) * lim.row_gap, 1)
+    if not r.errors and (brg is not None or gen == "eccentric"):    # Д-46: детали .02, .03
+        r.sep = ptk_parts.separator(n, R, a, D, rol["l"], pitch, r.phasing, lim, SEP_K)
+        r.ecc = ptk_parts.eccentric(n, a, D, rol, brg, r.phasing, lim, gen, R)
+        r.warnings += r.ecc.pop("warnings")
+        r.parts += ptk_parts.parts(r.id, r.ecc)
     if (brg is not None or gen == "eccentric") and not r.errors:
         t = ptk_force.torque(n, z, a, R, D, rol["l"], rol.get("type", "roller"), brg, lim,
                              lim.rows)
@@ -596,7 +615,7 @@ def self_test():
     assert c(20, RingHoles(pin_d=5.0)).id != r.id
     assert calc(20, "t", b, PtkLimits(a_k=0.15), holes, fast, bears).id != r.id
     assert roller_code({"type": "ball", "d": 2.5}) == "B2_5"
-    assert [p["id"] for p in c(62).parts] == [c(62).id + ".01A", c(62).id + ".01B"]
+    assert [p["id"] for p in c(62).parts if ".01" in p["id"]] == [c(62).id + ".01A", c(62).id + ".01B"]
     rows = [asdict(c(20)), asdict(c(62))]
     assert find(rows, c(62).id + ".01B")["u"] == 62
     return True

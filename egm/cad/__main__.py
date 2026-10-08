@@ -12,10 +12,10 @@ import sys
 from pathlib import Path
 
 from egm import products, ptk
-from egm.cad import ptk_ring, step, svg
+from egm.cad import ptk_ecc, ptk_ring, ptk_sep, step, svg
 
 ROOT = Path(__file__).resolve().parents[2]
-GENERATORS = {"ptk_ring": ptk_ring.build}
+GENERATORS = {"ptk_ring": ptk_ring.build, "ptk_sep": ptk_sep.build, "ptk_ecc": ptk_ecc.build}
 
 
 def _row(cfg, phase, row):

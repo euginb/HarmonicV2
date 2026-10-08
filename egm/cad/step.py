@@ -28,10 +28,17 @@ def solid(m, mode="spline"):
     """PartModel -> cq.Solid: грань (D, впадины, отверстия) × толщина."""
     import cadquery as cq
     V, nz = cq.Vector, cq.Vector(0, 0, 1)
-    outer = cq.Wire.makeCircle(m.d_out / 2, V(0, 0, 0), nz)
-    inner = [_inner(cq, [V(x, y, 0) for x, y in m.cut.pts], mode)]
+    outer = cq.Wire.makeCircle(m.d_out / 2, V(m.cx[0], m.cx[1], 0), nz)
+    inner = [_inner(cq, [V(x, y, 0) for x, y in m.cut.pts], m.cut_mode or mode)]
     inner += [cq.Wire.makeCircle(h.d / 2, V(h.x, h.y, 0), nz) for h in m.holes]
     body = cq.Solid.extrudeLinear(outer, inner, V(0, 0, m.thick))
+    if m.windows:                      # Д-46: все окна сепаратора — одна булева операция
+        tools = [cq.Solid.makeBox(wn.r_out - wn.r_in + 2, wn.w, wn.h,
+                                  V(wn.r_in - 1, -wn.w / 2, wn.z0))
+                 .rotate(V(0, 0, 0), V(0, 0, 1), wn.angle) for wn in m.windows]
+        body = body.cut(*tools)
+        if hasattr(body, "Solids") and len(body.Solids()) == 1:
+            body = body.Solids()[0]
     if not body.isValid():
         raise ValueError(f"{m.id}: тело STEP невалидно (режим {mode}); попробуйте --step poly")
     return body

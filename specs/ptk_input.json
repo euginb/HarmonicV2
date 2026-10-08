@@ -24,7 +24,17 @@
     "M_min": 0.0,
     "gen_types": ["bearing", "eccentric"],
     "dgen_step": 0.1,
-    "groove_f": 0.52
+    "groove_f": 0.52,
+    "sep_gap": 0.05,
+    "rho": 7850.0,
+    "brg_mass_k": 0.35,
+    "shaft_key_b": 2.0,
+    "shaft_key_t2": 1.0,
+    "key_angle": 45.0,
+    "bal_wall": 1.0,
+    "bal_n_max": 3,
+    "bal_d_min": 1.0,
+    "bal_d_step": 0.1
   },
   "mount_mode": "first_ok",
   "ring_mounts": {

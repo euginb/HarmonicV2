@@ -34,6 +34,17 @@ class Disk:
 
 
 @dataclass
+class Window:
+    angle: float               # ось радиального окна, град (Д-46)
+    r_in: float
+    r_out: float
+    w: float                   # ширина поперёк радиуса, мм
+    z0: float                  # начало по оси, мм
+    h: float                   # высота по оси, мм
+    row: int = 1
+
+
+@dataclass
 class Dim:
     d: float                   # размер диаметра
     label: str                 # обозначение колонки SPEC-10
@@ -60,3 +71,7 @@ class PartModel:
     notes: list = field(default_factory=list)
     legend: list = field(default_factory=list)   # [(обозначение SPEC-10, значение, смысл)]
     prims: list = field(default_factory=list)    # сборочные примитивы Disk (Д-44): SVG, не STEP
+    cx: tuple = (0.0, 0.0)                       # центр наружной окружности (эксцентрик, Д-46)
+    cut_mode: str = ""                           # "" — как --step; poly — контур с углами (паз)
+    windows: list = field(default_factory=list)  # окна Window (сепаратор)
+    row: int = 0                                 # ряд вида SVG: окна только этого ряда

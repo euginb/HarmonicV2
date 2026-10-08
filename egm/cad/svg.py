@@ -64,8 +64,15 @@ def render(m):
     h = ly + 4.5 * (len(m.legend) + 1) + 4 - y0
     o = [f'<line x1="{-R - 4:g}" y1="0" x2="{R + 4:g}" y2="0" {ST["axis"]}/>',
          f'<line x1="0" y1="{-R - 4:g}" x2="0" y2="{R + 4:g}" {ST["axis"]}/>',
-         f'<circle cx="0" cy="0" r="{R:g}" {ST["part"]}/>',
+         f'<circle cx="{m.cx[0]:g}" cy="{-m.cx[1]:g}" r="{R:g}" {ST["part"]}/>',
          f'<path d="M{" L".join(_pt(*p) for p in m.cut.pts)} Z" {ST["part"]}/>']
+    for wn in m.windows:
+        if m.row and wn.row != m.row:
+            continue
+        c, s = math.cos(math.radians(wn.angle)), math.sin(math.radians(wn.angle))
+        q = [(r * c - sg * wn.w / 2 * s, r * s + sg * wn.w / 2 * c)
+             for r, sg in ((wn.r_in, 1), (wn.r_out, 1), (wn.r_out, -1), (wn.r_in, -1))]
+        o.append(f'<path d="M{" L".join(_pt(*p) for p in q)} Z" {ST["part"]}/>')
     o += [f'<circle cx="0" cy="0" r="{c.r:g}" {ST[c.role]}/>' for c in m.axes]
     o += [f'<circle cx="{hl.x:.4f}" cy="{-hl.y:.4f}" r="{hl.d / 2:g}" {ST["part"]}/>'
           for hl in m.holes]
