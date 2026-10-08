@@ -101,4 +101,6 @@ def render(m):
             f'viewBox="{x0:g} {y0:g} {w:g} {h:g}">\n'
             '<defs><marker id="a" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="4" '
             'markerHeight="4" orient="auto-start-reverse"><path d="M0,0 L6,3 L0,6 z"/>'
-            '</marker></defs>\n' + "\n".join(o) + "\n</svg>\n")
+            '</marker></defs>\n'
+            f'<rect x="{x0:g}" y="{y0:g}" width="{w:g}" height="{h:g}" fill="white"/>\n'
+            + "\n".join(o) + "\n</svg>\n")

@@ -56,8 +56,8 @@ def build(cfg, part, row=None):
     m.notes = [f"ряды {part['rows']}; чертёж для ряда {k} (φ = {rw['phi']:g}°, вход 0°)",
                f"профиль: эквидистанта траектории (6) на Dш/2 = {D / 2:g} (Д-38)",
                f"толщина B венца = {g['roller']['l']:g} мм; штифты H7",
-               f"тонкие линии — ряд {k}: тела (синие), генератор: {gen_txt} (зелёные), "
-               "вал и сепаратор (серые); в деталь и STEP не входят (Д-44)"]
+               f"тонкие линии — ряд {k}, в деталь и STEP не входят (Д-44): тела — синие,",
+               f"генератор ({gen_txt}) — зелёные, вал и сепаратор — серые"]
     m.legend = [("u", cfg["u"], "передаточное число, u = n = z − 1"),
                 ("z", z, "число впадин венца"),
                 ("n", cfg["n"], "тел в ряду"),
@@ -102,6 +102,7 @@ def self_test():
     assert len(rol) == 19 and len(m.prims) == 24, len(m.prims)
     assert all(abs(math.hypot(p.x - ex, p.y - ey) - R) < 1e-6 for p in rol)
     assert 'stroke="blue"' in out
+    assert 'fill="white"' in out                       # фон: прозрачное ≠ чёрное (CP-32)
     try:
         build(cfg, part, row=3)
         raise AssertionError("ряд чужого варианта принят")
