@@ -8,13 +8,20 @@
     "a_k": 0.2,
     "r_tip_min": 0.05,
     "sep_web_min": 1.0,
-    "Dgen_min": 18.0,
+    "shaft_d_min": 6.0,
+    "ecc_wall_min": 1.0,
     "d_bc_step": 0.1,
     "d_out_step": 1.0,
     "row_gap": 1.0,
     "rows": 4,
     "row_phases": [0, 90, 180, 270],
-    "u_list": [10, 16, 20, 25, 32, 40, 50, 63, 80, 100]
+    "u_list": [10, 16, 20, 25, 32, 40, 50, 63, 80, 100],
+    "E_mod": 210000.0,
+    "nu": 0.3,
+    "sigma_H_line": 2500.0,
+    "sigma_H_point": 3000.0,
+    "s0_brg": 1.0,
+    "M_min": 0.0
   },
   "mount_mode": "first_ok",
   "ring_mounts": {

@@ -10,7 +10,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from egm import catalog, naming, products, ptk, ptk_profile
+from egm import catalog, naming, products, ptk, ptk_force, ptk_profile
 from egm.cad import ptk_ring, step as cad_step
 
 ROOT = Path(__file__).resolve().parent
@@ -70,13 +70,15 @@ def run_ptk(prices):
         lim, mounts, fast, mode = ptk.load_config(load_json("ptk_input.json"))
     except (KeyError, ValueError, TypeError) as e:
         return [f"ptk_input.json: {e!r}"]
-    rows = ptk.to_rows(ptk.sweep(prices["rollers"], lim, mounts, fast, mode), mounts)
+    rows = ptk.to_rows(ptk.sweep(prices["rollers"], prices.get("bearings", {}), lim, mounts,
+                                 fast, mode), mounts)
     write("specs", "ptk_configs.json", json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
     table, errs, warns = [], [], []
     for r in rows:
-        m = r["torque_Nm_est"] if r["ok"] else "—"
+        m = f"{r['M']:g} ({r['M_by']})" if r["M"] else "—"
         table.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['Drol']} | {r['Drol_max']} | "
-                     f"{r['n']} | {r['z']} | {r['a_w']} | {r['Dgen'] or '—'} | {r['d_root']} | "
+                     f"{r['n']} | {r['z']} | {r['a_w']} | {r['bearing'] or '—'} | "
+                     f"{r['Dgen'] or '—'} | {r['d_root']} | "
                      f"{r['alpha_max'] or '—'} | "
                      f"{(r['holes'] + ' (' + r['mount'] + ')') if r['holes'] else '—'} | "
                      f"{r['ring_variants'] or '—'} | {r['d_bc']} | {r['d_out']} | "
@@ -92,7 +94,8 @@ def run_ptk(prices):
     text, missing = fill(
         tpl,
         params=params, rows="\n".join(table),
-        profile=ptk_profile.theory_md() + "\n\n" + ptk.profile_table(rows),
+        profile=(ptk_profile.theory_md() + "\n\n" + ptk_force.theory_md() + "\n\n"
+                 + ptk.profile_table(rows)),
         errors="\n".join(errs) or "нет", warnings="\n".join(warns) or "нет",
         n_ok=sum(r["ok"] for r in rows), n_all=len(rows),
         two_stage=ptk.two_stage_table(lim), phasing=phasing)
@@ -125,7 +128,8 @@ def main(argv):
     for name, test in (("ptk", ptk.self_test), ("naming", naming.self_test),
                        ("catalog", catalog.self_test), ("products", products.self_test),
                        ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test),
-                       ("fill", fill_self_test), ("step", cad_step.self_test)):
+                       ("fill", fill_self_test), ("step", cad_step.self_test),
+                       ("force", ptk_force.self_test)):
         try:
             test()
         except AssertionError as e:

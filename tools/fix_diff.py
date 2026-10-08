@@ -10,6 +10,11 @@ deleted file mode, счётчики @@, пустые строки без пре�
     привязывает hunk без хвостового контекста к концу файла);
   * расставляется '\\ No newline at end of file';
   * сохраняется стиль окончаний строк файла (LF/CRLF).
+Стадия 2 устойчива к ошибкам ИИ в номерах строк: hunk ищется по содержимому по
+всему файлу, а не только после предыдущего; найденные hunk'и сортируются по
+позиции в файле (порядок в патче может не совпадать с ним), уже применённые
+hunk'и распознаются и пропускаются, а в сообщении «не найден» указывается
+причина (полное совпадение вне доступной позиции, перекрытие и т. п.).
 
 Использование:
   python tools/fix_diff.py IN [OUT] [--root DIR]
@@ -127,15 +132,31 @@ def read_target(root, rel):
     return lines, eol, final_nl
 
 
-def find(flines, old, hint, lo):
+def find(flines, old, hint, lo, occupied=()):
+    """Позиция (0-based) блока old в flines, начиная со строки lo; участки occupied
+    (уже занятые другими hunk'ами) пропускаются; из кандидатов — ближайший к hint."""
     key = [s.rstrip() for s in old]
     n = len(key)
     cands = [p for p in range(lo, len(flines) - n + 1)
-             if all(flines[p + k].rstrip() == key[k] for k in range(n))]
+             if all(flines[p + k].rstrip() == key[k] for k in range(n))
+             and not any(p < b and p + n > a for a, b in occupied)]
     return min(cands, key=lambda p: abs(p - hint)) if cands else None
 
 
-def diagnose(flines, old, hint):
+def already_applied(flines, body, occupied=()):
+    """True, если новая сторона hunk'а (контекст + строки '+') уже есть в файле:
+    повторная выдача патча на уже пропатченном дереве не должна быть ошибкой."""
+    for amb in ("+", " "):
+        cand = [(amb if k == "?" else k, t) for k, t, _ in body]
+        new = [t for k, t in cand if k in " +"]
+        if len(new) < 2 or not any(k == "+" for k, _ in cand):
+            continue
+        if find(flines, new, 0, 0, occupied) is not None:
+            return True
+    return False
+
+
+def diagnose(flines, old, hint, lo, occupied):
     best_m, best_p = -1, 0
     for p in range(max(1, len(flines))):
         m = 0
@@ -143,6 +164,14 @@ def diagnose(flines, old, hint):
             m += 1
         if m > best_m or (m == best_m and abs(p - hint) < abs(best_p - hint)):
             best_m, best_p = m, p
+    if best_m == len(old):
+        why = []
+        if best_p < lo:
+            why.append(f"лежит раньше курсора (строка {lo + 1})")
+        if any(best_p < b and best_p + len(old) > a for a, b in occupied):
+            why.append("перекрывается с уже найденным hunk'ом")
+        note = " (" + "; ".join(why) + ")" if why else ""
+        return f"полное совпадение найдено со строки {best_p + 1}, но блок недоступен{note}"
     exp = old[best_m] if best_m < len(old) else "?"
     got = flines[best_p + best_m] if best_p + best_m < len(flines) else "<конец файла>"
     return (f"лучшее совпадение с строки {best_p + 1}: совпало {best_m} из {len(old)}; "
@@ -193,8 +222,23 @@ def emit_deleted(root, path, hdr):
     return hdr + [f"--- a/{path}", "+++ /dev/null", f"@@ -1,{len(flines)} +0,0 @@"] + render(out, eol)
 
 
+def merge_close(flines, located):
+    """Соседние hunk'и ближе 2·CTX сливаются в один. Отдельный hunk, прижатый к границе
+    (без хвостового контекста), git apply и patch отказываются применять; при слиянии
+    хвостовой контекст появляется, и форма совпадает с каноническим diff -u."""
+    merged = []
+    for p, n, body, tail in located:
+        if merged and p - (merged[-1][0] + merged[-1][1]) <= 2 * CTX:
+            p0, n0, b0, _ = merged[-1]
+            gap = [[" ", flines[j], None] for j in range(p0 + n0, p)]
+            merged[-1] = (p0, p + n - p0, b0 + gap + [list(b) for b in body], tail)
+        else:
+            merged.append((p, n, [list(b) for b in body], tail))
+    return merged
+
+
 def locate(path, flines, hunks):
-    located, lo = [], 0
+    located, lo, occupied = [], 0, []
     for h in hunks:
         body = [list(b) for b in h["body"]]
         while body and body[-1][0] in " ?" and not body[-1][1].strip():
@@ -203,24 +247,38 @@ def locate(path, flines, hunks):
             warn(f"{path}: hunk со строки патча {h['line']} без изменений — пропущен")
             continue
         hint = max(h["old_start"] - 1, 0)
-        p = None
+        res = None
         for amb in (" ", "+"):  # '?' сперва как контекст, затем как добавленная строка
             cand = [(amb if k == "?" else k, t, n) for k, t, n in body]
             old = [t for k, t, _ in cand if k in " -"]
             if not old:
                 p = min(max(h["old_start"], lo), len(flines))
                 warn(f"{path}: hunk со строки патча {h['line']} без контекста — вставка после строки {p}")
+                res = (p, 0, cand, h["tail"])
                 break
-            p = find(flines, old, hint, lo)
+            p = find(flines, old, hint, lo, occupied)
+            if p is None and lo:
+                # номера строк у ИИ могут врать: ищем блок по всему файлу, а не только ниже курсора
+                p = find(flines, old, hint, 0, occupied)
+                if p is not None:
+                    warn(f"{path}: hunk со строки патча {h['line']} лежит раньше предыдущего "
+                         f"(строка файла {p + 1}); порядок hunk'ов в патче не совпадает с файлом")
             if p is not None:
+                res = (p, len(old), cand, h["tail"])
                 break
-        if p is None:
+        if res is None:
+            if already_applied(flines, body, occupied):
+                warn(f"{path}: hunk со строки патча {h['line']} уже применён — пропущен")
+                continue
             old = [t for k, t, _ in body if k in " -?"]
             die(f"{path}: hunk со строки патча {h['line']} не найден в файле. "
-                + diagnose(flines, old, hint))
-        located.append((p, len(old), cand, h["tail"]))
-        lo = p + len(old)
-    return located
+                + diagnose(flines, old, hint, lo, occupied))
+        p, n, cand, tail = res
+        occupied.append((p, p + n))
+        located.append((p, n, cand, tail))
+        lo = max(lo, p + n)
+    located.sort(key=lambda t: t[0])  # git apply требует hunk'и в порядке возрастания позиций
+    return merge_close(flines, located)  # смежные hunk'и сливаются, чтобы не терять контекст
 
 
 def emit_modified(root, path, f, hdr):

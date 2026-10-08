@@ -258,7 +258,7 @@ def validate(db, pairs, prices):
             if t["dims"].get(k) is not None and t["dims"][k] != r.get(k):
                 err.append(f"HGR{size}T.{k}={t['dims'][k]} ≠ HGR{size}R.{k}={r.get(k)}")
     known = (set(db["blocks"]) | set(db["rails"]) | set(pairs["pairs"])
-             | set(prices.get("rollers", {})))
+             | set(prices.get("rollers", {})) | set(prices.get("bearings", {})))
     no_price = 0
     for k, v in prices.get("items", {}).items():
         if k.startswith("_"):
