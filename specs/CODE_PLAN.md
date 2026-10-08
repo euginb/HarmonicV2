@@ -17,7 +17,7 @@ code-first перегенерируются только прогоном.
 ## 2. Пункты плана
 
 | CP | Содержание | Файлы | Основание | Зависит от | Статус |
-|---|---|---|---|---|------|
+|---|---|---|---|---|--|
 | CP-01 | Каркас `main.py`, пакет `egm`, калькулятор ПТК ур.1, шаблон SPEC-10 | main.py, egm/, templates/ | Д-08 | — | закрыт (прогон OK, 4eb0bbe) |
 | CP-02 | Парсер `docs/HG-Series-Catalog_opt.md` → `catalog_hiwin_hg.json`, пары с каталожными номерами, проверка совместимости, раскладка отверстий рельса, сверка `vendor_prices.json` | egm/catalog.py, main.py | Д-07, Д-10 | CP-01 | закрыт (прогон OK, 0291bd6) |
 | CP-03 | Расчёт стоимости по `vendor_prices.json`, отчёт о несовместимостях | egm/cost.py | Д-07 | CP-02 | открыт |
@@ -47,4 +47,4 @@ code-first перегенерируются только прогоном.
 | CP-27 | rev 7.3: подбор gap_k по углу профиля γ, η, заклинивание (Д-34); округление Ø окр. отв./Øнар (Д-35); SVG — ширина по тексту, выноски меток; концепция и балансировка (Д-36) | egm/ptk.py, egm/ptk_profile.py, egm/cad/, main.py, specs/ptk_input.json, specs/DECISIONS.md, instructions/INS-10_PTK_CALC.md | Д-34, Д-35, Д-36 | CP-26 | (прогон OK, 8358c3b7) |
 | CP-28 | rev 7.4: обозначения Янгулова (Д-37); расчёт R_Σ по подрезу/сепаратору/D_г, профиль по (6), α max, (8)/(9) (Д-38); отмена gap_k (X-07); архитектура SPEC-04 (Д-39); STEP — реальная ошибка импорта | egm/ptk.py, egm/ptk_profile.py, egm/cad/, egm/catalog.py, main.py, templates/, specs/ | Д-37, Д-38, Д-39 | CP-27 | (прогон OK, a83e6b83) |
 | CP-29 | rev 7.4: STEP без булевых операций — одна грань (D, впадины, отверстия) и одно выдавливание; контур впадин `--step spline\|poly\|off`; время построения в выводе; `step.self_test` в прогоне | egm/cad/step.py, egm/cad/__main__.py, main.py, instructions/INS-30_CAD.md, specs/CODE_PLAN.md | Д-32 | CP-28 | (прогон OK, 6fb98aa4) |
-| CP-30 | rev 7.5: подшипник генератора из `bearings` (Д-40, OQ-07), силовой расчёт: Герц, статика C0, M = min(M_H, M_B, M крепл./safety) (Д-41); заглушка `torque_estimate` удалена; GEOM_REV = 5 | egm/ptk_force.py, egm/ptk.py, egm/catalog.py, egm/cad/ptk_ring.py, main.py, templates/, specs/, instructions/INS-10_PTK_CALC.md | Д-40, Д-41 | CP-29 | открыт |
+| CP-30 | rev 7.5: подшипник генератора из `bearings` (Д-40, OQ-07), силовой расчёт: Герц, статика C0, M = min(M_H, M_B, M крепл./safety) (Д-41); заглушка `torque_estimate` удалена; GEOM_REV = 5 | egm/ptk_force.py, egm/ptk.py, egm/catalog.py, egm/cad/ptk_ring.py, main.py, templates/, specs/, instructions/INS-10_PTK_CALC.md | Д-40, Д-41 | CP-29 | (прогон OK, 307e9a53) |
