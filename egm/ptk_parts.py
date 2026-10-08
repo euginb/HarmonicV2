@@ -149,10 +149,14 @@ def self_test():
                           shaft_d_min=6.0, shaft_key_b=2.0, shaft_key_t2=1.0, bal_wall=1.0,
                           bal_n_max=3, bal_d_min=1.0, bal_d_step=0.1, ecc_wall_min=1.0,
                           key_angle=45.0, groove_f=0.52)
-    rows = [{"row": k + 1, "phi": p, "s": 0.0} for k, p in enumerate((0, 90, 180, 270))]
+    rows = [{"row": k + 1, "phi": p, "s": -p} for k, p in enumerate((0, 90, 180, 270))]
     s = separator(50, 33.5, 0.4, 2.0, 4.2, 7.0, rows, lim, 1.1)
     assert s["web"] > 0 and len(s["rows"]) == 4, s
-    assert abs(s["rows"][1]["cage"] - (90 % 7.2)) < 1e-6        # при s = −φ: cage = φ mod 360/n
+    c = s["rows"][1]["cage"]
+    assert abs(c - 90 % 7.2) < 1e-6, ("s = −φ: cage = φ mod 360/n (Д-46)", c)
+    s0 = separator(50, 33.5, 0.4, 2.0, 4.2, 7.0, [{**x, "s": 0.0} for x in rows], lim, 1.1)
+    c0 = s0["rows"][1]["cage"]
+    assert abs(c0 - (-90 / 50) % 7.2) < 1e-6, ("s = 0: cage = −φ/n mod 360/n (Д-46)", c0)
     e = eccentric(50, 0.4, 2.0, {"type": "roller", "d": 2.0, "l": 4.2},
                   {"d": 50.0, "D": 65.0, "B": 7.0}, rows, lim, "bearing", 33.5)
     assert e["bal"]["n"] >= 1 and abs(e["bal"]["res"]) <= 0.05 * e["U"]["sum"], e["bal"]
