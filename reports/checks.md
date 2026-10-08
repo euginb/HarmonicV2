@@ -1,3 +1,3 @@
 # Проверки прогона (code-first, НЕ ПРАВИТЬ РУКАМИ)
 
-все пройдены
+- parts.self_test: AssertionError()

@@ -139,7 +139,6 @@ def main(argv):
                        ("catalog", catalog.self_test), ("products", products.self_test),
                        ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test),
                        ("fill", fill_self_test), ("step", cad_step.self_test),
-                       ("force", ptk_force.self_test)):
                        ("force", ptk_force.self_test), ("parts", ptk_parts.self_test)):
         try:
             test()
