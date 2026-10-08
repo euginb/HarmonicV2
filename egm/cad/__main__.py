@@ -31,7 +31,8 @@ def _row(cfg, phase, row):
 def build(arg, configs, prods, phase=None, row=None, step_mode="spline"):
     cfg = ptk.find(configs, arg)
     if not cfg["ok"]:
-        print(f"предупреждение: {cfg['id']} нереализуема: {'; '.join(cfg['errors'])}")
+        why = cfg["errors"] or [f"исключено по технологии {cfg.get('excluded')} (Д-45, SPEC-10)"]
+        print(f"предупреждение: {cfg['id']} нереализуема: {'; '.join(why)}")
     k = _row(cfg, phase, row)
     parts = [p for p in cfg["parts"] if ("." not in arg or p["id"] == arg)
              and (k is None or k in p["rows"])]

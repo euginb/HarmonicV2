@@ -73,10 +73,14 @@ def run_ptk(prices):
     rows = ptk.to_rows(ptk.sweep(prices["rollers"], prices.get("bearings", {}), lim, mounts,
                                  fast, mode), mounts)
     write("specs", "ptk_configs.json", json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
-    table, errs, warns = [], [], []
+    table, errs, warns, excl = [], [], [], []
     for r in rows:
+        if r["excluded"]:                                # Д-45: не молча — в конец SPEC-10
+            excl.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['gen']} | {r['excluded']} |")
+            continue
         m = f"{r['M']:g} ({r['M_by']})" if r["M"] else "—"
         gen = (r["bearing"] or "—") if r["gen"] == "bearing" else "эксцентрик"
+        st = ("OK" if r["ok"] else "нет") + (f" ({', '.join(r['tech'])})" if r["tech"] else "")
         table.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['Drol']} | "
                      f"{r['Drol_max'] or '—'} | "
                      f"{r['n']} | {r['z']} | {r['a_w']} | {gen} | "
@@ -84,7 +88,7 @@ def run_ptk(prices):
                      f"{r['alpha_max'] or '—'} | "
                      f"{(r['holes'] + ' (' + r['mount'] + ')') if r['holes'] else '—'} | "
                      f"{r['ring_variants'] or '—'} | {r['d_bc']} | {r['d_out']} | "
-                     f"{r['width']} | {m} | {r['t_hold']} | {'OK' if r['ok'] else 'нет'} |")
+                     f"{r['width']} | {m} | {r['t_hold']} | {st} |")
         tag = f"- u={r['u']}, {r['roller']}, {r['gen']}: "
         errs += [tag + e for e in r["errors"]]
         warns += [tag + w for w in r["warnings"]]
@@ -97,9 +101,12 @@ def run_ptk(prices):
         tpl,
         params=params, rows="\n".join(table),
         profile=(ptk_profile.theory_md() + "\n\n" + ptk_force.theory_md() + "\n\n"
-                 + ptk.profile_table(rows)),
+                 + ptk.profile_table([r for r in rows if not r["excluded"]])),
         errors="\n".join(errs) or "нет", warnings="\n".join(warns) or "нет",
-        n_ok=sum(r["ok"] for r in rows), n_all=len(rows),
+        n_ok=sum(r["ok"] for r in rows), n_all=len(table), n_excl=len(excl),
+        tech=ptk.tech_md(),
+        excluded=("| ID | u | Тело | Генератор | Код |\n|---|---|---|---|---|\n" + "\n".join(excl))
+                 if excl else "нет",
         two_stage=ptk.two_stage_table(lim), phasing=phasing)
     write("specs", "SPEC-10_PTK_CALC.md", text)
     bad = [f"SPEC-10: в шаблоне нет полей {missing}"] if missing else []

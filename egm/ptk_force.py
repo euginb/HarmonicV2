@@ -42,13 +42,15 @@ def sigma_point(F, kx, ky, Es):
     return (6 * F * Es ** 2 * kx * ky / math.pi ** 3) ** (1 / 3)
 
 
-def pair_limits(D, l, kind, Dg, B, lim):
+def pair_limits(D, l, kind, Dg, B, lim, groove=False):
     """Допускаемые силы на теле, Н: (F_г — тело/наружное кольцо подшипника, F_в — тело/венец).
-    Венец — плоскость (запас: во впадине профиль вогнутый); ролик на кольце — длина min(l, B)."""
+    Венец — плоскость (запас: во впадине профиль вогнутый); ролик на кольце — длина min(l, B).
+    groove — шарик в жёлобе эксцентрика r = groove_f·D (Д-45, Т2)."""
     Es = e_star(lim.E_mod, lim.nu)
     if kind == "ball":
         s = lim.sigma_H_point
-        return (f_point(s, _k(D / 2, Dg / 2), _k(D / 2), Es),
+        ky = _k(D / 2, -lim.groove_f * D) if groove else _k(D / 2)
+        return (f_point(s, _k(D / 2, Dg / 2), ky, Es),
                 f_point(s, _k(D / 2), _k(D / 2), Es))
     s = lim.sigma_H_line
     return (f_line(s, min(l, B), D / 2, Dg / 2, Es), f_line(s, l, D / 2, math.inf, Es))
@@ -61,7 +63,8 @@ def torque(n, z, a, R, D, l, kind, brg, lim, rows):
     Выход: M_р = Σ R_i·(R_о/R)_i·Y_i; подшипник: R_max·|Σ sin φ_i·e_i| ≤ C0/s0_brg.
     Худшее из K_PHASE положений генератора внутри шага тел.
     brg = None — тела на эксцентрике (Д-42): пара тело/эксцентрик на всей длине l, M_B нет."""
-    Fg, Fv = pair_limits(D, l, kind, 2 * R - D, brg["B"] if brg else l, lim)
+    Fg, Fv = pair_limits(D, l, kind, 2 * R - D, brg["B"] if brg else l, lim,
+                         kind == "ball" and brg is None)
     MH = MB = math.inf
     for j in range(K_PHASE):
         s_max = srv = mom = bx = by = 0.0
@@ -104,6 +107,8 @@ rows · $M_\text{р}$; берётся худшее из 8 положений г�
 ролик — $\sigma_H = \sqrt{F E^* k / (\pi l)}$; шарик — $\sigma_H = (6 F E^{*2} k_x k_y / \pi^3)^{1/3}$.
 Кривизны: тело/наружное кольцо $k = 2/D_\text{ш} + 2/D_\text{г}$ (ролик — на длине
 min(l, B подш.)), тело/венец $k = 2/D_\text{ш}$ (венец как плоскость — запас).
+Шарик на эксцентрике (Д-45, Т2): жёлоб $r = f D_\text{ш}$, $f$ = `groove_f`,
+$k_y = 2/D_\text{ш} - 1/(f D_\text{ш})$; шарик на подшипнике исключён (Т1), венец без жёлоба (Т3).
 
 $R_\text{max}$ = min($F_\text{г}$ / max sin φ, $F_\text{в}$ / max(sin φ · $R_\text{в}/R$)) → $M_H$;
 подшипник $R_\text{max} \lvert \sum \sin\varphi_i \vec e_i \rvert \le C_0 / s_0$ → $M_B$.
@@ -131,7 +136,10 @@ def self_test():
         ro, _ = ptk_profile.contact_ratios(p, a, R, z)
         assert abs(ro - (z - 1) * a * math.sin(p) / R) < 1e-9, (p, ro)
     lim = SimpleNamespace(E_mod=210000.0, nu=0.3, sigma_H_line=2500.0,
-                          sigma_H_point=3000.0, s0_brg=1.0)
+                          sigma_H_point=3000.0, s0_brg=1.0, groove_f=0.52)
+    g0 = pair_limits(2.0, 2.0, "ball", 60.0, 2.0, lim)                    # Д-45: жёлоб
+    g1 = pair_limits(2.0, 2.0, "ball", 60.0, 2.0, lim, True)
+    assert g1[0] > 10 * g0[0] and g1[1] == g0[1], (g0, g1)
     brg = {"d": 45.0, "D": 58.0, "B": 7.0, "C": 6.63, "C0": 6.1}
     t1 = torque(19, z, a, R, D, 8.0, "roller", brg, lim, 4)
     assert t1["M_H"] > 0 and t1["M_B"] > 0, t1

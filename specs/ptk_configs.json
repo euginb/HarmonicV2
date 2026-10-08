@@ -140,7 +140,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 10,
@@ -279,7 +281,11 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 10,
@@ -422,7 +428,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 10,
@@ -561,100 +569,44 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 10,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-010-B3-8M4P2-27A0E0",
+    "id": "PTK-010-B3-8M4P2-7DFF8D",
     "n": 10,
     "z": 11,
-    "a_w": 0.6,
-    "R_sum": 11.0,
-    "R_by": "подрез",
-    "Dgen": 19.0,
-    "bearing": "61800",
+    "a_w": 0.0,
+    "R_sum": 0.0,
+    "R_by": "",
+    "Dgen": 0.0,
+    "bearing": "",
     "gen": "bearing",
-    "d_root": 26.2,
-    "d_tip": 23.8,
-    "alpha_max": 31.0,
-    "r_tip": 0.357,
-    "sep_web": 3.39,
-    "holes": "8×M4+2шт Ø4",
+    "d_root": 0.0,
+    "d_tip": 0.0,
+    "alpha_max": 0.0,
+    "r_tip": 0.0,
+    "sep_web": 0.0,
+    "holes": "",
     "mount": "M4x8P2",
-    "d_bc": 38.7,
-    "d_out": 52.0,
-    "width": 25.0,
-    "Drol_max": 9.73,
-    "t_hold": 76.2,
-    "M_H": 1.2,
-    "M_B": 19.9,
-    "M": 1.2,
-    "M_by": "контакт",
-    "ring_variants": 2,
-    "phasing": [
-      {
-        "row": 1,
-        "phi": 0.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 2,
-        "phi": 90.0,
-        "delta_p": 0.75,
-        "s": 8.1818,
-        "cage": 18.0,
-        "variant": "B",
-        "s_arc_mm": 2.763
-      },
-      {
-        "row": 3,
-        "phi": 180.0,
-        "delta_p": 0.5,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 4,
-        "phi": 270.0,
-        "delta_p": 0.25,
-        "s": 8.1818,
-        "cage": 18.0,
-        "variant": "B",
-        "s_arc_mm": 2.763
-      }
-    ],
-    "parts": [
-      {
-        "id": "PTK-010-B3-8M4P2-27A0E0.01A",
-        "name": "венец",
-        "variant": "A",
-        "s": 0.0,
-        "s_arc_mm": 0.0,
-        "rows": [
-          1,
-          3
-        ]
-      },
-      {
-        "id": "PTK-010-B3-8M4P2-27A0E0.01B",
-        "name": "венец",
-        "variant": "B",
-        "s": 8.1818,
-        "s_arc_mm": 2.763,
-        "rows": [
-          2,
-          4
-        ]
-      }
-    ],
+    "d_bc": 0.0,
+    "d_out": 0.0,
+    "width": 0.0,
+    "Drol_max": 0.0,
+    "t_hold": 0.0,
+    "M_H": 0.0,
+    "M_B": 0.0,
+    "M": 0.0,
+    "M_by": "",
+    "ring_variants": 0,
+    "phasing": [],
+    "parts": [],
     "geom": {
       "rev": 6.0,
       "u": 10.0,
@@ -666,11 +618,7 @@
         "a_w": null,
         "wall_min": null
       },
-      "bearing": {
-        "d": 10.0,
-        "D": 19.0,
-        "B": 5.0
-      },
+      "bearing": null,
       "limits": {
         "a_k": 0.2,
         "r_tip_min": 0.05,
@@ -702,9 +650,13 @@
         "dk": 7.0
       }
     },
-    "ok": true,
+    "ok": false,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т1"
+    ],
+    "excluded": "Т1"
   },
   {
     "u": 10,
@@ -843,7 +795,13 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т2",
+      "Т3",
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 16,
@@ -986,7 +944,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 16,
@@ -1125,7 +1085,11 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 16,
@@ -1268,7 +1232,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 16,
@@ -1407,100 +1373,44 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 16,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-016-B3-8M4P2-DED876",
+    "id": "PTK-016-B3-8M4P2-9EF289",
     "n": 16,
     "z": 17,
-    "a_w": 0.6,
-    "R_sum": 17.5,
-    "R_by": "подрез",
-    "Dgen": 32.0,
-    "bearing": "61804",
+    "a_w": 0.0,
+    "R_sum": 0.0,
+    "R_by": "",
+    "Dgen": 0.0,
+    "bearing": "",
     "gen": "bearing",
-    "d_root": 39.2,
-    "d_tip": 36.8,
-    "alpha_max": 30.3,
-    "r_tip": 0.397,
-    "sep_web": 3.57,
-    "holes": "8×M4+2шт Ø4",
+    "d_root": 0.0,
+    "d_tip": 0.0,
+    "alpha_max": 0.0,
+    "r_tip": 0.0,
+    "sep_web": 0.0,
+    "holes": "",
     "mount": "M4x8P2",
-    "d_bc": 51.7,
-    "d_out": 65.0,
-    "width": 33.0,
-    "Drol_max": 6.5,
-    "t_hold": 101.7,
-    "M_H": 3.1,
-    "M_B": 89.1,
-    "M": 3.1,
-    "M_by": "контакт",
-    "ring_variants": 2,
-    "phasing": [
-      {
-        "row": 1,
-        "phi": 0.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 2,
-        "phi": 90.0,
-        "delta_p": 0.25,
-        "s": 5.2941,
-        "cage": 0.0,
-        "variant": "B",
-        "s_arc_mm": 2.389
-      },
-      {
-        "row": 3,
-        "phi": 180.0,
-        "delta_p": 0.5,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 4,
-        "phi": 270.0,
-        "delta_p": 0.75,
-        "s": 5.2941,
-        "cage": 0.0,
-        "variant": "B",
-        "s_arc_mm": 2.389
-      }
-    ],
-    "parts": [
-      {
-        "id": "PTK-016-B3-8M4P2-DED876.01A",
-        "name": "венец",
-        "variant": "A",
-        "s": 0.0,
-        "s_arc_mm": 0.0,
-        "rows": [
-          1,
-          3
-        ]
-      },
-      {
-        "id": "PTK-016-B3-8M4P2-DED876.01B",
-        "name": "венец",
-        "variant": "B",
-        "s": 5.2941,
-        "s_arc_mm": 2.389,
-        "rows": [
-          2,
-          4
-        ]
-      }
-    ],
+    "d_bc": 0.0,
+    "d_out": 0.0,
+    "width": 0.0,
+    "Drol_max": 0.0,
+    "t_hold": 0.0,
+    "M_H": 0.0,
+    "M_B": 0.0,
+    "M": 0.0,
+    "M_by": "",
+    "ring_variants": 0,
+    "phasing": [],
+    "parts": [],
     "geom": {
       "rev": 6.0,
       "u": 16.0,
@@ -1512,11 +1422,7 @@
         "a_w": null,
         "wall_min": null
       },
-      "bearing": {
-        "d": 20.0,
-        "D": 32.0,
-        "B": 7.0
-      },
+      "bearing": null,
       "limits": {
         "a_k": 0.2,
         "r_tip_min": 0.05,
@@ -1548,9 +1454,13 @@
         "dk": 7.0
       }
     },
-    "ok": true,
+    "ok": false,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т1"
+    ],
+    "excluded": "Т1"
   },
   {
     "u": 16,
@@ -1689,7 +1599,13 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т2",
+      "Т3",
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 20,
@@ -1832,7 +1748,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 20,
@@ -1971,7 +1889,11 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 20,
@@ -2114,7 +2036,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 20,
@@ -2253,100 +2177,44 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 20,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-020-B3-8M4P2-DD58D9",
+    "id": "PTK-020-B3-8M4P2-466254",
     "n": 20,
     "z": 21,
-    "a_w": 0.6,
-    "R_sum": 20.0,
-    "R_by": "подрез",
-    "Dgen": 37.0,
-    "bearing": "61805",
+    "a_w": 0.0,
+    "R_sum": 0.0,
+    "R_by": "",
+    "Dgen": 0.0,
+    "bearing": "",
     "gen": "bearing",
-    "d_root": 44.2,
-    "d_tip": 41.8,
-    "alpha_max": 32.2,
-    "r_tip": 0.086,
-    "sep_web": 3.05,
-    "holes": "8×M4+2шт Ø4",
+    "d_root": 0.0,
+    "d_tip": 0.0,
+    "alpha_max": 0.0,
+    "r_tip": 0.0,
+    "sep_web": 0.0,
+    "holes": "",
     "mount": "M4x8P2",
-    "d_bc": 56.7,
-    "d_out": 70.0,
-    "width": 33.0,
-    "Drol_max": 5.76,
-    "t_hold": 111.6,
-    "M_H": 4.8,
-    "M_B": 124.8,
-    "M": 4.8,
-    "M_by": "контакт",
-    "ring_variants": 2,
-    "phasing": [
-      {
-        "row": 1,
-        "phi": 0.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 2,
-        "phi": 90.0,
-        "delta_p": 0.25,
-        "s": 4.2857,
-        "cage": 0.0,
-        "variant": "B",
-        "s_arc_mm": 2.121
-      },
-      {
-        "row": 3,
-        "phi": 180.0,
-        "delta_p": 0.5,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 4,
-        "phi": 270.0,
-        "delta_p": 0.75,
-        "s": 4.2857,
-        "cage": 0.0,
-        "variant": "B",
-        "s_arc_mm": 2.121
-      }
-    ],
-    "parts": [
-      {
-        "id": "PTK-020-B3-8M4P2-DD58D9.01A",
-        "name": "венец",
-        "variant": "A",
-        "s": 0.0,
-        "s_arc_mm": 0.0,
-        "rows": [
-          1,
-          3
-        ]
-      },
-      {
-        "id": "PTK-020-B3-8M4P2-DD58D9.01B",
-        "name": "венец",
-        "variant": "B",
-        "s": 4.2857,
-        "s_arc_mm": 2.121,
-        "rows": [
-          2,
-          4
-        ]
-      }
-    ],
+    "d_bc": 0.0,
+    "d_out": 0.0,
+    "width": 0.0,
+    "Drol_max": 0.0,
+    "t_hold": 0.0,
+    "M_H": 0.0,
+    "M_B": 0.0,
+    "M": 0.0,
+    "M_by": "",
+    "ring_variants": 0,
+    "phasing": [],
+    "parts": [],
     "geom": {
       "rev": 6.0,
       "u": 20.0,
@@ -2358,11 +2226,7 @@
         "a_w": null,
         "wall_min": null
       },
-      "bearing": {
-        "d": 25.0,
-        "D": 37.0,
-        "B": 7.0
-      },
+      "bearing": null,
       "limits": {
         "a_k": 0.2,
         "r_tip_min": 0.05,
@@ -2394,9 +2258,13 @@
         "dk": 7.0
       }
     },
-    "ok": true,
+    "ok": false,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т1"
+    ],
+    "excluded": "Т1"
   },
   {
     "u": 20,
@@ -2535,7 +2403,13 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т2",
+      "Т3",
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 25,
@@ -2678,7 +2552,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 25,
@@ -2817,7 +2693,11 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 25,
@@ -2960,7 +2840,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 25,
@@ -3099,100 +2981,44 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 25,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-025-B3-8M4P2-EFFFBE",
+    "id": "PTK-025-B3-8M4P2-5B06F7",
     "n": 25,
     "z": 26,
-    "a_w": 0.6,
-    "R_sum": 25.0,
-    "R_by": "подрез",
-    "Dgen": 47.0,
-    "bearing": "61807",
+    "a_w": 0.0,
+    "R_sum": 0.0,
+    "R_by": "",
+    "Dgen": 0.0,
+    "bearing": "",
     "gen": "bearing",
-    "d_root": 54.2,
-    "d_tip": 51.8,
-    "alpha_max": 32.0,
-    "r_tip": 0.103,
-    "sep_web": 3.1,
-    "holes": "8×M4+2шт Ø4",
+    "d_root": 0.0,
+    "d_tip": 0.0,
+    "alpha_max": 0.0,
+    "r_tip": 0.0,
+    "sep_web": 0.0,
+    "holes": "",
     "mount": "M4x8P2",
-    "d_bc": 66.7,
-    "d_out": 80.0,
-    "width": 33.0,
-    "Drol_max": 4.7,
-    "t_hold": 131.3,
-    "M_H": 7.5,
-    "M_B": 191.9,
-    "M": 7.5,
-    "M_by": "контакт",
-    "ring_variants": 2,
-    "phasing": [
-      {
-        "row": 1,
-        "phi": 0.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 2,
-        "phi": 90.0,
-        "delta_p": 0.5,
-        "s": 6.9231,
-        "cage": 3.6,
-        "variant": "B",
-        "s_arc_mm": 4.03
-      },
-      {
-        "row": 3,
-        "phi": 180.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 7.2,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 4,
-        "phi": 270.0,
-        "delta_p": 0.5,
-        "s": 6.9231,
-        "cage": 10.8,
-        "variant": "B",
-        "s_arc_mm": 4.03
-      }
-    ],
-    "parts": [
-      {
-        "id": "PTK-025-B3-8M4P2-EFFFBE.01A",
-        "name": "венец",
-        "variant": "A",
-        "s": 0.0,
-        "s_arc_mm": 0.0,
-        "rows": [
-          1,
-          3
-        ]
-      },
-      {
-        "id": "PTK-025-B3-8M4P2-EFFFBE.01B",
-        "name": "венец",
-        "variant": "B",
-        "s": 6.9231,
-        "s_arc_mm": 4.03,
-        "rows": [
-          2,
-          4
-        ]
-      }
-    ],
+    "d_bc": 0.0,
+    "d_out": 0.0,
+    "width": 0.0,
+    "Drol_max": 0.0,
+    "t_hold": 0.0,
+    "M_H": 0.0,
+    "M_B": 0.0,
+    "M": 0.0,
+    "M_by": "",
+    "ring_variants": 0,
+    "phasing": [],
+    "parts": [],
     "geom": {
       "rev": 6.0,
       "u": 25.0,
@@ -3204,11 +3030,7 @@
         "a_w": null,
         "wall_min": null
       },
-      "bearing": {
-        "d": 35.0,
-        "D": 47.0,
-        "B": 7.0
-      },
+      "bearing": null,
       "limits": {
         "a_k": 0.2,
         "r_tip_min": 0.05,
@@ -3240,9 +3062,13 @@
         "dk": 7.0
       }
     },
-    "ok": true,
+    "ok": false,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т1"
+    ],
+    "excluded": "Т1"
   },
   {
     "u": 25,
@@ -3381,7 +3207,13 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т2",
+      "Т3",
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 32,
@@ -3524,7 +3356,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 32,
@@ -3663,7 +3497,11 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 32,
@@ -3806,7 +3644,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 32,
@@ -3945,100 +3785,44 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 32,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-032-B3-8M4P2-1DE46C",
+    "id": "PTK-032-B3-8M4P2-C75215",
     "n": 32,
     "z": 33,
-    "a_w": 0.6,
-    "R_sum": 34.0,
-    "R_by": "подрез",
-    "Dgen": 65.0,
-    "bearing": "61810",
+    "a_w": 0.0,
+    "R_sum": 0.0,
+    "R_by": "",
+    "Dgen": 0.0,
+    "bearing": "",
     "gen": "bearing",
-    "d_root": 72.2,
-    "d_tip": 69.8,
-    "alpha_max": 30.2,
-    "r_tip": 0.333,
-    "sep_web": 3.54,
-    "holes": "8×M4+2шт Ø4",
+    "d_root": 0.0,
+    "d_tip": 0.0,
+    "alpha_max": 0.0,
+    "r_tip": 0.0,
+    "sep_web": 0.0,
+    "holes": "",
     "mount": "M4x8P2",
-    "d_bc": 84.7,
-    "d_out": 98.0,
-    "width": 33.0,
-    "Drol_max": 3.53,
-    "t_hold": 166.7,
-    "M_H": 12.5,
-    "M_B": 522.2,
-    "M": 12.5,
-    "M_by": "контакт",
-    "ring_variants": 2,
-    "phasing": [
-      {
-        "row": 1,
-        "phi": 0.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 2,
-        "phi": 90.0,
-        "delta_p": 0.25,
-        "s": 2.7273,
-        "cage": 0.0,
-        "variant": "B",
-        "s_arc_mm": 2.016
-      },
-      {
-        "row": 3,
-        "phi": 180.0,
-        "delta_p": 0.5,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 4,
-        "phi": 270.0,
-        "delta_p": 0.75,
-        "s": 2.7273,
-        "cage": 0.0,
-        "variant": "B",
-        "s_arc_mm": 2.016
-      }
-    ],
-    "parts": [
-      {
-        "id": "PTK-032-B3-8M4P2-1DE46C.01A",
-        "name": "венец",
-        "variant": "A",
-        "s": 0.0,
-        "s_arc_mm": 0.0,
-        "rows": [
-          1,
-          3
-        ]
-      },
-      {
-        "id": "PTK-032-B3-8M4P2-1DE46C.01B",
-        "name": "венец",
-        "variant": "B",
-        "s": 2.7273,
-        "s_arc_mm": 2.016,
-        "rows": [
-          2,
-          4
-        ]
-      }
-    ],
+    "d_bc": 0.0,
+    "d_out": 0.0,
+    "width": 0.0,
+    "Drol_max": 0.0,
+    "t_hold": 0.0,
+    "M_H": 0.0,
+    "M_B": 0.0,
+    "M": 0.0,
+    "M_by": "",
+    "ring_variants": 0,
+    "phasing": [],
+    "parts": [],
     "geom": {
       "rev": 6.0,
       "u": 32.0,
@@ -4050,11 +3834,7 @@
         "a_w": null,
         "wall_min": null
       },
-      "bearing": {
-        "d": 50.0,
-        "D": 65.0,
-        "B": 7.0
-      },
+      "bearing": null,
       "limits": {
         "a_k": 0.2,
         "r_tip_min": 0.05,
@@ -4086,9 +3866,13 @@
         "dk": 7.0
       }
     },
-    "ok": true,
+    "ok": false,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т1"
+    ],
+    "excluded": "Т1"
   },
   {
     "u": 32,
@@ -4227,7 +4011,13 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т2",
+      "Т3",
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 40,
@@ -4370,7 +4160,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 40,
@@ -4509,7 +4301,11 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 40,
@@ -4652,7 +4448,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 40,
@@ -4791,100 +4589,44 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 40,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-040-B3-8M3P2-998DAB",
+    "id": "PTK-040-B3-8M4P2-9EF811",
     "n": 40,
     "z": 41,
-    "a_w": 0.6,
-    "R_sum": 40.5,
-    "R_by": "подрез",
-    "Dgen": 78.0,
-    "bearing": "61812",
+    "a_w": 0.0,
+    "R_sum": 0.0,
+    "R_by": "",
+    "Dgen": 0.0,
+    "bearing": "",
     "gen": "bearing",
-    "d_root": 85.2,
-    "d_tip": 82.8,
-    "alpha_max": 31.3,
-    "r_tip": 0.169,
-    "sep_web": 3.25,
-    "holes": "8×M3+2шт Ø3",
-    "mount": "M3x8P2",
-    "d_bc": 96.6,
-    "d_out": 108.0,
-    "width": 45.0,
-    "Drol_max": 3.07,
-    "t_hold": 102.0,
-    "M_H": 19.3,
-    "M_B": 1094.3,
-    "M": 19.3,
-    "M_by": "контакт",
-    "ring_variants": 2,
-    "phasing": [
-      {
-        "row": 1,
-        "phi": 0.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 2,
-        "phi": 90.0,
-        "delta_p": 0.25,
-        "s": 2.1951,
-        "cage": 0.0,
-        "variant": "B",
-        "s_arc_mm": 1.85
-      },
-      {
-        "row": 3,
-        "phi": 180.0,
-        "delta_p": 0.5,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 4,
-        "phi": 270.0,
-        "delta_p": 0.75,
-        "s": 2.1951,
-        "cage": 0.0,
-        "variant": "B",
-        "s_arc_mm": 1.85
-      }
-    ],
-    "parts": [
-      {
-        "id": "PTK-040-B3-8M3P2-998DAB.01A",
-        "name": "венец",
-        "variant": "A",
-        "s": 0.0,
-        "s_arc_mm": 0.0,
-        "rows": [
-          1,
-          3
-        ]
-      },
-      {
-        "id": "PTK-040-B3-8M3P2-998DAB.01B",
-        "name": "венец",
-        "variant": "B",
-        "s": 2.1951,
-        "s_arc_mm": 1.85,
-        "rows": [
-          2,
-          4
-        ]
-      }
-    ],
+    "d_root": 0.0,
+    "d_tip": 0.0,
+    "alpha_max": 0.0,
+    "r_tip": 0.0,
+    "sep_web": 0.0,
+    "holes": "",
+    "mount": "M4x8P2",
+    "d_bc": 0.0,
+    "d_out": 0.0,
+    "width": 0.0,
+    "Drol_max": 0.0,
+    "t_hold": 0.0,
+    "M_H": 0.0,
+    "M_B": 0.0,
+    "M": 0.0,
+    "M_by": "",
+    "ring_variants": 0,
+    "phasing": [],
+    "parts": [],
     "geom": {
       "rev": 6.0,
       "u": 40.0,
@@ -4896,11 +4638,7 @@
         "a_w": null,
         "wall_min": null
       },
-      "bearing": {
-        "d": 60.0,
-        "D": 78.0,
-        "B": 10.0
-      },
+      "bearing": null,
       "limits": {
         "a_k": 0.2,
         "r_tip_min": 0.05,
@@ -4921,20 +4659,24 @@
         "dgen_step": 0.1
       },
       "ring_holes": {
-        "bolt": "M3",
+        "bolt": "M4",
         "n": 8.0,
         "pins": 2.0,
-        "pin_d": 3.0,
+        "pin_d": 4.0,
         "head_margin": 0.5
       },
       "fastener": {
-        "d_clear": 3.4,
-        "dk": 5.5
+        "d_clear": 4.5,
+        "dk": 7.0
       }
     },
-    "ok": true,
+    "ok": false,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т1"
+    ],
+    "excluded": "Т1"
   },
   {
     "u": 40,
@@ -5073,7 +4815,13 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т2",
+      "Т3",
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 50,
@@ -5218,7 +4966,9 @@
     "errors": [
       "D 128 > 110: тела Dш 3 при n=50 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 2.49 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 50,
@@ -5359,7 +5109,11 @@
     "errors": [
       "D 127 > 110: тела Dш 3 при n=50 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 2.5 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 50,
@@ -5502,7 +5256,9 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 50,
@@ -5641,100 +5397,44 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 50,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-050-B3-8M4P2-D4BB3F",
+    "id": "PTK-050-B3-8M4P2-DE090D",
     "n": 50,
     "z": 51,
-    "a_w": 0.6,
-    "R_sum": 49.0,
-    "R_by": "подрез",
-    "Dgen": 95.0,
-    "bearing": "61815",
+    "a_w": 0.0,
+    "R_sum": 0.0,
+    "R_by": "",
+    "Dgen": 0.0,
+    "bearing": "",
     "gen": "bearing",
-    "d_root": 102.2,
-    "d_tip": 99.8,
-    "alpha_max": 32.0,
-    "r_tip": 0.069,
-    "sep_web": 3.07,
-    "holes": "8×M4+2шт Ø4",
+    "d_root": 0.0,
+    "d_tip": 0.0,
+    "alpha_max": 0.0,
+    "r_tip": 0.0,
+    "sep_web": 0.0,
+    "holes": "",
     "mount": "M4x8P2",
-    "d_bc": 114.7,
-    "d_out": 128.0,
-    "width": 45.0,
-    "Drol_max": 2.49,
-    "t_hold": 225.7,
+    "d_bc": 0.0,
+    "d_out": 0.0,
+    "width": 0.0,
+    "Drol_max": 0.0,
+    "t_hold": 0.0,
     "M_H": 0.0,
     "M_B": 0.0,
     "M": 0.0,
     "M_by": "",
-    "ring_variants": 2,
-    "phasing": [
-      {
-        "row": 1,
-        "phi": 0.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 2,
-        "phi": 90.0,
-        "delta_p": 0.75,
-        "s": 1.7647,
-        "cage": 3.6,
-        "variant": "B",
-        "s_arc_mm": 1.766
-      },
-      {
-        "row": 3,
-        "phi": 180.0,
-        "delta_p": 0.5,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 4,
-        "phi": 270.0,
-        "delta_p": 0.25,
-        "s": 1.7647,
-        "cage": 3.6,
-        "variant": "B",
-        "s_arc_mm": 1.766
-      }
-    ],
-    "parts": [
-      {
-        "id": "PTK-050-B3-8M4P2-D4BB3F.01A",
-        "name": "венец",
-        "variant": "A",
-        "s": 0.0,
-        "s_arc_mm": 0.0,
-        "rows": [
-          1,
-          3
-        ]
-      },
-      {
-        "id": "PTK-050-B3-8M4P2-D4BB3F.01B",
-        "name": "венец",
-        "variant": "B",
-        "s": 1.7647,
-        "s_arc_mm": 1.766,
-        "rows": [
-          2,
-          4
-        ]
-      }
-    ],
+    "ring_variants": 0,
+    "phasing": [],
+    "parts": [],
     "geom": {
       "rev": 6.0,
       "u": 50.0,
@@ -5746,11 +5446,7 @@
         "a_w": null,
         "wall_min": null
       },
-      "bearing": {
-        "d": 75.0,
-        "D": 95.0,
-        "B": 10.0
-      },
+      "bearing": null,
       "limits": {
         "a_k": 0.2,
         "r_tip_min": 0.05,
@@ -5783,10 +5479,12 @@
       }
     },
     "ok": false,
-    "errors": [
-      "D 128 > 110: тела Dш 3 при n=50 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 2.49 мм (OQ-05)"
+    "errors": [],
+    "warnings": [],
+    "tech": [
+      "Т1"
     ],
-    "warnings": []
+    "excluded": "Т1"
   },
   {
     "u": 50,
@@ -5927,7 +5625,13 @@
     "errors": [
       "D 127 > 110: тела Dш 3 при n=50 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 2.5 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т2",
+      "Т3",
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 63,
@@ -6063,7 +5767,9 @@
     "errors": [
       "D 153 > 110: тела Dш 3 при n=63 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 2 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 63,
@@ -6195,7 +5901,11 @@
     "errors": [
       "D 152 > 110: тела Dш 3 при n=63 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 2.01 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 63,
@@ -6331,7 +6041,9 @@
     "errors": [
       "D 115 > 110: тела Dш 2 при n=63 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.89 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 63,
@@ -6461,91 +6173,44 @@
     },
     "ok": true,
     "errors": [],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 63,
     "roller": "B_D3",
     "Drol": 3.0,
-    "id": "PTK-063-B3-8M4P2-2883FF",
+    "id": "PTK-063-B3-8M4P2-63BA12",
     "n": 63,
     "z": 64,
-    "a_w": 0.6,
-    "R_sum": 61.5,
-    "R_by": "подрез",
-    "Dgen": 120.0,
-    "bearing": "61819",
+    "a_w": 0.0,
+    "R_sum": 0.0,
+    "R_by": "",
+    "Dgen": 0.0,
+    "bearing": "",
     "gen": "bearing",
-    "d_root": 127.2,
-    "d_tip": 124.8,
-    "alpha_max": 32.0,
-    "r_tip": 0.063,
-    "sep_web": 3.07,
-    "holes": "8×M4+2шт Ø4",
+    "d_root": 0.0,
+    "d_tip": 0.0,
+    "alpha_max": 0.0,
+    "r_tip": 0.0,
+    "sep_web": 0.0,
+    "holes": "",
     "mount": "M4x8P2",
-    "d_bc": 139.7,
-    "d_out": 153.0,
-    "width": 57.0,
-    "Drol_max": 2.0,
-    "t_hold": 274.9,
+    "d_bc": 0.0,
+    "d_out": 0.0,
+    "width": 0.0,
+    "Drol_max": 0.0,
+    "t_hold": 0.0,
     "M_H": 0.0,
     "M_B": 0.0,
     "M": 0.0,
     "M_by": "",
-    "ring_variants": 1,
-    "phasing": [
-      {
-        "row": 1,
-        "phi": 0.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 2,
-        "phi": 90.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 4.2857,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 3,
-        "phi": 180.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 2.8571,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 4,
-        "phi": 270.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 1.4286,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      }
-    ],
-    "parts": [
-      {
-        "id": "PTK-063-B3-8M4P2-2883FF.01A",
-        "name": "венец",
-        "variant": "A",
-        "s": 0.0,
-        "s_arc_mm": 0.0,
-        "rows": [
-          1,
-          2,
-          3,
-          4
-        ]
-      }
-    ],
+    "ring_variants": 0,
+    "phasing": [],
+    "parts": [],
     "geom": {
       "rev": 6.0,
       "u": 63.0,
@@ -6557,11 +6222,7 @@
         "a_w": null,
         "wall_min": null
       },
-      "bearing": {
-        "d": 95.0,
-        "D": 120.0,
-        "B": 13.0
-      },
+      "bearing": null,
       "limits": {
         "a_k": 0.2,
         "r_tip_min": 0.05,
@@ -6594,10 +6255,12 @@
       }
     },
     "ok": false,
-    "errors": [
-      "D 153 > 110: тела Dш 3 при n=63 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 2 мм (OQ-05)"
+    "errors": [],
+    "warnings": [],
+    "tech": [
+      "Т1"
     ],
-    "warnings": []
+    "excluded": "Т1"
   },
   {
     "u": 63,
@@ -6729,7 +6392,13 @@
     "errors": [
       "D 152 > 110: тела Dш 3 при n=63 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 2.01 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т2",
+      "Т3",
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 80,
@@ -6871,7 +6540,9 @@
       "нет подшипника генератора с D ≥ 152.3 и d ≥ 9.2 мм в vendor_prices.json → bearings (Д-40)",
       "D 185 > 110: тела Dш 3 при n=80 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.59 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 80,
@@ -7012,7 +6683,11 @@
     "errors": [
       "D 185 > 110: тела Dш 3 при n=80 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.59 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 80,
@@ -7157,7 +6832,9 @@
     "errors": [
       "D 140 > 110: тела Dш 2 при n=80 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.48 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 80,
@@ -7298,7 +6975,11 @@
     "errors": [
       "D 133 > 110: тела Dш 2 при n=80 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.58 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 80,
@@ -7307,91 +6988,31 @@
     "id": "PTK-080-B3-8M4P2-149642",
     "n": 80,
     "z": 81,
-    "a_w": 0.6,
-    "R_sum": 77.64,
-    "R_by": "подрез",
-    "Dgen": 152.28,
+    "a_w": 0.0,
+    "R_sum": 0.0,
+    "R_by": "",
+    "Dgen": 0.0,
     "bearing": "",
     "gen": "bearing",
-    "d_root": 159.48,
-    "d_tip": 157.08,
-    "alpha_max": 32.0,
-    "r_tip": 0.05,
-    "sep_web": 3.04,
-    "holes": "8×M4+2шт Ø4",
+    "d_root": 0.0,
+    "d_tip": 0.0,
+    "alpha_max": 0.0,
+    "r_tip": 0.0,
+    "sep_web": 0.0,
+    "holes": "",
     "mount": "M4x8P2",
-    "d_bc": 172.0,
-    "d_out": 185.0,
-    "width": 17.0,
-    "Drol_max": 1.59,
-    "t_hold": 338.5,
+    "d_bc": 0.0,
+    "d_out": 0.0,
+    "width": 0.0,
+    "Drol_max": 0.0,
+    "t_hold": 0.0,
     "M_H": 0.0,
     "M_B": 0.0,
     "M": 0.0,
     "M_by": "",
-    "ring_variants": 2,
-    "phasing": [
-      {
-        "row": 1,
-        "phi": 0.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 2,
-        "phi": 90.0,
-        "delta_p": 0.25,
-        "s": 1.1111,
-        "cage": 0.0,
-        "variant": "B",
-        "s_arc_mm": 1.668
-      },
-      {
-        "row": 3,
-        "phi": 180.0,
-        "delta_p": 0.5,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 4,
-        "phi": 270.0,
-        "delta_p": 0.75,
-        "s": 1.1111,
-        "cage": 0.0,
-        "variant": "B",
-        "s_arc_mm": 1.668
-      }
-    ],
-    "parts": [
-      {
-        "id": "PTK-080-B3-8M4P2-149642.01A",
-        "name": "венец",
-        "variant": "A",
-        "s": 0.0,
-        "s_arc_mm": 0.0,
-        "rows": [
-          1,
-          3
-        ]
-      },
-      {
-        "id": "PTK-080-B3-8M4P2-149642.01B",
-        "name": "венец",
-        "variant": "B",
-        "s": 1.1111,
-        "s_arc_mm": 1.668,
-        "rows": [
-          2,
-          4
-        ]
-      }
-    ],
+    "ring_variants": 0,
+    "phasing": [],
+    "parts": [],
     "geom": {
       "rev": 6.0,
       "u": 80.0,
@@ -7436,11 +7057,12 @@
       }
     },
     "ok": false,
-    "errors": [
-      "нет подшипника генератора с D ≥ 152.3 и d ≥ 9.2 мм в vendor_prices.json → bearings (Д-40)",
-      "D 185 > 110: тела Dш 3 при n=80 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.59 мм (OQ-05)"
+    "errors": [],
+    "warnings": [],
+    "tech": [
+      "Т1"
     ],
-    "warnings": []
+    "excluded": "Т1"
   },
   {
     "u": 80,
@@ -7581,7 +7203,13 @@
     "errors": [
       "D 185 > 110: тела Dш 3 при n=80 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.59 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т2",
+      "Т3",
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 100,
@@ -7723,7 +7351,9 @@
       "нет подшипника генератора с D ≥ 190.9 и d ≥ 9.2 мм в vendor_prices.json → bearings (Д-40)",
       "D 224 > 110: тела Dш 3 при n=100 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.28 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 100,
@@ -7864,7 +7494,11 @@
     "errors": [
       "D 224 > 110: тела Dш 3 при n=100 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.28 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 100,
@@ -8006,7 +7640,9 @@
       "нет подшипника генератора с D ≥ 128.3 и d ≥ 8.8 мм в vendor_prices.json → bearings (Д-40)",
       "D 159 > 110: тела Dш 2 при n=100 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.27 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [],
+    "excluded": ""
   },
   {
     "u": 100,
@@ -8147,7 +7783,11 @@
     "errors": [
       "D 159 > 110: тела Dш 2 при n=100 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.27 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т4"
+    ],
+    "excluded": ""
   },
   {
     "u": 100,
@@ -8156,91 +7796,31 @@
     "id": "PTK-100-B3-8M4P2-C0E5B0",
     "n": 100,
     "z": 101,
-    "a_w": 0.6,
-    "R_sum": 96.927,
-    "R_by": "подрез",
-    "Dgen": 190.85,
+    "a_w": 0.0,
+    "R_sum": 0.0,
+    "R_by": "",
+    "Dgen": 0.0,
     "bearing": "",
     "gen": "bearing",
-    "d_root": 198.05,
-    "d_tip": 195.65,
-    "alpha_max": 32.0,
-    "r_tip": 0.05,
-    "sep_web": 3.05,
-    "holes": "8×M4+2шт Ø4",
+    "d_root": 0.0,
+    "d_tip": 0.0,
+    "alpha_max": 0.0,
+    "r_tip": 0.0,
+    "sep_web": 0.0,
+    "holes": "",
     "mount": "M4x8P2",
-    "d_bc": 210.6,
-    "d_out": 224.0,
-    "width": 17.0,
-    "Drol_max": 1.28,
-    "t_hold": 414.5,
+    "d_bc": 0.0,
+    "d_out": 0.0,
+    "width": 0.0,
+    "Drol_max": 0.0,
+    "t_hold": 0.0,
     "M_H": 0.0,
     "M_B": 0.0,
     "M": 0.0,
     "M_by": "",
-    "ring_variants": 2,
-    "phasing": [
-      {
-        "row": 1,
-        "phi": 0.0,
-        "delta_p": 0.0,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 2,
-        "phi": 90.0,
-        "delta_p": 0.25,
-        "s": 0.8911,
-        "cage": 0.0,
-        "variant": "B",
-        "s_arc_mm": 1.638
-      },
-      {
-        "row": 3,
-        "phi": 180.0,
-        "delta_p": 0.5,
-        "s": 0.0,
-        "cage": 0.0,
-        "variant": "A",
-        "s_arc_mm": 0.0
-      },
-      {
-        "row": 4,
-        "phi": 270.0,
-        "delta_p": 0.75,
-        "s": 0.8911,
-        "cage": 0.0,
-        "variant": "B",
-        "s_arc_mm": 1.638
-      }
-    ],
-    "parts": [
-      {
-        "id": "PTK-100-B3-8M4P2-C0E5B0.01A",
-        "name": "венец",
-        "variant": "A",
-        "s": 0.0,
-        "s_arc_mm": 0.0,
-        "rows": [
-          1,
-          3
-        ]
-      },
-      {
-        "id": "PTK-100-B3-8M4P2-C0E5B0.01B",
-        "name": "венец",
-        "variant": "B",
-        "s": 0.8911,
-        "s_arc_mm": 1.638,
-        "rows": [
-          2,
-          4
-        ]
-      }
-    ],
+    "ring_variants": 0,
+    "phasing": [],
+    "parts": [],
     "geom": {
       "rev": 6.0,
       "u": 100.0,
@@ -8285,11 +7865,12 @@
       }
     },
     "ok": false,
-    "errors": [
-      "нет подшипника генератора с D ≥ 190.9 и d ≥ 9.2 мм в vendor_prices.json → bearings (Д-40)",
-      "D 224 > 110: тела Dш 3 при n=100 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.28 мм (OQ-05)"
+    "errors": [],
+    "warnings": [],
+    "tech": [
+      "Т1"
     ],
-    "warnings": []
+    "excluded": "Т1"
   },
   {
     "u": 100,
@@ -8430,6 +8011,12 @@
     "errors": [
       "D 224 > 110: тела Dш 3 при n=100 с отверстиями 8×M4+2шт Ø4 не вмещаются; Dш max ≈ 1.28 мм (OQ-05)"
     ],
-    "warnings": []
+    "warnings": [],
+    "tech": [
+      "Т2",
+      "Т3",
+      "Т4"
+    ],
+    "excluded": ""
   }
 ]

@@ -23,7 +23,8 @@
     "s0_brg": 1.0,
     "M_min": 0.0,
     "gen_types": ["bearing", "eccentric"],
-    "dgen_step": 0.1
+    "dgen_step": 0.1,
+    "groove_f": 0.52
   },
   "mount_mode": "first_ok",
   "ring_mounts": {

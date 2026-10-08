@@ -47,6 +47,7 @@ class PtkLimits:
     M_min: float = 0.0            # требуемый выходной момент, Н·м; 0 — не проверяется (Д-41)
     gen_types: tuple = ("bearing", "eccentric")   # генераторы для расчёта (Д-42)
     dgen_step: float = 0.1        # округление вверх D_г эксцентрика без подшипника, мм (Д-42)
+    groove_f: float = 0.52        # жёлоб под шарик на эксцентрике: r = groove_f·D_ш, > 0.5 (Д-45)
 
 
 @dataclass
@@ -98,6 +99,8 @@ class PtkResult:
     ok: bool = False
     errors: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
+    tech: list = field(default_factory=list)      # коды TECH (Д-45)
+    excluded: str = ""                            # код TECH, по которому исключено из SPEC-10
 
 
 def _load(cls, d):
@@ -118,6 +121,8 @@ def load_config(cfg):
     bad = [g for g in lim.gen_types if g not in GEN_TYPES]
     if bad or not lim.gen_types:
         raise ValueError(f"limits.gen_types: {list(lim.gen_types)} — допустимы {GEN_TYPES} (Д-42)")
+    if lim.groove_f <= 0.5:
+        raise ValueError(f"limits.groove_f = {lim.groove_f}: нужно > 0.5 — жёлоб шире шарика (Д-45)")
     return lim, mounts, fast, cfg.get("mount_mode", "first_ok")
 
 
@@ -223,6 +228,28 @@ GEOM_ROLLER = ("type", "d", "l", "a_w", "wall_min")
 GEOM_BEARING = ("d", "D", "B")     # Д-40
 ROLLER_TYPES = {"roller": "R", "ball": "B"}
 
+# Д-45: технологические ограничения пар тело/генератор/венец — код: (пара, следствие, обоснование)
+TECH = {
+    "Т1": ("шарик / наружное кольцо подшипника",
+           "исключено из результатов SPEC-10",
+           "без жёлоба контакт точечный: допускаемая сила на шарик — десятки Н (B_D3, u = 10: "
+           "M ≈ 1 Н·м, CP-32); жёлоб на закалённой шлифованной дорожке покупного подшипника "
+           "не изготовить"),
+    "Т2": ("шарик / эксцентрик",
+           "контакт с жёлобом r = groove_f·Dш: k_y = 2/Dш − 1/(groove_f·Dш); Герц в круговом "
+           "приближении — оценка",
+           "жёлоб точится и шлифуется на эксцентрике .03 (своё изготовление); на чертёж .03 — "
+           "радиус и биение жёлоба (CP-28)"),
+    "Т3": ("шарик / венец",
+           "жёлоба в венце нет: шарик на профиле как на плоскости — обычно ограничивает M",
+           "жёлоб по траектории (6) — сферической фрезой (SM-1, ось C) или профильным "
+           "электродом ЭЭС; не заложен — OQ-11"),
+    "Т4": ("тело / эксцентрик без подшипника",
+           "M без проверки по скорости входа; η и износ не считаются",
+           "скольжение ≈ ω·Dг/2: твёрдость эксцентрика не ниже тел, смазка; предел скорости — "
+           "OQ-10 после калибровки OQ-08"),
+}
+
 
 def _n(v):
     """Нормализация для хэша: 4 и 4.0 — одно значение."""
@@ -327,6 +354,9 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
     if u < 2:
         return r
     z, n = u + 1, u                                     # Д-31
+    if rol.get("type") == "ball" and gen == "bearing":   # Д-45: жёлоб на покупном кольце не сделать
+        r.n, r.z, r.excluded, r.tech = n, z, "Т1", ["Т1"]
+        return r
     R, by = r_sum(u, D, a, lim)
     brg = None
     if gen == "bearing":
@@ -382,6 +412,8 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
         r.M, r.M_by = min(cand)
         if r.M < lim.M_min:
             r.errors.append(f"M {r.M:g} < M_min {lim.M_min:g} Н·м, ограничивает: {r.M_by} (Д-41)")
+    if gen == "eccentric":                               # Д-45
+        r.tech += (["Т2", "Т3"] if rol.get("type") == "ball" else []) + ["Т4"]
     r.ok = not r.errors
     return r
 
@@ -483,6 +515,13 @@ def to_rows(results, mounts):
     return [asdict(r) for r in results]
 
 
+def tech_md():
+    """Расшифровка технологических кодов (Д-45) для SPEC-10."""
+    L = ["| Код | Пара | Следствие для расчёта | Обоснование |", "|---|---|---|---|"]
+    L += [f"| {k} | {p} | {e} | {w} |" for k, (p, e, w) in TECH.items()]
+    return "\n".join(L)
+
+
 def self_test():
     """Проверки ПО на фиксированных параметрах (не зависят от ptk_input.json)."""
     lim, holes = PtkLimits(), RingHoles()
@@ -517,6 +556,12 @@ def self_test():
     assert abs(2 * e.R_sum - e.Dgen - e.Drol) < 1e-3 and e.M_B == 0.0
     assert e.M_by in ("контакт", "крепление") and e.id != r.id, (e.M_by, e.id)
     assert e.width == 4 * 8.0 + 5 * lim.row_gap
+    assert "Т4" in e.tech and not r.tech, (e.tech, r.tech)
+    bb = c(10, rol={"type": "ball", "d": 2.0, "l": 2.0})          # Д-45: шарик на подшипнике
+    assert not bb.ok and bb.excluded == "Т1" and not bb.errors, bb
+    be = calc(10, "t", {"type": "ball", "d": 2.0, "l": 2.0}, lim, holes, fast, {}, "eccentric")
+    assert not be.excluded and be.tech == ["Т2", "Т3", "Т4"], be.tech
+    assert tech_md().count("| Т") == len(TECH)
     big = calc(100, "t", b, PtkLimits(d_out_max=None), holes, fast, {}, "eccentric")
     assert big.ok and big.d_out > 110.0 and big.Drol_max == 0.0, big.errors   # Д-43
     try:
@@ -524,7 +569,7 @@ def self_test():
         raise AssertionError("неизвестный gen_types принят")
     except ValueError:
         pass
-    rb = c(10, rol={"type": "ball", "d": 2.0, "l": 2.0})
+    rb = c(10, rol={"type": "roller", "d": 2.0, "l": 2.0})
     assert bears[rb.bearing]["d"] >= lim.shaft_d_min + 2 * (rb.a_w + lim.ecc_wall_min) - 1e-9
     assert r.ring_variants == 1, r.phasing
     assert not c(5).ok and not c(100).ok
