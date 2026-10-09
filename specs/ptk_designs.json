@@ -1,0 +1,346 @@
+[
+  {
+    "id": "PTK-050-R2X4_2-8M4P2-06A797",
+    "name": "K8",
+    "ok": false,
+    "errors": [
+      "вал Ø8: τ = 43.7 > [τ] = 25 МПа — нужен d ≥ 9.4 мм"
+    ],
+    "warnings": [],
+    "input": {
+      "id": "PTK-050-R2X4_2-8M4P2",
+      "bearing": "61810",
+      "name": "K8",
+      "eta": 0.8,
+      "ecc_share": 0.5,
+      "key_angle": 45.0,
+      "shaft": {
+        "d": 8.0,
+        "bore": 0.0,
+        "link": "key",
+        "tau_allow": 25.0,
+        "sigma_crush": 100.0,
+        "wall_min": 1.5
+      },
+      "balance": {
+        "n_max": 3,
+        "wall": 1.0,
+        "drills": [
+          3.0,
+          3.5,
+          4.0,
+          4.5,
+          5.0,
+          5.5,
+          6.0
+        ]
+      },
+      "lighten": "none",
+      "output": "flange"
+    },
+    "shaft": {
+      "d": 8.0,
+      "bore": 0.0,
+      "link": "key",
+      "eta": 0.8,
+      "ecc_share": 0.5,
+      "M": 108.0,
+      "T_in": 2.7,
+      "T_e": 1.35,
+      "tau": 43.7,
+      "tau_allow": 25.0,
+      "d_req": 9.39
+    },
+    "link": {
+      "type": "key",
+      "sigma": 84.4,
+      "b": 2,
+      "h": 2,
+      "t1": 1.2,
+      "t2": 1.0,
+      "lp": 5.0,
+      "sigma_allow": 100.0
+    },
+    "ecc": {
+      "De": 50.0,
+      "t": 7.0,
+      "a": 0.4,
+      "d_shaft": 8.0,
+      "key_b": 2,
+      "key_t2": 1.0,
+      "m_brg_g": 26.1,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 43.16,
+        "brg": 10.42,
+        "bodies": 1.04,
+        "sum": 54.62
+      },
+      "bal": {
+        "n": 2,
+        "d": 5.5,
+        "r": 21.64,
+        "U_rem": 55.86,
+        "res": -1.25,
+        "holes": [
+          [
+            21.395,
+            -3.25
+          ],
+          [
+            21.395,
+            3.25
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 20.28
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 20.28
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 19.72
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 19.72
+        }
+      ]
+    },
+    "mass": {
+      "ecc_g": 102.5,
+      "brg_g": 26.1,
+      "shaft_g": 13.0,
+      "sum_g": 527.5,
+      "J_in": 0.0002178,
+      "J_out": 0.5445
+    },
+    "parts": [
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-06A797.03A-K8",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ],
+        "base": "PTK-050-R2X4_2-8M4P2-06A797.03A"
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-06A797.03B-K8",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ],
+        "base": "PTK-050-R2X4_2-8M4P2-06A797.03B"
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-06A797.03C-K8",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ],
+        "base": "PTK-050-R2X4_2-8M4P2-06A797.03C"
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-06A797.03D-K8",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
+          4
+        ],
+        "base": "PTK-050-R2X4_2-8M4P2-06A797.03D"
+      }
+    ]
+  },
+  {
+    "id": "PTK-050-R2X4_2-8M4P2-06A797",
+    "name": "K10",
+    "ok": true,
+    "errors": [],
+    "warnings": [],
+    "input": {
+      "id": "PTK-050-R2X4_2-8M4P2",
+      "bearing": "61810",
+      "name": "K10",
+      "eta": 0.8,
+      "ecc_share": 0.5,
+      "key_angle": 45.0,
+      "shaft": {
+        "d": 10.0,
+        "bore": 0.0,
+        "link": "key",
+        "tau_allow": 25.0,
+        "sigma_crush": 100.0,
+        "wall_min": 1.5
+      },
+      "balance": {
+        "n_max": 3,
+        "wall": 1.0,
+        "drills": [
+          3.0,
+          3.5,
+          4.0,
+          4.5,
+          5.0,
+          5.5,
+          6.0
+        ]
+      },
+      "lighten": "none",
+      "output": "flange"
+    },
+    "shaft": {
+      "d": 10.0,
+      "bore": 0.0,
+      "link": "key",
+      "eta": 0.8,
+      "ecc_share": 0.5,
+      "M": 108.0,
+      "T_in": 2.7,
+      "T_e": 1.35,
+      "tau": 24.9,
+      "tau_allow": 25.0,
+      "d_req": 9.99
+    },
+    "link": {
+      "type": "key",
+      "sigma": 56.2,
+      "b": 3,
+      "h": 3,
+      "t1": 1.8,
+      "t2": 1.4,
+      "lp": 4.0,
+      "sigma_allow": 100.0
+    },
+    "ecc": {
+      "De": 50.0,
+      "t": 7.0,
+      "a": 0.4,
+      "d_shaft": 10.0,
+      "key_b": 3,
+      "key_t2": 1.4,
+      "m_brg_g": 26.1,
+      "m_brg_est": true,
+      "groove_r": null,
+      "U": {
+        "disk": 43.16,
+        "brg": 10.42,
+        "bodies": 1.04,
+        "sum": 54.62
+      },
+      "bal": {
+        "n": 2,
+        "d": 5.5,
+        "r": 21.64,
+        "U_rem": 55.86,
+        "res": -1.25,
+        "holes": [
+          [
+            21.395,
+            -3.25
+          ],
+          [
+            21.395,
+            3.25
+          ]
+        ]
+      },
+      "rows": [
+        {
+          "row": 1,
+          "phi": 0.0,
+          "key_angle": 45.0,
+          "key_wall": 18.88
+        },
+        {
+          "row": 2,
+          "phi": 90.0,
+          "key_angle": 315.0,
+          "key_wall": 18.88
+        },
+        {
+          "row": 3,
+          "phi": 180.0,
+          "key_angle": 225.0,
+          "key_wall": 18.32
+        },
+        {
+          "row": 4,
+          "phi": 270.0,
+          "key_angle": 135.0,
+          "key_wall": 18.32
+        }
+      ]
+    },
+    "mass": {
+      "ecc_g": 101.0,
+      "brg_g": 26.1,
+      "shaft_g": 20.3,
+      "sum_g": 528.6,
+      "J_in": 0.0002178,
+      "J_out": 0.5446
+    },
+    "parts": [
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-06A797.03A-K10",
+        "name": "эксцентрик",
+        "variant": "A",
+        "key_angle": 45.0,
+        "rows": [
+          1
+        ],
+        "base": "PTK-050-R2X4_2-8M4P2-06A797.03A"
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-06A797.03B-K10",
+        "name": "эксцентрик",
+        "variant": "B",
+        "key_angle": 315.0,
+        "rows": [
+          2
+        ],
+        "base": "PTK-050-R2X4_2-8M4P2-06A797.03B"
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-06A797.03C-K10",
+        "name": "эксцентрик",
+        "variant": "C",
+        "key_angle": 225.0,
+        "rows": [
+          3
+        ],
+        "base": "PTK-050-R2X4_2-8M4P2-06A797.03C"
+      },
+      {
+        "id": "PTK-050-R2X4_2-8M4P2-06A797.03D-K10",
+        "name": "эксцентрик",
+        "variant": "D",
+        "key_angle": 135.0,
+        "rows": [
+          4
+        ],
+        "base": "PTK-050-R2X4_2-8M4P2-06A797.03D"
+      }
+    ]
+  }
+]

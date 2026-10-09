@@ -53,10 +53,13 @@ def balance(U, a, Re, t, rho, r_lo, lim):
     """Подбор N × Ø d с наименьшим |U − U_отв|; N = 0 — без отверстий."""
     k = rho * t * math.pi / 4
     best = (abs(U), 0, 0.0, 0.0, [], 0.0)
+    ds = getattr(lim, "bal_drills", None)       # Д-48: только свёрла из списка
     for N in range(1, int(lim.bal_n_max) + 1):
         i = 0
         while True:
-            d = round(lim.bal_d_min + i * lim.bal_d_step, 4)
+            if ds is not None and i >= len(ds):
+                break
+            d = ds[i] if ds is not None else round(lim.bal_d_min + i * lim.bal_d_step, 4)
             g = _fit(N, d, a, Re, r_lo, lim.bal_wall)
             if g is None:
                 break

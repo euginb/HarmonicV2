@@ -17,7 +17,7 @@ def apply(path, doc=None):
         labels = json.load(f)["labels"]
     n = 0
     for o in doc.Objects:
-        meta = labels.get(o.Label) or labels.get(re.sub(r"\d{3}$", "", o.Label))
+        meta = labels.get(o.Label) or labels.get(re.sub(r"(?<=\))\d+$", "", o.Label))
         if not meta:
             continue
         for k, v in meta.items():

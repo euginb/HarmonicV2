@@ -233,10 +233,11 @@ def ring(d_root, holes, fast, lim, wall):
 
 # Д-22: маркировка. GEOM_REV повышается при смене формул геометрии — меняются все ID.
 GEOM_REV = 6                       # Д-42: тип генератора bearing | eccentric в хэше
+# Д-48: параметры эксцентрика (rho, brg_mass_k, shaft_key_*, key_angle, bal_*) — не в хэше;
+# эксцентрик в SPEC-10 предварительный по limits, окончательный — шаг 2 (egm/ptk_design.py)
 GEOM_LIMITS = ("a_k", "r_tip_min", "sep_web_min", "shaft_d_min", "ecc_wall_min", "wall_min",
                "row_gap", "rows", "row_phases", "d_bc_step", "d_out_step", "dgen_step",
-               "sep_gap", "rho", "brg_mass_k", "shaft_key_b", "shaft_key_t2", "key_angle",
-               "bal_wall", "bal_n_max", "bal_d_min", "bal_d_step")
+               "sep_gap")
 GEOM_HOLES = ("bolt", "n", "pins", "pin_d", "head_margin")
 GEOM_ROLLER = ("type", "d", "l", "a_w", "wall_min")
 GEOM_BEARING = ("d", "D", "B")     # Д-40

@@ -37,6 +37,12 @@ def _nn(pid):
     return pid.split(".", 1)[1][:2]
 
 
+def _base(pid):
+    """ID детали без суффикса проработки (Д-48): <ID>.03B-K8 -> <ID>.03B."""
+    head, _, tail = pid.partition(".")
+    return f"{head}.{tail.split('-')[0]}" if tail else pid
+
+
 def _txt(v):
     return f"{v:g}" if isinstance(v, float) else str(v)
 
@@ -97,7 +103,7 @@ def item_meta(cfg, prods, pid, nn):
     it = {}
     if nn != "ref":
         try:
-            it = products.item(prods, pid)
+            it = products.item(prods, _base(pid))
         except (KeyError, ValueError):
             it = {}
     m = {"id": pid, "name": it.get("name", "вал (примитив)"), "kind": it.get("kind", "ref")}
@@ -158,8 +164,9 @@ def nodes(cfg, prods, p, lang="ru"):
     return out
 
 
-def step_str(s):
-    """str -> строка STEP (ISO 10303-21): ' -> '', \\ -> \\\\, не ASCII -> \\X2\\…\\X0\\."""
+def step_str(s, enc="x2"):
+    """str -> строка STEP (ISO 10303-21): ' -> '', \\ -> \\\\, не ASCII -> \\X2\\…\\X0\\;
+    enc = utf8 — не ASCII байтами UTF-8 (вне стандарта; так читает FreeCAD/OCCT, Д-51)."""
     out, wide = [], []
 
     def flush():
@@ -170,6 +177,8 @@ def step_str(s):
         if 32 <= ord(ch) < 127:
             flush()
             out.append({"'": "''", "\\": "\\\\"}.get(ch, ch))
+        elif enc == "utf8":
+            out.append(ch.encode("utf-8").decode("latin-1"))
         else:
             b = ch.encode("utf-16-be")
             wide += [int.from_bytes(b[i:i + 2], "big") for i in range(0, len(b), 2)]
@@ -190,7 +199,7 @@ def _refs(a):
     return [int(x) for x in re.findall(r"#(\d+)", a)]
 
 
-def finish(path, texts, meta):
+def finish(path, texts, meta, enc="x2"):
     """Д-50: подставляет в STEP имена узлов и дописывает атрибуты -> число узлов с атрибутами.
 
     В XCAF узлы названы ASCII-метками 'EGM<i>' (texts[i] — настоящее имя): результат не
@@ -209,7 +218,7 @@ def finish(path, texts, meta):
         f = next((x for x in _refs(a) if x in form), None) if t == "PRODUCT_DEFINITION" else None
         if f is not None:
             pdef.setdefault(form[f], i)
-    s = _TOK.sub(lambda m: step_str(texts[int(m.group(1))]), s)
+    s = _TOK.sub(lambda m: step_str(texts[int(m.group(1))], enc), s)
     nxt = max([int(x) for x in re.findall(r"#(\d+)\s*=", s)] + [0]) + 1
     ctx, out, n = nxt, [], 0
     nxt += 1
@@ -220,7 +229,7 @@ def finish(path, texts, meta):
         ids = list(range(nxt, nxt + len(kv)))
         a, b, c = nxt + len(kv), nxt + len(kv) + 1, nxt + len(kv) + 2
         nxt += len(kv) + 3
-        out += [f"#{j}=DESCRIPTIVE_REPRESENTATION_ITEM({step_str(k)},{step_str(_txt(v))});"
+        out += [f"#{j}=DESCRIPTIVE_REPRESENTATION_ITEM({step_str(k, enc)},{step_str(_txt(v), enc)});"
                 for j, (k, v) in zip(ids, kv)]
         out += [f"#{a}=PROPERTY_DEFINITION('user defined attributes','EGM',#{pd});",
                 f"#{b}=PROPERTY_DEFINITION_REPRESENTATION(#{a},#{c});",
@@ -269,7 +278,7 @@ def _shape(cq, cfg, pid, nn, mode):
     return cq.Solid.makeCylinder(g["limits"]["shaft_d_min"] / 2, cfg["sep"]["length"] + 10)
 
 
-def export(cfg, prods, path, mode="spline", lang="ru"):
+def export(cfg, prods, path, mode="spline", lang="en", enc="x2"):
     """Пишет STEP сборки -> (время, с; число узлов с атрибутами в STEP).
 
     Дерево (Д-50): изделие (полный ID) → «Ряд k (φ)» → венец, эксцентрик, подшипник и группа
@@ -346,7 +355,7 @@ def export(cfg, prods, path, mode="spline", lang="ru"):
     w.Transfer(doc, STEPControl_StepModelType.STEPControl_AsIs)
     if w.Write(str(path)) != IFSelect_ReturnStatus.IFSelect_RetDone:
         raise ValueError(f"{cfg['id']}: STEP сборки не записан: {path}")
-    return time.perf_counter() - t0, finish(Path(path), texts, nodes(cfg, prods, p, lang))
+    return time.perf_counter() - t0, finish(Path(path), texts, nodes(cfg, prods, p, lang), enc)
 
 
 def self_test():

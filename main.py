@@ -10,7 +10,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from egm import catalog, naming, products, ptk, ptk_force, ptk_parts, ptk_profile
+from egm import catalog, naming, products, ptk, ptk_design, ptk_force, ptk_parts, ptk_profile
 from egm.cad import assy as cad_assy, ptk_ring, ptk_sep, step as cad_step
 
 ROOT = Path(__file__).resolve().parent
@@ -131,6 +131,24 @@ def run_catalog(prices):
     return [f"catalog: {e}" for e in rep["errors"]]
 
 
+def run_design():
+    """SPEC-11: проработка выбранных исполнений, шаг 2 (Д-48); вход — ptk_configs.json прогона."""
+    cfg_path = OUT / "specs" / "ptk_configs.json"
+    if not (SPECS / "ptk_design_input.json").exists() or not cfg_path.exists():
+        return []
+    try:
+        lim = ptk.load_config(load_json("ptk_input.json"))[0]
+        res = ptk_design.run(load_json("ptk_design_input.json"),
+                             json.loads(cfg_path.read_text(encoding="utf-8")), lim)
+    except (KeyError, ValueError, TypeError) as e:
+        return [f"ptk_design_input.json: {e!r}"]
+    write("specs", "ptk_designs.json", json.dumps(res, ensure_ascii=False, indent=2) + "\n")
+    tpl = (TPL / "SPEC-11_PTK_DESIGN.md.tmpl").read_text(encoding="utf-8")
+    text, missing = fill(tpl, **ptk_design.md(res))
+    write("specs", "SPEC-11_PTK_DESIGN.md", text)
+    return [f"SPEC-11: в шаблоне нет полей {missing}"] if missing else []
+
+
 def main(argv):
     for kind in DEST:
         shutil.rmtree(OUT / kind, ignore_errors=True)
@@ -140,13 +158,15 @@ def main(argv):
                        ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test),
                        ("fill", fill_self_test), ("step", cad_step.self_test),
                        ("force", ptk_force.self_test), ("parts", ptk_parts.self_test),
-                       ("sep_svg", ptk_sep.self_test), ("assy", cad_assy.self_test)):
+                       ("sep_svg", ptk_sep.self_test), ("assy", cad_assy.self_test),
+                       ("design", ptk_design.self_test)):
         try:
             test()
         except AssertionError as e:
             fails.append(f"{name}.self_test: {e!r}")
     prices = load_json("vendor_prices.json")
     fails += run_ptk(prices)
+    fails += run_design()
     cfg_path = OUT / "specs" / "ptk_configs.json"
     if cfg_path.exists():
         fails += products.check(load_json("products.json"), json.loads(cfg_path.read_text(encoding="utf-8")))

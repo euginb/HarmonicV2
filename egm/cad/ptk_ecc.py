@@ -10,6 +10,9 @@ from egm.cad.model import Contour, Dim, Hole, Mark, PartModel
 
 
 def _bore(rs, b, t2, ang, N=180):
+    if b <= 0 or t2 <= 0:                    # без шпонки: flat, integral (Д-48)
+        return [(rs * math.cos(2 * math.pi * i / N), rs * math.sin(2 * math.pi * i / N))
+                for i in range(N)]
     a0 = math.asin(b / 2 / rs)
     pts = [(rs * math.cos(a0 + (2 * math.pi - 2 * a0) * i / N),
             rs * math.sin(a0 + (2 * math.pi - 2 * a0) * i / N)) for i in range(N + 1)]
