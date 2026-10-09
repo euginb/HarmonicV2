@@ -75,3 +75,4 @@ class PartModel:
     cut_mode: str = ""                           # "" — как --step; poly — контур с углами (паз)
     windows: list = field(default_factory=list)  # окна Window (сепаратор)
     row: int = 0                                 # ряд вида SVG: окна только этого ряда
+    view: str = ""                               # "" — вид по оси; unroll — развёртка втулки (Д-47)

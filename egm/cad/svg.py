@@ -48,6 +48,8 @@ def _labels(m, R):
 
 
 def render(m):
+    if m.view == "unroll":                     # Д-47: сепаратор — развёртка втулки
+        return render_unroll(m)
     R = m.d_out / 2
     lab = _labels(m, R)
     lw = max([tw(k.text, 2.5) for k, *_ in lab] + [0])
@@ -111,3 +113,85 @@ def render(m):
             '</marker></defs>\n'
             f'<rect x="{x0:g}" y="{y0:g}" width="{w:g}" height="{h:g}" fill="white"/>\n'
             + "\n".join(o) + "\n</svg>\n")
+
+
+def _widths(m, fl):
+    """Ширины колонок легенды по длине текста."""
+    return (max([tw(s, fl) for s, _, _ in m.legend] + [0]) + 3,
+            max([tw(_fmt(v), fl) for _, v, _ in m.legend] + [0]) + 3,
+            max([tw(t, fl) for _, _, t in m.legend] + [0]))
+
+
+def _legend(m, x0, ly, fl, c1, c2):
+    o = [f'<text x="{x0 + 4:g}" y="{ly:g}" font-size="3.2">Легенда — обозначения '
+         f'колонок SPEC-10_PTK_CALC.md</text>']
+    for i, (sym, val, txt) in enumerate(m.legend):
+        yy = ly + 4.5 * (i + 1)
+        o += [f'<text x="{x0 + 4:g}" y="{yy:g}" font-size="{fl}">{esc(str(sym))}</text>',
+              f'<text x="{x0 + 4 + c1:g}" y="{yy:g}" font-size="{fl}">{esc(_fmt(val))}</text>',
+              f'<text x="{x0 + 4 + c1 + c2:g}" y="{yy:g}" font-size="{fl}">{esc(txt)}</text>']
+    return o
+
+
+def _wrap(x0, y0, w, h, o):
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{w:g}mm" height="{h:g}mm" '
+            f'viewBox="{x0:g} {y0:g} {w:g} {h:g}">\n'
+            '<defs><marker id="a" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="4" '
+            'markerHeight="4" orient="auto-start-reverse"><path d="M0,0 L6,3 L0,6 z"/>'
+            '</marker></defs>\n'
+            f'<rect x="{x0:g}" y="{y0:g}" width="{w:g}" height="{h:g}" fill="white"/>\n'
+            + "\n".join(o) + "\n</svg>\n")
+
+
+def render_unroll(m):
+    """Развёртка втулки по среднему Ø (Д-47): x — дуга от 0°, y — ось от торца, 1:1.
+
+    Окна всех рядов; ряд m.row — основной линией, прочие — тонкой. Диаметры, толщина,
+    длины окружностей — в легенде (сноски), на виде не изображаются."""
+    first = {}
+    for wn in m.windows:
+        first.setdefault(wn.row, wn)
+    w0 = next(iter(first.values()))
+    L, B = math.pi * (w0.r_in + w0.r_out), m.thick
+    lab = [(wn, f"ряд {k}: z0 = {wn.z0:g}, поворот {wn.angle:g}°")
+           for k, wn in sorted(first.items())]
+    fl = 2.8
+    c1, c2, c3 = _widths(m, fl)
+    lw = max([tw(t, 2.5) for _, t in lab] + [0])
+    top = max([tw(m.id, 4)] + [tw(t, 3) for t in m.notes])
+    x0, y0 = -14, -5 * (len(m.notes) + 1) - 10
+    w = max(L + 24 + lw, c1 + c2 + c3 + 8, top + 8)
+    ly = B + 20
+    h = ly + 4.5 * (len(m.legend) + 1) + 4 - y0
+    o = [f'<rect x="0" y="0" width="{L:.3f}" height="{B:g}" {ST["part"]}/>']
+    for wn in m.windows:
+        st = ST["part"] if not m.row or wn.row == m.row else ST["thin"]
+        xc = (wn.angle % 360) / 360 * L
+        for c in (xc - L, xc, xc + L):                 # окно на шве 0° — две части
+            xa, xb = max(0.0, c - wn.w / 2), min(L, c + wn.w / 2)
+            if xb - xa > 1e-6:
+                o.append(f'<rect x="{xa:.3f}" y="{wn.z0:.3f}" width="{xb - xa:.3f}" '
+                         f'height="{wn.h:g}" {st}/>')
+    for wn, t in lab:
+        yc = wn.z0 + wn.h / 2
+        o += [f'<line x1="{L:.3f}" y1="{yc:.3f}" x2="{L + 4:.3f}" y2="{yc:.3f}" {ST["mark"]}/>',
+              f'<text x="{L + 5:.3f}" y="{yc + 0.9:.3f}" font-size="2.5" fill="red">{esc(t)}</text>']
+    yd = B + 8
+    o += [f'<line x1="0" y1="{B:g}" x2="0" y2="{yd + 1:g}" {ST["thin"]}/>',
+          f'<line x1="{L:.3f}" y1="{B:g}" x2="{L:.3f}" y2="{yd + 1:g}" {ST["thin"]}/>',
+          f'<line x1="0" y1="{yd:g}" x2="{L:.3f}" y2="{yd:g}" {ST["thin"]} '
+          'marker-start="url(#a)" marker-end="url(#a)"/>',
+          f'<text x="{L / 2:.3f}" y="{yd - 1:g}" font-size="3" text-anchor="middle">'
+          f'π·Dm = {L:.2f}</text>',
+          f'<line x1="0" y1="0" x2="-7" y2="0" {ST["thin"]}/>',
+          f'<line x1="0" y1="{B:g}" x2="-7" y2="{B:g}" {ST["thin"]}/>',
+          f'<line x1="-6" y1="0" x2="-6" y2="{B:g}" {ST["thin"]} '
+          'marker-start="url(#a)" marker-end="url(#a)"/>',
+          f'<text x="-7.5" y="{B / 2:g}" font-size="3" text-anchor="middle" '
+          f'transform="rotate(-90 -7.5 {B / 2:g})">B = {B:g}</text>']
+    ty = y0 + 6
+    o.append(f'<text x="{x0 + 4:g}" y="{ty:g}" font-size="4">{esc(m.id)}</text>')
+    o += [f'<text x="{x0 + 4:g}" y="{ty + 5 * (i + 1):g}" font-size="3">{esc(t)}</text>'
+          for i, t in enumerate(m.notes)]
+    return _wrap(x0, y0, w, h, o + _legend(m, x0, ly, fl, c1, c2))
