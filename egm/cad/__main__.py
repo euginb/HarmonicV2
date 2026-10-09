@@ -1,5 +1,5 @@
 """python -m egm.cad <ID исполнения | ID детали> [...] [--phase φ | --row k]
-                     [--step spline|poly|off] [--assy] [--design NAME] [--names en|ru] [--enc x2|utf8]
+                     [--step spline|poly|off] [--assy] [--design NAME]
 -> out/cad/<ID>/<деталь>[-r<k>].svg|.step
 --assy — сборка исполнения: out/cad/<ID>/<ID>.step + <ID>.assy.json (Д-49).
 --design NAME или ID детали <ID>.03B-NAME — эксцентрики и вал проработки шага 2 (Д-48)
@@ -72,7 +72,7 @@ def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=Non
             raise ValueError(f"{part['id']}: ошибка построения STEP (traceback выше)")
 
 
-def build_assy(arg, configs, prods, step_mode="spline", lang="en", enc="x2", des=None):
+def build_assy(arg, configs, prods, step_mode="spline", des=None):
     """Д-49: сборка исполнения -> out/cad/<ID>/<ID>.step + <ID>.assy.json."""
     cfg = ptk_design.apply(ptk.find(configs, arg), des)
     tag = cfg["id"] + (f"-{des['name']}" if des else "")
@@ -83,12 +83,15 @@ def build_assy(arg, configs, prods, step_mode="spline", lang="en", enc="x2", des
     out.mkdir(parents=True, exist_ok=True)
     p = assy.plan(cfg)
     man = out / f"{tag}.assy.json"
-    data = assy.manifest(cfg, prods, p, lang)
+    data = assy.manifest(cfg, prods, p)
     if des:
         data["design"] = {k: des[k] for k in ("name", "shaft", "link", "mass")}
     man.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n",
                    encoding="utf-8", newline="\n")
     print(f"assy: {man}")
+    sh = cfg["geom"]["limits"].get("shaft_d_min") or 0
+    print(f"вал Ø{sh:g}, эксцентрики .03 — " + (f"проработка {des['name']} (SPEC-11, Д-48)" if des
+          else "предварительные шага 1 (limits.shaft_d_min); окончательные — --design"))
     if step_mode == "off":
         print("step: пропущен (--step off)")
         return
@@ -103,7 +106,7 @@ def build_assy(arg, configs, prods, step_mode="spline", lang="en", enc="x2", des
           f"{step_mode})…", flush=True)
     path = out / f"{tag}.step"
     try:
-        dt, meta = assy.export(cfg, prods, path, step_mode, lang, enc)
+        dt, meta = assy.export(cfg, prods, path, step_mode)
     except Exception:
         import traceback
         traceback.print_exc()
@@ -124,10 +127,6 @@ def main(argv):
                     help="контур впадин в STEP: B-сплайн | ломаная | без STEP")
     ap.add_argument("--assy", action="store_true",
                     help="сборка исполнения в один STEP: дерево, слои, метаданные (Д-49)")
-    ap.add_argument("--names", choices=("ru", "en"), default="en",
-                    help="алиасы узлов дерева STEP: латиница | русские (Д-50, Д-51)")
-    ap.add_argument("--enc", choices=("x2", "utf8"), default="x2",
-                    help="кириллица в STEP: X2 по ISO 10303-21 | байты UTF-8 для FreeCAD (Д-51)")
     ap.add_argument("--design", help="проработка шага 2 из specs/ptk_designs.json (Д-48)")
     a = ap.parse_args(argv)
     load = lambda n: json.loads((ROOT / "specs" / n).read_text(encoding="utf-8"))
@@ -138,7 +137,7 @@ def main(argv):
         try:
             des = ptk_design.pick(designs, arg, a.design)
             if a.assy:
-                build_assy(arg, configs, prods, a.step, a.names, a.enc, des)
+                build_assy(arg, configs, prods, a.step, des)
             else:
                 build(arg, configs, prods, a.phase, a.row, a.step, des)
         except (KeyError, ValueError) as e:

@@ -8,13 +8,13 @@
 
 ## 1. Реестр инструкций
 
-| Инструкция | Назначение | Когда читать | Связанные решения |
-|---|---|---|---|
-| [README.md](README.md) (INS-00) | реестр инструкций, режимы работы с ИИ, порядок code-first, глоссарий | в начале любой сессии | Д-17, Д-25 |
-| [INS-10_PTK_CALC.md](INS-10_PTK_CALC.md) | калькулятор ПТК: входные параметры `specs/ptk_input.json` (`limits`, набор креплений `ring_mounts`, `mount_mode`), тела и подшипники `vendor_prices.json → rollers, bearings`, типы генератора и технологические коды Т1–Т4, профиль венца, допускаемый момент, чтение SPEC-10 и `ptk_configs.json`, ID исполнения | правка параметров ПТК, разбор SPEC-10 | Д-08, Д-16, Д-18, Д-19, Д-22, Д-31, Д-33, Д-38, Д-40…Д-43, Д-45 |
-| [INS-20_CATALOG.md](INS-20_CATALOG.md) | каталог HIWIN HG: разбор `docs/HG-Series-Catalog_opt.md`, БД `catalog_hiwin_hg*.json`, каталожные номера EGC, `reports/catalog_report.md` | правка каталога, цен, подбор направляющих | Д-07, Д-10 |
-| [INS-30_CAD.md](INS-30_CAD.md) | генератор чертежей 2D/3D по ID: `python -m egm.cad`, выход `out/cad/`, номенклатура `specs/products.json`, состав по умолчанию и его смена | построение чертежей, правка номенклатуры | Д-22, Д-24, Д-30 |
-| [INS-90_AUDIT_BUNDLE.md](INS-90_AUDIT_BUNDLE.md) | ручная подготовка контекста для ИИ: `tools/context_bundle.py` (по ключам) и `tools/make_audit_bundle.py` (снимок `AUDIT_BUNDLE.md`, профили исключения) | работа с моделью в AI Chat; review | Д-20, Д-21, Д-26, Д-27, Д-28 |
+| Инструкция | Назначение | Когда читать | Связанные решения                                               |
+|---|---|---|-----------------------------------------------------------------|
+| [README.md](README.md) (INS-00) | реестр инструкций, режимы работы с ИИ, порядок code-first, глоссарий | в начале любой сессии | Д-17, Д-25                                                      |
+| [INS-10_PTK_CALC.md](INS-10_PTK_CALC.md) | калькулятор ПТК: входные параметры `specs/ptk_input.json` (`limits`, набор креплений `ring_mounts`, `mount_mode`), тела и подшипники `vendor_prices.json → rollers, bearings`, типы генератора и технологические коды Т1–Т4, профиль венца, допускаемый момент, чтение SPEC-10 и `ptk_configs.json`, ID исполнения; шаг 2 — проработка исполнения `ptk_design_input.json`, SPEC-11», к решениям — «Д-46, Д-48, Д-51» | правка параметров ПТК, разбор SPEC-10 | Д-08, Д-16, Д-18, Д-19, Д-22, Д-31, Д-33, Д-38, Д-40…Д-43, Д-45 |
+| [INS-20_CATALOG.md](INS-20_CATALOG.md) | каталог HIWIN HG: разбор `docs/HG-Series-Catalog_opt.md`, БД `catalog_hiwin_hg*.json`, каталожные номера EGC, `reports/catalog_report.md` | правка каталога, цен, подбор направляющих | Д-07, Д-10                                                      |
+| [INS-30_CAD.md](INS-30_CAD.md) | генератор чертежей 2D/3D по ID: `python -m egm.cad`, выход `out/cad/`, номенклатура `specs/products.json`, состав по умолчанию и его смена | построение чертежей, правка номенклатуры | Д-22, Д-24, Д-30, Д-46…Д-52                                     |
+| [INS-90_AUDIT_BUNDLE.md](INS-90_AUDIT_BUNDLE.md) | ручная подготовка контекста для ИИ: `tools/context_bundle.py` (по ключам) и `tools/make_audit_bundle.py` (снимок `AUDIT_BUNDLE.md`, профили исключения) | работа с моделью в AI Chat; review | Д-20, Д-21, Д-26, Д-27, Д-28                                    |
 
 Справочный файл вне раздела: [`HarmonicV2-workflow.md`](../HarmonicV2-workflow.md)
 в корне репозитория — **референсная копия** порядка работы Super Agent с
