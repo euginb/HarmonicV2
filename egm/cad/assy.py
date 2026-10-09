@@ -10,7 +10,9 @@ ptk_profile.bodies(θe = φk + s_k), повёрнутые на −s_k, — по�
 Сохранённые виды AP242 (Views) OCCT не пишет — предлагаемые виды в <ID>.assy.json (OQ-14).
 """
 import math
+import re
 import time
+from pathlib import Path
 
 from egm import products, ptk_profile
 from egm.cad import ptk_ecc, ptk_ring, ptk_sep, step
@@ -25,6 +27,10 @@ VIEWS = [{"name": "ISO", "dir": [1, -1, 1], "layers": "все"},
          {"name": "сбоку", "dir": [1, 0, 0], "layers": "все"},
          {"name": "без венцов и сепаратора", "dir": [1, -1, 1], "layers": "03, 04, 08, REF"}]
 SCHEMA = "AP242DIS"
+ALIAS = {"01": ("Венец", "RING"), "02": ("Сепаратор", "CAGE"), "03": ("Эксцентрик", "ECC"),
+         "04": ("Тело", "BODY"), "08": ("Подшипник", "BEARING"), "ref": ("Вал", "SHAFT")}
+_ENT = re.compile(r"#(\d+)\s*=\s*([A-Z0-9_]+)\s*\((.*?)\)\s*;", re.S)
+_TOK = re.compile(r"'EGM(\d+)'")
 
 
 def _nn(pid):
@@ -120,15 +126,124 @@ def _r(x):
     return {"id": x["id"], **{k: round(x[k], 4) for k in ("x", "y", "z", "ang")}}
 
 
-def manifest(cfg, prods, p):
-    """<ID>.assy.json: то же дерево, слои, метаданные и предлагаемые виды (OQ-14)."""
+def label(cfg, pid, nn, lang="ru"):
+    """Алиас определения детали (Д-50): «Эксцентрик (.03D)»; полный ID — только у корня.
+    Скобка в конце: FreeCAD у дублей увеличивает хвостовые цифры (.04 → .05 … .152)."""
+    code = {"04": cfg.get("roller"), "08": cfg.get("bearing")}.get(nn)
+    suf = pid.split(".", 1)[1] + (f" {code}" if code else "")
+    return f"{ALIAS[nn][0 if lang == 'ru' else 1]} (.{suf})"
+
+
+def row_label(r, lang="ru"):
+    return (f"Ряд {r['row']} (φ = {r['phi']:g}°)" if lang == "ru"
+            else f"ROW{r['row']} (phi = {r['phi']:g} deg)")
+
+
+def bodies_label(r, n, lang="ru"):
+    return (f"Тела ряда {r['row']} ({n} шт)" if lang == "ru"
+            else f"BODIES_ROW{r['row']} ({n} pcs)")
+
+
+def nodes(cfg, prods, p, lang="ru"):
+    """Метка узла дерева STEP -> метаданные (Д-50): корень, ряды, группы тел, определения."""
+    out = {cfg["id"]: root_meta(cfg)}
+    for r in p["rows"]:
+        out[row_label(r, lang)] = {"row": r["row"], "phi": r["phi"], "s": r["s"],
+                                   "zc": round(r["zc"], 3)}
+        nb = sum(x["nn"] == "04" for x in r["inst"])
+        if nb:
+            out[bodies_label(r, nb, lang)] = {"row": r["row"], "n": nb, "code": cfg.get("roller")}
+    for pid, nn in items(p):
+        out[label(cfg, pid, nn, lang)] = item_meta(cfg, prods, pid, nn)
+    return out
+
+
+def step_str(s):
+    """str -> строка STEP (ISO 10303-21): ' -> '', \\ -> \\\\, не ASCII -> \\X2\\…\\X0\\."""
+    out, wide = [], []
+
+    def flush():
+        if wide:
+            out.append("\\X2\\" + "".join(f"{c:04X}" for c in wide) + "\\X0\\")
+            wide.clear()
+    for ch in str(s):
+        if 32 <= ord(ch) < 127:
+            flush()
+            out.append({"'": "''", "\\": "\\\\"}.get(ch, ch))
+        else:
+            b = ch.encode("utf-16-be")
+            wide += [int.from_bytes(b[i:i + 2], "big") for i in range(0, len(b), 2)]
+    flush()
+    return "'" + "".join(out) + "'"
+
+
+def step_unstr(s):
+    """Содержимое строки STEP (без кавычек) -> str: '', \\X2\\…\\X0\\, \\X\\hh, \\\\."""
+    s = s.replace("''", "'")
+    s = re.sub(r"\\X2\\((?:[0-9A-Fa-f]{4})+)\\X0\\",
+               lambda m: bytes.fromhex(m.group(1)).decode("utf-16-be"), s)
+    s = re.sub(r"\\X\\([0-9A-Fa-f]{2})", lambda m: bytes.fromhex(m.group(1)).decode("latin-1"), s)
+    return s.replace("\\\\", "\\")
+
+
+def _refs(a):
+    return [int(x) for x in re.findall(r"#(\d+)", a)]
+
+
+def finish(path, texts, meta):
+    """Д-50: подставляет в STEP имена узлов и дописывает атрибуты -> число узлов с атрибутами.
+
+    В XCAF узлы названы ASCII-метками 'EGM<i>' (texts[i] — настоящее имя): результат не
+    зависит от того, как писатель OCCT кодирует кириллицу. Атрибуты — по рекомендации
+    CAx-IF «User Defined Attributes»: PROPERTY_DEFINITION → PROPERTY_DEFINITION_REPRESENTATION
+    → REPRESENTATION из DESCRIPTIVE_REPRESENTATION_ITEM(ключ, значение) на PRODUCT_DEFINITION."""
+    s = path.read_text(encoding="latin-1")
+    ents = [(int(m.group(1)), m.group(2), m.group(3)) for m in _ENT.finditer(s)
+            if m.group(2).startswith("PRODUCT")]
+    prod = {i: texts[int(m.group(1))] for i, t, a in ents
+            if t == "PRODUCT" and (m := _TOK.search(a))}
+    form = {i: prod[_refs(a)[-1]] for i, t, a in ents
+            if t.startswith("PRODUCT_DEFINITION_FORMATION") and _refs(a) and _refs(a)[-1] in prod}
+    pdef = {}
+    for i, t, a in ents:
+        f = next((x for x in _refs(a) if x in form), None) if t == "PRODUCT_DEFINITION" else None
+        if f is not None:
+            pdef.setdefault(form[f], i)
+    s = _TOK.sub(lambda m: step_str(texts[int(m.group(1))]), s)
+    nxt = max([int(x) for x in re.findall(r"#(\d+)\s*=", s)] + [0]) + 1
+    ctx, out, n = nxt, [], 0
+    nxt += 1
+    for text, pd in pdef.items():
+        kv = [(k, v) for k, v in meta.get(text, {}).items() if v is not None]
+        if not kv:
+            continue
+        ids = list(range(nxt, nxt + len(kv)))
+        a, b, c = nxt + len(kv), nxt + len(kv) + 1, nxt + len(kv) + 2
+        nxt += len(kv) + 3
+        out += [f"#{j}=DESCRIPTIVE_REPRESENTATION_ITEM({step_str(k)},{step_str(_txt(v))});"
+                for j, (k, v) in zip(ids, kv)]
+        out += [f"#{a}=PROPERTY_DEFINITION('user defined attributes','EGM',#{pd});",
+                f"#{b}=PROPERTY_DEFINITION_REPRESENTATION(#{a},#{c});",
+                f"#{c}=REPRESENTATION('EGM',({','.join(f'#{j}' for j in ids)}),#{ctx});"]
+        n += 1
+    if n:
+        out.insert(0, f"#{ctx}=REPRESENTATION_CONTEXT('EGM','user defined attributes');")
+        k = s.rfind("ENDSEC;")
+        s = s[:k] + "\n".join(out) + "\n" + s[k:]
+    path.write_text(s, encoding="latin-1", newline="")
+    return n
+
+
+def manifest(cfg, prods, p, lang="ru"):
+    """<ID>.assy.json: дерево, слои, метаданные, метки узлов STEP (labels) и виды (OQ-14)."""
     return {"id": cfg["id"], "schema": SCHEMA, "units": "mm",
             "frame": "z — ось вала, z = 0 — торец пакета; 0° — впадина 0 венца ряда 1 (Д-49)",
             "meta": root_meta(cfg), "layers": {k: {"step": s, "name": t} for k, (s, t) in LAYERS.items()}, "views": VIEWS,
-            "items": {pid: {"nn": nn, "layer": LAYERS[nn][0], **item_meta(cfg, prods, pid, nn)}
-                      for pid, nn in items(p)},
-            "tree": [{"row": r["row"], "phi": r["phi"], "s": r["s"], "zc": round(r["zc"], 3),
-                      "inst": [_r(x) for x in r["inst"]]} for r in p["rows"]],
+            "items": {pid: {"nn": nn, "label": label(cfg, pid, nn, lang), "layer": LAYERS[nn][0],
+                            **item_meta(cfg, prods, pid, nn)} for pid, nn in items(p)},
+            "labels": nodes(cfg, prods, p, lang),
+            "tree": [{"row": r["row"], "label": row_label(r, lang), "phi": r["phi"], "s": r["s"],
+                      "zc": round(r["zc"], 3), "inst": [_r(x) for x in r["inst"]]} for r in p["rows"]],
             "root": [_r(x) for x in p["root"]]}
 
 
@@ -154,8 +269,11 @@ def _shape(cq, cfg, pid, nn, mode):
     return cq.Solid.makeCylinder(g["limits"]["shaft_d_min"] / 2, cfg["sep"]["length"] + 10)
 
 
-def export(cfg, prods, path, mode="spline"):
-    """Пишет STEP сборки -> (время, с; метаданные записаны в STEP: bool)."""
+def export(cfg, prods, path, mode="spline", lang="ru"):
+    """Пишет STEP сборки -> (время, с; число узлов с атрибутами в STEP).
+
+    Дерево (Д-50): изделие (полный ID) → «Ряд k (φ)» → венец, эксцентрик, подшипник и группа
+    «Тела ряда k»; сепаратор и вал — у корня. Имена — алиасы label(), атрибуты — finish()."""
     import cadquery as cq
     from OCP.IFSelect import IFSelect_ReturnStatus
     from OCP.Interface import Interface_Static
@@ -167,10 +285,6 @@ def export(cfg, prods, path, mode="spline"):
     from OCP.XCAFApp import XCAFApp_Application
     from OCP.XCAFDoc import XCAFDoc_ColorGen, XCAFDoc_DocumentTool
     from OCP.XSControl import XSControl_WorkSession
-    try:
-        from OCP.TDataStd import TDataStd_NamedData
-    except ImportError:
-        TDataStd_NamedData = None
     t0 = time.perf_counter()
     p = plan(cfg)
     app = XCAFApp_Application.GetApplication_s()
@@ -180,44 +294,46 @@ def export(cfg, prods, path, mode="spline"):
     ct = XCAFDoc_DocumentTool.ColorTool_s(doc.Main())
     lt = XCAFDoc_DocumentTool.LayerTool_s(doc.Main())
     layer = {k: lt.AddLayer(XS(v[0])) for k, v in LAYERS.items()}
-    meta_ok = [TDataStd_NamedData is not None]
+    texts = []
 
-    def name(lab, text, meta):
-        TDataStd_Name.Set_s(lab, XS(text))
-        if meta_ok[0]:
-            try:
-                nd = TDataStd_NamedData.Set_s(lab)
-                for k, v in meta.items():
-                    nd.SetString(XS(str(k)), XS(_txt(v), True))
-            except Exception:            # другая версия OCP — метаданные только в .assy.json
-                meta_ok[0] = False
+    def name(lab, text):                 # Д-50: ASCII-метка, настоящее имя — в finish()
+        TDataStd_Name.Set_s(lab, XS(f"EGM{len(texts)}"))
+        texts.append(text)
 
     defs = {}
     for pid, nn in items(p):
         lab = st.AddShape(_shape(cq, cfg, pid, nn, mode).wrapped, False)
-        name(lab, pid, item_meta(cfg, prods, pid, nn))
+        name(lab, label(cfg, pid, nn, lang))
         ct.SetColor(lab, cq.Color(*COLORS[nn]).wrapped, XCAFDoc_ColorGen)
         lt.SetLayer(lab, layer[nn])
         defs[pid] = lab
 
     def put(parent, x, text):
         loc = cq.Location(cq.Vector(x["x"], x["y"], x["z"]), cq.Vector(0, 0, 1), x["ang"])
-        TDataStd_Name.Set_s(st.AddComponent(parent, defs[x["id"]], loc.wrapped), XS(text))
+        name(st.AddComponent(parent, defs[x["id"]], loc.wrapped), text)
+
+    def group(parent, text):
+        sub = st.NewShape()
+        name(sub, text)
+        name(st.AddComponent(parent, sub, cq.Location().wrapped), text)
+        return sub
 
     root = st.NewShape()
-    name(root, cfg["id"], root_meta(cfg))
+    name(root, cfg["id"])
     for r in p["rows"]:
-        sub = st.NewShape()
-        name(sub, f"{cfg['id']}_ROW{r['row']}",
-             {"row": r["row"], "phi": r["phi"], "s": r["s"], "zc": round(r["zc"], 3)})
-        TDataStd_Name.Set_s(st.AddComponent(root, sub, cq.Location().wrapped),
-                            XS(f"ROW{r['row']}"))
+        sub = group(root, row_label(r, lang))
         cnt = {}
         for x in r["inst"]:
-            cnt[x["id"]] = cnt.get(x["id"], 0) + 1
-            put(sub, x, f".{x['id'].split('.', 1)[1]} #{cnt[x['id']]} ROW{r['row']}")
+            if x["nn"] != "04":
+                cnt[x["id"]] = cnt.get(x["id"], 0) + 1
+                put(sub, x, f"{label(cfg, x['id'], x['nn'], lang)} #{cnt[x['id']]}")
+        bod = [x for x in r["inst"] if x["nn"] == "04"]
+        if bod:
+            grp = group(sub, bodies_label(r, len(bod), lang))
+            for j, x in enumerate(bod, 1):
+                put(grp, x, f"#{j}")
     for x in p["root"]:
-        put(root, x, "." + x["id"].split(".", 1)[1])
+        put(root, x, label(cfg, x["id"], x["nn"], lang))
     st.UpdateAssemblies()
     Interface_Static.SetCVal_s("write.step.schema", SCHEMA)
     Interface_Static.SetCVal_s("xstep.cascade.unit", "MM")
@@ -227,13 +343,10 @@ def export(cfg, prods, path, mode="spline"):
     w.SetColorMode(True)
     w.SetLayerMode(True)
     w.SetNameMode(True)
-    meta = meta_ok[0] and hasattr(w, "SetMetaMode")
-    if meta:
-        w.SetMetaMode(True)
     w.Transfer(doc, STEPControl_StepModelType.STEPControl_AsIs)
     if w.Write(str(path)) != IFSelect_ReturnStatus.IFSelect_RetDone:
         raise ValueError(f"{cfg['id']}: STEP сборки не записан: {path}")
-    return time.perf_counter() - t0, meta
+    return time.perf_counter() - t0, finish(Path(path), texts, nodes(cfg, prods, p, lang))
 
 
 def self_test():
@@ -273,4 +386,26 @@ def self_test():
             assert -1e-9 <= x["z"] and x["z"] + hgt[x["nn"]] <= p["B"] + 1e-9, (x["nn"], x["z"])
     assert len(items(p)) == 12, items(p)
     assert sum(len(r["inst"]) for r in p["rows"]) + len(p["root"]) == 4 * 53 + 2
+    labs = [label(cfg, pid, nn) for pid, nn in items(p)]
+    labs += [row_label(r) for r in p["rows"]] + [bodies_label(r, n) for r in p["rows"]]
+    assert len(set(labs)) == len(labs) == 20, ("метки узлов не уникальны (Д-50)", labs)
+    assert all(not x[-1].isdigit() for x in labs), "хвостовые цифры: FreeCAD перенумерует дубли"
+    assert not any("PTK-T" in x for x in labs), "полный ID — только у корня (Д-50)"
+    for s in ("Эксцентрик (.03D)", "it's \\ ok", "φ = 90°"):
+        assert step_unstr(step_str(s)[1:-1]) == s, ("кодирование строки STEP", s)
+    import tempfile
+    txt = ("ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n#1=PRODUCT('EGM0','EGM0','',(#9));\n"
+           "#2=PRODUCT_DEFINITION_FORMATION('','',#1);\n#3=PRODUCT_DEFINITION('design','',#2,#8);\n"
+           "#4=NEXT_ASSEMBLY_USAGE_OCCURRENCE('1','EGM1','',#3,#3,$);\n"
+           "#9=( GEOMETRIC_REPRESENTATION_CONTEXT(3) );\nENDSEC;\nEND-ISO-10303-21;\n")
+    with tempfile.TemporaryDirectory() as d:
+        f = Path(d) / "t.step"
+        f.write_text(txt, encoding="latin-1")
+        k = finish(f, ["Тело (.04)", "#1"], {"Тело (.04)": {"d": 2.0, "name": "тело 'R'"}})
+        out = f.read_text(encoding="latin-1")
+    assert k == 1 and "EGM0" not in out and "'#1'" in out, out
+    assert step_str("Тело (.04)") in out, "имя узла не подставлено"
+    assert "#13=PROPERTY_DEFINITION('user defined attributes','EGM',#3);" in out, out
+    assert "#11=DESCRIPTIVE_REPRESENTATION_ITEM('d','2');" in out, out
+    assert out.count("ENDSEC;") == 2 and out.rstrip().endswith("END-ISO-10303-21;")
     return True

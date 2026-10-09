@@ -70,7 +70,7 @@ def build(arg, configs, prods, phase=None, row=None, step_mode="spline"):
             raise ValueError(f"{part['id']}: ошибка построения STEP (traceback выше)")
 
 
-def build_assy(arg, configs, prods, step_mode="spline"):
+def build_assy(arg, configs, prods, step_mode="spline", lang="ru"):
     """Д-49: сборка исполнения -> out/cad/<ID>/<ID>.step + <ID>.assy.json."""
     cfg = ptk.find(configs, arg)
     if not cfg.get("sep") or not cfg.get("ecc"):
@@ -80,7 +80,7 @@ def build_assy(arg, configs, prods, step_mode="spline"):
     out.mkdir(parents=True, exist_ok=True)
     p = assy.plan(cfg)
     man = out / f"{cfg['id']}.assy.json"
-    man.write_text(json.dumps(assy.manifest(cfg, prods, p), ensure_ascii=False, indent=1) + "\n",
+    man.write_text(json.dumps(assy.manifest(cfg, prods, p, lang), ensure_ascii=False, indent=1) + "\n",
                    encoding="utf-8", newline="\n")
     print(f"assy: {man}")
     if step_mode == "off":
@@ -97,13 +97,14 @@ def build_assy(arg, configs, prods, step_mode="spline"):
           f"{step_mode})…", flush=True)
     path = out / f"{cfg['id']}.step"
     try:
-        dt, meta = assy.export(cfg, prods, path, step_mode)
+        dt, meta = assy.export(cfg, prods, path, step_mode, lang)
     except Exception:
         import traceback
         traceback.print_exc()
         raise ValueError(f"{cfg['id']}: ошибка построения STEP сборки (traceback выше)")
     print(f"step: {path} ({dt:.1f} с); метаданные в STEP: "
-          f"{'да' if meta else 'нет — только в .assy.json (OQ-14)'}")
+          + (f"{meta} узлов (PROPERTY_DEFINITION, Д-50)" if meta else "нет — только в .assy.json")
+          + "; FreeCAD: макрос tools/freecad_meta.py")
 
 
 def main(argv):
@@ -117,6 +118,8 @@ def main(argv):
                     help="контур впадин в STEP: B-сплайн | ломаная | без STEP")
     ap.add_argument("--assy", action="store_true",
                     help="сборка исполнения в один STEP: дерево, слои, метаданные (Д-49)")
+    ap.add_argument("--names", choices=("ru", "en"), default="ru",
+                    help="алиасы узлов дерева STEP: русские | латиница (Д-50)")
     a = ap.parse_args(argv)
     load = lambda n: json.loads((ROOT / "specs" / n).read_text(encoding="utf-8"))
     configs, prods = load("ptk_configs.json"), load("products.json")
@@ -124,7 +127,7 @@ def main(argv):
     for arg in a.ids:
         try:
             if a.assy:
-                build_assy(arg, configs, prods, a.step)
+                build_assy(arg, configs, prods, a.step, a.names)
             else:
                 build(arg, configs, prods, a.phase, a.row, a.step)
         except (KeyError, ValueError) as e:
