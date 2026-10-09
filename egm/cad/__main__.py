@@ -15,10 +15,11 @@ import sys
 from pathlib import Path
 
 from egm import products, ptk, ptk_design
-from egm.cad import assy, ptk_ecc, ptk_ring, ptk_sep, step, svg
+from egm.cad import assy, ptk_ecc, ptk_ring, ptk_sep, ptk_spacer, step, svg
 
 ROOT = Path(__file__).resolve().parents[2]
-GENERATORS = {"ptk_ring": ptk_ring.build, "ptk_sep": ptk_sep.build, "ptk_ecc": ptk_ecc.build}
+GENERATORS = {"ptk_ring": ptk_ring.build, "ptk_sep": ptk_sep.build, "ptk_ecc": ptk_ecc.build,
+              "ptk_spacer": ptk_spacer.build}
 
 
 def _row(cfg, phase, row):

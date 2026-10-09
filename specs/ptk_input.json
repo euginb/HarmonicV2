@@ -34,7 +34,8 @@
     "bal_wall": 1.0,
     "bal_n_max": 3,
     "bal_d_min": 1.0,
-    "bal_d_step": 0.1
+    "bal_d_step": 0.1,
+    "spacer_gap": 0.5
   },
   "mount_mode": "first_ok",
   "ring_mounts": {

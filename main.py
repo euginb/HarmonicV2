@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from egm import catalog, naming, products, ptk, ptk_design, ptk_force, ptk_parts, ptk_profile
-from egm.cad import assy as cad_assy, ptk_ring, ptk_sep, step as cad_step
+from egm.cad import assy as cad_assy, ptk_ring, ptk_sep, ptk_spacer, step as cad_step
 
 ROOT = Path(__file__).resolve().parent
 SPECS, REPORTS, TPL = ROOT / "specs", ROOT / "reports", ROOT / "templates"
@@ -158,7 +158,8 @@ def main(argv):
                        ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test),
                        ("fill", fill_self_test), ("step", cad_step.self_test),
                        ("force", ptk_force.self_test), ("parts", ptk_parts.self_test),
-                       ("sep_svg", ptk_sep.self_test), ("assy", cad_assy.self_test),
+                       ("sep_svg", ptk_sep.self_test), ("spacer", ptk_spacer.self_test),
+                       ("assy", cad_assy.self_test),
                        ("design", ptk_design.self_test)):
         try:
             test()

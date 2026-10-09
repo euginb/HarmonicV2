@@ -58,6 +58,7 @@ class PtkLimits:
     bal_n_max: int = 3            # наибольшее число отверстий балансировки
     bal_d_min: float = 1.0        # Ø отверстий балансировки: от, мм
     bal_d_step: float = 0.1       # шаг Ø (сверло), мм
+    spacer_gap: float = 0.5       # зазор dвн шайбы .05 над DВ венца, мм; не в хэше ID (Д-53)
 
 
 @dataclass
@@ -113,6 +114,7 @@ class PtkResult:
     excluded: str = ""                            # код TECH, по которому исключено из SPEC-10
     sep: dict = field(default_factory=dict)       # сепаратор .02 (Д-46)
     ecc: dict = field(default_factory=dict)       # эксцентрик .03 (Д-46)
+    spacer: dict = field(default_factory=dict)    # шайбы .05 (Д-53)
 
 
 def _load(cls, d):
@@ -181,7 +183,7 @@ def phasing(z, n_rol, holes, lim):
 
     Ряд k — копия ряда 1, повёрнутая на φk. В системе профиля венца сверловка ряда k
     повёрнута на s = (−φk) mod g, g = 360°/НОК(z, N). Равные s — один вариант венца.
-    Гнёзда сепаратора ряда k смещены на φk mod (360/n)."""
+    Окна сепаратора ряда k повёрнуты на (−s·z − φk)/n mod (360/n) (Д-46, Д-53, OQ-13)."""
     order = pattern_order(holes)
     g = Fraction(360, z * order // math.gcd(z, order))
     p = Fraction(360, z)
@@ -194,7 +196,8 @@ def phasing(z, n_rol, holes, lim):
         s = (-phi) % g
         var = labels.setdefault(s, chr(ord("A") + len(labels)))
         rows.append({"row": k + 1, "phi": _deg(phi), "delta_p": _deg((phi % p) / p),
-                     "s": _deg(s), "cage": _deg(phi % q), "variant": var})
+                     "s": _deg(s), "cage": _deg(((-s * z - phi) / max(n_rol, 1)) % q),
+                     "variant": var})
     return {"z": z, "pitch": _deg(p), "order": order, "g": _deg(g),
             "variants": len(labels), "rows": rows}
 
@@ -422,6 +425,10 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
         r.ecc = ptk_parts.eccentric(n, a, D, rol, brg, r.phasing, lim, gen, R)
         r.warnings += r.ecc.pop("warnings")
         r.parts += ptk_parts.parts(r.id, r.ecc)
+        r.spacer = ptk_parts.spacers(d_root, r.d_out, r.d_bc, r.geom["fastener"]["d_clear"],
+                                     rol["l"], pitch, lim.rows, lim)
+        r.warnings += r.spacer.pop("warnings")
+        r.parts += ptk_parts.spacer_parts(r.id, r.spacer, lim.rows)
     if (brg is not None or gen == "eccentric") and not r.errors:
         t = ptk_force.torque(n, z, a, R, D, rol["l"], rol.get("type", "roller"), brg, lim,
                              lim.rows)
@@ -564,6 +571,9 @@ def self_test():
     assert r.bearing and r.Dgen == bears[r.bearing]["D"], (r.bearing, r.Dgen)   # Д-40
     assert abs(2 * r.R_sum - r.Dgen - r.Drol) < 1e-3
     assert r.width == 4 * 8.0 + 5 * lim.row_gap
+    sp = [p for p in r.parts if ".05" in p["id"]]                 # Д-53: шаг = l — один вариант
+    assert [p["id"][-4:] for p in sp] == [".05A"] and sp[0]["pos"] == [0, 1, 2, 3, 4], sp
+    assert abs(sum(x["h"] for x in r.spacer["pos"]) + 4 * 8.0 - r.width) < 1e-6, r.spacer
     assert r.M > 0 and r.M_by in ("контакт", "подшипник", "крепление"), (r.M, r.M_by)
     assert r.M <= min(r.M_H, r.M_B, r.t_hold / holes.safety) + 0.1                # Д-41
     assert not calc(19, "t", b, PtkLimits(M_min=1e6), holes, fast, bears).ok

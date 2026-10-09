@@ -5,7 +5,8 @@ egm/cad/ptk_sep.py и ptk_ecc.py только строят PartModel.
 
 Сепаратор .02 — одна деталь на пакет: втулка R_Σ ± SEP_K·a_ω длиной B пакета с прямыми
 радиальными окнами (тела движутся строго радиально); окна ряда k повёрнуты на
-φk mod (360/n) — ptk.phasing → cage.
+(−s_k·z − φk)/n mod (360/n) — ptk.phasing → cage (Д-46, Д-53).
+Шайбы .05 — кольца пакета венцов по торцам и между рядами (Д-53).
 Эксцентрик .03 — диск толщиной t: наружный Ø D_э со смещением a_ω (посадка подшипника d
 или поверхность качения D_г), отверстие под вал shaft_d_min с пазом шпонки; паз ряда k —
 на угле key_angle − φk от эксцентриситета, отсюда варианты .03A… по рядам.
@@ -127,11 +128,50 @@ def parts(cid, ecc):
     return out
 
 
+def spacers(d_root, d_out, d_bc, d_clear, l, pitch, rows, lim):
+    """Шайбы .05 (Д-53): венец ряда k занимает zc ± l/2 (egm/cad/assy.plan), шайбы — остальное.
+
+    У торца h = row_gap + (шаг − l)/2, между рядами h = row_gap + шаг − l; dвн = DВ + 2·spacer_gap,
+    поэтому тела и сепаратор шайб не касаются; осевую фиксацию тел даёт окно сепаратора."""
+    r_in = d_root / 2 + lim.spacer_gap
+    h_end = round(lim.row_gap + (pitch - l) / 2, 3)
+    h_mid = round(lim.row_gap + pitch - l, 3)
+    pos, var, z = [], {}, 0.0
+    for j in range(rows + 1):
+        h = h_end if j in (0, rows) else h_mid
+        v = var.setdefault(h, chr(ord("A") + len(var)))
+        pos.append({"pos": j, "z": round(z, 3), "h": h, "variant": v})
+        z += h + l
+    web = round(d_bc / 2 - d_clear / 2 - r_in, 2)
+    warns = [] if web > 0 else [f"шайба .05: dвн {2 * r_in:.2f} заходит на отверстия Dотв "
+                                f"{d_bc:g} — уменьшить spacer_gap (Д-53)"]
+    return {"r_in": round(r_in, 3), "d_out": d_out, "h_end": h_end, "h_mid": h_mid,
+            "web": web, "pos": pos, "warnings": warns}
+
+
+def spacer_parts(cid, sp, rows):
+    """Детали .05<вариант>: вариант — по толщине; pos — места в пакете (0 — торец входа)."""
+    out = {}
+    for x in sp["pos"]:
+        v = x["variant"]
+        p = out.setdefault(v, {"id": f"{cid}.05{v}", "name": "межрядная шайба", "variant": v,
+                               "h": x["h"], "pos": [], "rows": []})
+        p["pos"].append(x["pos"])
+        near = {x["pos"], x["pos"] + 1} & set(range(1, rows + 1))
+        p["rows"] = sorted(set(p["rows"]) | near)
+    return list(out.values())
+
+
+def _sp(s):
+    return (f"{2 * s['r_in']:g} / {s['d_out']:g}, {s['h_end']:g} / {s['h_mid']:g}"
+            if s else "—")
+
+
 def table(rows):
     """SPEC-10: детали .02, .03 реализуемых исполнений."""
     L = ["| ID | Генератор | Dэ × t, мм | Пазы шпонки, ° | U, г·мм | Отв. балансировки | "
-         "Остаток, г·мм | Сепаратор dс / Dс × B | Окна w × h | Перемычка |",
-         "|---|---|---|---|---|---|---|---|---|---|"]
+         "Остаток, г·мм | Сепаратор dс / Dс × B | Окна w × h | Перемычка | "
+         "Шайбы .05 dвн / D, h торец / между |", "|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         e, s = r.get("ecc"), r.get("sep")
         if not e or not s:
@@ -142,7 +182,7 @@ def table(rows):
         L.append(f"| {r['id']} | {r['bearing'] or 'эксцентрик'} | {e['De']:g} × {e['t']:g} | {keys} | "
                  f"{e['U']['sum']:g} | {holes} | {b['res']:g} | "
                  f"{2 * s['r_in']:g} / {2 * s['r_out']:g} × {s['length']:g} | "
-                 f"{s['w']:g} × {s['h']:g} | {s['web']:g} |")
+                 f"{s['w']:g} × {s['h']:g} | {s['web']:g} | {_sp(r.get('spacer'))} |")
     return "\n".join(L) if len(L) > 2 else "нет реализуемых исполнений"
 
 
@@ -151,7 +191,7 @@ def self_test():
     lim = SimpleNamespace(sep_gap=0.05, row_gap=1.0, rho=7850.0, brg_mass_k=0.35,
                           shaft_d_min=6.0, shaft_key_b=2.0, shaft_key_t2=1.0, bal_wall=1.0,
                           bal_n_max=3, bal_d_min=1.0, bal_d_step=0.1, ecc_wall_min=1.0,
-                          key_angle=45.0, groove_f=0.52)
+                          key_angle=45.0, groove_f=0.52, spacer_gap=0.5)
     rows = [{"row": k + 1, "phi": p, "s": -p} for k, p in enumerate((0, 90, 180, 270))]
     s = separator(50, 33.5, 0.4, 2.0, 4.2, 7.0, rows, lim, 1.1)
     assert s["web"] > 0 and len(s["rows"]) == 4, s
@@ -167,4 +207,10 @@ def self_test():
     p = parts("PTK-T", e)
     assert [q["id"] for q in p] == ["PTK-T.02", "PTK-T.03A", "PTK-T.03B", "PTK-T.03C",
                                     "PTK-T.03D"], p
+    sp = spacers(69.8, 88.0, 80.0, 4.5, 4.2, 7.0, 4, lim)           # Д-53
+    assert (sp["h_end"], sp["h_mid"]) == (2.4, 3.8) and not sp["warnings"], sp
+    assert abs(sum(x["h"] for x in sp["pos"]) + 4 * 4.2 - 33.0) < 1e-6, ("шайбы + венцы = B", sp)
+    q = spacer_parts("PTK-T", sp, 4)
+    assert [(x["id"], x["pos"]) for x in q] == [("PTK-T.05A", [0, 4]), ("PTK-T.05B", [1, 2, 3])], q
+    assert q[0]["rows"] == [1, 4] and q[1]["rows"] == [1, 2, 3, 4], q
     return True

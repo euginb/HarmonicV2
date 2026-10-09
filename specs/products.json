@@ -8,7 +8,7 @@
       "02": {"name": "сепаратор", "kind": "make", "variant": "none", "qty": 1, "cad": "ptk_sep"},
       "03": {"name": "эксцентрик генератора", "kind": "make", "variant": "row", "qty": "rows", "cad": "ptk_ecc"},
       "04": {"name": "тело качения", "kind": "buy", "variant": "none", "qty": "rows*n_bodies", "cad": null},
-      "05": {"name": "межрядная шайба", "kind": "make", "variant": "none", "qty": "rows+1", "cad": null},
+      "05": {"name": "межрядная шайба", "kind": "make", "variant": "thick", "qty": "rows+1", "cad": "ptk_spacer"},
       "06": {"name": "корпус", "kind": "make", "variant": "none", "qty": 1, "cad": null},
       "07": {"name": "крышка", "kind": "make", "variant": "none", "qty": 2, "cad": null},
       "08": {"name": "подшипник генератора", "kind": "buy", "variant": "none", "qty": "rows", "cad": null}

@@ -15,20 +15,22 @@ import time
 from pathlib import Path
 
 from egm import products, ptk_profile
-from egm.cad import ptk_ecc, ptk_ring, ptk_sep, step
+from egm.cad import ptk_ecc, ptk_ring, ptk_sep, ptk_spacer, step
 
 LAYERS = {"01": ("01_RING", "венец"), "02": ("02_CAGE", "сепаратор"),
           "03": ("03_ECC", "эксцентрик"), "04": ("04_BODIES", "тела качения"),
+          "05": ("05_SPACER", "межрядные шайбы"),
           "08": ("08_BEARING", "подшипник генератора"), "ref": ("REF", "примитивы: вал")}
 COLORS = {"01": (0.55, 0.57, 0.60), "02": (0.80, 0.60, 0.20), "03": (0.30, 0.50, 0.80),
-          "04": (0.85, 0.20, 0.20), "08": (0.20, 0.65, 0.30), "ref": (0.70, 0.70, 0.70)}
+          "04": (0.85, 0.20, 0.20), "05": (0.45, 0.47, 0.52), "08": (0.20, 0.65, 0.30),
+          "ref": (0.70, 0.70, 0.70)}
 VIEWS = [{"name": "ISO", "dir": [1, -1, 1], "layers": "все"},
          {"name": "по оси", "dir": [0, 0, 1], "layers": "все"},
          {"name": "сбоку", "dir": [1, 0, 0], "layers": "все"},
          {"name": "без венцов и сепаратора", "dir": [1, -1, 1], "layers": "03, 04, 08, REF"}]
 SCHEMA = "AP242DIS"
-ALIAS = {"01": "RING", "02": "CAGE", "03": "ECC", "04": "BODY", "08": "BEARING",
-         "ref": "SHAFT"}          # Д-52: имена узлов STEP — только латиница
+ALIAS = {"01": "RING", "02": "CAGE", "03": "ECC", "04": "BODY", "05": "SPACER",
+         "08": "BEARING", "ref": "SHAFT"}   # Д-52: имена узлов STEP — только латиница
 _ENT = re.compile(r"#(\d+)\s*=\s*([A-Z0-9_]+)\s*\((.*?)\)\s*;", re.S)
 _TOK = re.compile(r"'EGM(\d+)'")
 
@@ -77,6 +79,9 @@ def plan(cfg):
         rows.append({"row": rk, "phi": phi, "s": sk, "zc": zc, "ecc": (ex, ey), "inst": inst})
     root = [{"id": by[("02", rows[0]["row"])]["id"], "nn": "02",
              "x": 0.0, "y": 0.0, "z": 0.0, "ang": 0.0}]
+    for x in (cfg.get("spacer") or {}).get("pos", []):      # Д-53: шайбы пакета венцов
+        root.append({"id": f"{cid}.05{x['variant']}", "nn": "05", "x": 0.0, "y": 0.0,
+                     "z": x["z"], "ang": 0.0})
     if g["limits"].get("shaft_d_min"):
         root.append({"id": f"{cid}.REF-shaft", "nn": "ref", "x": 0.0, "y": 0.0, "z": -5.0,
                      "ang": 0.0})
@@ -119,6 +124,10 @@ def item_meta(cfg, prods, pid, nn):
         e, b = cfg["ecc"], cfg["ecc"]["bal"]
         m.update(De=e["De"], t=e["t"], a_w=e["a"], U=e["U"]["sum"],
                  bal=f"{b['n']}×Ø{b['d']:g} r {b['r']:g}" if b["n"] else "нет")
+    elif nn == "05":
+        s = cfg["spacer"]
+        m.update(d_in=round(2 * s["r_in"], 3), d_out=s["d_out"], d_bc=cfg["d_bc"],
+                 h=next(q["h"] for q in cfg["parts"] if q["id"] == pid), holes=cfg["holes"])
     elif nn == "04":
         m.update(code=cfg["roller"], d=g["roller"]["d"], l=g["roller"]["l"])
     elif nn == "08":
@@ -261,6 +270,8 @@ def _shape(cq, cfg, pid, nn, mode):
         return step.solid(ptk_sep.build(cfg, part, part["rows"][0]), mode)
     if nn == "03":
         return step.solid(ptk_ecc.build(cfg, part), mode)
+    if nn == "05":
+        return step.solid(ptk_spacer.build(cfg, part), mode)
     if nn == "04":
         r = g["roller"]
         if r.get("type") == "ball":
@@ -337,8 +348,13 @@ def export(cfg, prods, path, mode="spline"):
             grp = group(sub, bodies_label(r, len(bod)))
             for j, x in enumerate(bod, 1):
                 put(grp, x, f"#{j}")
+    nr = {}
     for x in p["root"]:
-        put(root, x, label(cfg, x["id"], x["nn"]))
+        nm = label(cfg, x["id"], x["nn"])
+        if x["nn"] == "05":                       # Д-53: шайб несколько — номер экземпляра
+            nr[x["id"]] = nr.get(x["id"], 0) + 1
+            nm += f" #{nr[x['id']]}"
+        put(root, x, nm)
     st.UpdateAssemblies()
     Interface_Static.SetCVal_s("write.step.schema", SCHEMA)
     Interface_Static.SetCVal_s("xstep.cascade.unit", "MM")
@@ -398,6 +414,16 @@ def self_test():
     assert not any("PTK-T" in x for x in labs), "полный ID — только у корня (Д-50)"
     assert all(x.isascii() for x in labs), ("имена узлов — только латиница (Д-52)", labs)
     assert label(cfg, "PTK-T.03D", "03") == "ECC (.03D)", label(cfg, "PTK-T.03D", "03")
+    sp = ptk_parts.spacers(69.8, 88.0, 80.0, 4.5, l, 7.0, 4,
+                           SimpleNamespace(row_gap=1.0, spacer_gap=0.5))     # Д-53
+    spp = ptk_parts.spacer_parts("PTK-T", sp, 4)
+    p2 = plan({**cfg, "spacer": sp, "parts": parts + spp})
+    hh = {q["id"]: q["h"] for q in spp}
+    seg = sorted([(x["z"], x["z"] + hh[x["id"]]) for x in p2["root"] if x["nn"] == "05"]
+                 + [(x["z"], x["z"] + l) for r in p2["rows"] for x in r["inst"] if x["nn"] == "01"])
+    assert len(seg) == 9 and abs(seg[0][0]) < 1e-6 and abs(seg[-1][1] - p2["B"]) < 1e-6, seg
+    assert all(abs(e0[1] - e1[0]) < 1e-6 for e0, e1 in zip(seg, seg[1:])), ("пакет: зазор", seg)
+    assert label(cfg, "PTK-T.05B", "05") == "SPACER (.05B)"
     for s in ("Эксцентрик (.03D)", "it's \\ ok", "φ = 90°"):
         assert step_unstr(step_str(s)[1:-1]) == s, ("кодирование строки STEP", s)
     import tempfile
