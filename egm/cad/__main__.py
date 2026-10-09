@@ -1,6 +1,7 @@
 """python -m egm.cad <ID исполнения | ID детали> [...] [--phase φ | --row k]
-                     [--step spline|poly|off]
+                     [--step spline|poly|off] [--assy]
 -> out/cad/<ID>/<деталь>[-r<k>].svg|.step
+--assy — сборка исполнения: out/cad/<ID>/<ID>.step + <ID>.assy.json (Д-49).
 
 --phase φ / --row k — ряд редуктора: строится только венец этого ряда, на чертеже —
 направление его эксцентрика. Данные — specs/ptk_configs.json, specs/products.json.
@@ -12,7 +13,7 @@ import sys
 from pathlib import Path
 
 from egm import products, ptk
-from egm.cad import ptk_ecc, ptk_ring, ptk_sep, step, svg
+from egm.cad import assy, ptk_ecc, ptk_ring, ptk_sep, step, svg
 
 ROOT = Path(__file__).resolve().parents[2]
 GENERATORS = {"ptk_ring": ptk_ring.build, "ptk_sep": ptk_sep.build, "ptk_ecc": ptk_ecc.build}
@@ -69,6 +70,42 @@ def build(arg, configs, prods, phase=None, row=None, step_mode="spline"):
             raise ValueError(f"{part['id']}: ошибка построения STEP (traceback выше)")
 
 
+def build_assy(arg, configs, prods, step_mode="spline"):
+    """Д-49: сборка исполнения -> out/cad/<ID>/<ID>.step + <ID>.assy.json."""
+    cfg = ptk.find(configs, arg)
+    if not cfg.get("sep") or not cfg.get("ecc"):
+        raise ValueError(f"{cfg['id']}: нет деталей .02/.03 (нереализуемо или исключено) — "
+                         f"сборка не строится")
+    out = ROOT / "out" / "cad" / cfg["id"]
+    out.mkdir(parents=True, exist_ok=True)
+    p = assy.plan(cfg)
+    man = out / f"{cfg['id']}.assy.json"
+    man.write_text(json.dumps(assy.manifest(cfg, prods, p), ensure_ascii=False, indent=1) + "\n",
+                   encoding="utf-8", newline="\n")
+    print(f"assy: {man}")
+    if step_mode == "off":
+        print("step: пропущен (--step off)")
+        return
+    try:
+        import cadquery  # noqa: F401
+    except Exception as e:
+        print(f"step: пропущен — cadquery не импортируется в {sys.executable}: "
+              f"{type(e).__name__}: {e}")
+        return
+    n = sum(len(r["inst"]) for r in p["rows"]) + len(p["root"])
+    print(f"step: сборка строится ({len(assy.items(p))} деталей, {n} экземпляров, "
+          f"{step_mode})…", flush=True)
+    path = out / f"{cfg['id']}.step"
+    try:
+        dt, meta = assy.export(cfg, prods, path, step_mode)
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        raise ValueError(f"{cfg['id']}: ошибка построения STEP сборки (traceback выше)")
+    print(f"step: {path} ({dt:.1f} с); метаданные в STEP: "
+          f"{'да' if meta else 'нет — только в .assy.json (OQ-14)'}")
+
+
 def main(argv):
     ap = argparse.ArgumentParser(prog="python -m egm.cad", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -78,13 +115,18 @@ def main(argv):
     grp.add_argument("--row", type=int, help="номер ряда 1…rows")
     ap.add_argument("--step", choices=("spline", "poly", "off"), default="spline",
                     help="контур впадин в STEP: B-сплайн | ломаная | без STEP")
+    ap.add_argument("--assy", action="store_true",
+                    help="сборка исполнения в один STEP: дерево, слои, метаданные (Д-49)")
     a = ap.parse_args(argv)
     load = lambda n: json.loads((ROOT / "specs" / n).read_text(encoding="utf-8"))
     configs, prods = load("ptk_configs.json"), load("products.json")
     rc = 0
     for arg in a.ids:
         try:
-            build(arg, configs, prods, a.phase, a.row, a.step)
+            if a.assy:
+                build_assy(arg, configs, prods, a.step)
+            else:
+                build(arg, configs, prods, a.phase, a.row, a.step)
         except (KeyError, ValueError) as e:
             print(f"ошибка: {e}")
             rc = 1

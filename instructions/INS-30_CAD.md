@@ -38,6 +38,7 @@
 | `python -m egm.cad <ID1> <ID2> …` | несколько аргументов по очереди |
 | `python -m egm.cad <ID> --phase 90` | венец ряда с фазой φ = 90° (`row_phases`), на чертеже — направление его эксцентрика; файл `<NN><вар>-r<k>.svg` |
 | `python -m egm.cad <ID> --row 2` | то же по номеру ряда |
+| `python -m egm.cad <ID> --assy` | сборка исполнения одним STEP `<ID>.step`: дерево ROWk → детали, слои 01_RING…REF, цвета, метаданные; дубль дерева, метаданных и предлагаемые виды — `<ID>.assy.json` (Д-49, OQ-14) |
 
 ID исполнения — колонка ID в SPEC-10 или `ptk_configs.json → id`; ID деталей,
 их сдвиги s и ряды — `ptk_configs.json → parts[]`.
