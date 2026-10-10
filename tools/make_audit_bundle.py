@@ -46,6 +46,7 @@ TEXT_EXT = {
 """
 SKIP_FILES = {
     "docs/HG-Series-Catalog_opt.pdf": "Пропущен так-как vendor based, out of scope by review process",
+    "docs/RU2359790C1.pdf": "СПОСОБ НАРЕЗАНИЯ ЗУБЧАТОГО ВЕНЦА ЖЕСТКОГО КОЛЕСА ВОЛНОВОЙ ПЕРЕДАЧИ С ПРОМЕЖУТОЧНЫМИ ТЕЛАМИ КАЧЕНИЯ. Патент RU2359790C1",
     "specs/consolidation.md": "Рабочие запросы к ИИ по консолидации информации",
     "specs/repository-review.md": "Рабочие запросы к ИИ по аудиту информации"
 }
@@ -58,7 +59,9 @@ PROFILES = {
     "reports": (
         "без каталогов производителя и производных БД каталога",
         {
-            "docs/": "справочные материалы и каталоги производителей; источник БД — INS-20",
+            "docs/Силовой расчет ПТК/": "Теория по силовому расчету ПТК. В.С. Янгулов",
+            "docs/cnc_axes_guide.md": "Обозначение осей в станках с ЧПУ",
+            "docs/HG-Series-Catalog_opt.md": "справочные HIWIN Linear Guideways — серия HG (каталог G99TE17-1306)",
             "reports/catalog_*.md": "отчет о парсинге docs/HG-Series-Catalog_opt.md",
             "specs/catalog_*.json": "code-first БД каталога, производная от docs/ (egm/catalog.py)",
         },
