@@ -12,7 +12,7 @@ import math
 import re
 from types import SimpleNamespace
 
-from egm import ptk_parts
+from egm import ptk_layout, ptk_parts
 
 LINKS = ("key", "flat", "integral", "spline", "press")
 CALC = ("key", "flat", "integral")             # spline, press — только кручение вала
@@ -65,7 +65,7 @@ def _mass(cfg, ecc, dsh, bore, rho, rows):
             "J_out": float(f"{J * 1e-9 * int(cfg['u']) ** 2:.3e}")}
 
 
-def design(cfg, d, lim, keys):
+def design(cfg, d, lim, keys, extra=None):
     """Проработка одного исполнения -> запись ptk_designs.json."""
     name, sh, bal = d["name"], d["shaft"], d.get("balance", {})
     err, warn = [], []
@@ -122,10 +122,15 @@ def design(cfg, d, lim, keys):
         if sig > sa + 1e-9:
             err.append(f"шпонка {key['b']:g}×{key['h']:g}: σ см = {sig:.0f} > [σ] = {sa:g} МПа "
                        f"(l_p = {lp:g} мм)")
+    lay = None
+    if extra is not None:
+        lay, le, lw = ptk_layout.layout(cfg, d, ecc, dsh, L.row_gap, **extra)
+        err += le
+        warn += lw
     parts = [{**p, "base": p["id"], "id": f"{p['id']}-{name}"}
              for p in ptk_parts.parts(cfg["id"], ecc) if p["id"].split(".", 1)[1].startswith("03")]
     return {"id": cfg["id"], "name": name, "ok": not err, "errors": err, "warnings": warn,
-            "input": d,
+            "input": d, "layout": lay,
             "shaft": {"d": dsh, "bore": bore, "link": link, "eta": eta, "ecc_share": share, "M": M,
                       "T_in": round(T_in, 3), "T_e": round(T_e, 3), "tau": round(tau, 1),
                       "tau_allow": ta, "d_req": round(d_req, 2)},
@@ -134,7 +139,7 @@ def design(cfg, d, lim, keys):
             "parts": parts}
 
 
-def run(inp, configs, lim):
+def run(inp, configs, lim, extra=None):
     """ptk_design_input.json -> [запись]; ошибка входа — ValueError (в checks.md)."""
     keys = sorted(inp.get("keys", {}).get("table", []), key=lambda k: k["d_max"])
     out, names = [], set()
@@ -146,7 +151,7 @@ def run(inp, configs, lim):
             raise ValueError(f"designs.{name}.shaft.link: {d['shaft'].get('link')} — допустимы {LINKS}")
         names.add(name)
         cfg, why = select(configs, d)
-        out.append(design(cfg, d, lim, keys) if cfg else
+        out.append(design(cfg, d, lim, keys, extra) if cfg else
                    {"id": d["id"], "name": name, "ok": False, "errors": [why], "warnings": [], "input": d})
     return out
 
@@ -185,7 +190,7 @@ def md(res):
          "τ / [τ], МПа | σ см / [σ], МПа | Балансировка | Остаток, г·мм | m пакета, г | "
          "J вх, кг·м² | Статус |", "|---" * 13 + "|"]
     P = ["| Деталь | Как на шаге 1 | Паз, ° | Ряды |", "|---|---|---|---|"]
-    E, W = [], []
+    E, W, C = [], [], [ptk_layout.HEAD, "|---" * 10 + "|"]
     for r in res:
         s = r.get("shaft")
         if s:
@@ -199,6 +204,8 @@ def md(res):
                      f"{'OK' if r['ok'] else 'нет'} |")
             P += [f"| {p['id']} | {p['base']} | {p['key_angle']:g} | "
                   f"{', '.join(str(x) for x in p['rows'])} |" for p in r["parts"]]
+            if r.get("layout"):
+                C.append(ptk_layout.md_row(r["name"], r["layout"]))
         else:
             L.append(f"| {r['name']} | {r['id']} |" + " — |" * 10 + " нет |")
         tag = f"- {r['name']} ({r['id']}): "
@@ -206,6 +213,7 @@ def md(res):
         W += [tag + w for w in r["warnings"]]
     return {"summary": "\n".join(L) if res else "нет проработок",
             "parts": "\n".join(P) if len(P) > 2 else "нет",
+            "layouts": "\n".join(C) if len(C) > 2 else "нет",
             "errors": "\n".join(E) or "нет", "warnings": "\n".join(W) or "нет",
             "theory": THEORY, "n_ok": sum(r["ok"] for r in res), "n_all": len(res)}
 
@@ -256,4 +264,5 @@ def self_test():
         raise AssertionError("имя с «-» принято")
     except ValueError:
         pass
+    assert ptk_layout.self_test()
     return True

@@ -10,8 +10,21 @@
       "04": {"name": "тело качения", "kind": "buy", "variant": "none", "qty": "rows*n_bodies", "cad": null},
       "05": {"name": "межрядная шайба", "kind": "make", "variant": "thick", "qty": "rows+1", "cad": "ptk_spacer"},
       "06": {"name": "корпус", "kind": "make", "variant": "none", "qty": 1, "cad": null},
-      "07": {"name": "крышка", "kind": "make", "variant": "none", "qty": 2, "cad": null},
-      "08": {"name": "подшипник генератора", "kind": "buy", "variant": "none", "qty": "rows", "cad": null}
+      "07": {"name": "крышка (A — вход, B — выход)", "kind": "make", "variant": "side", "qty": 2, "cad": null},
+      "08": {"name": "подшипник генератора", "kind": "buy", "variant": "none", "qty": "rows", "cad": null},
+      "09": {"name": "подшипник выхода", "kind": "buy", "variant": "none", "qty": 1, "cad": null},
+      "10": {"name": "подшипник входного вала", "kind": "buy", "variant": "none", "qty": 2, "cad": null},
+      "11": {"name": "дистанционное кольцо эксцентриков", "kind": "make", "variant": "none", "qty": "rows-1", "cad": null},
+      "12": {"name": "ступица выхода", "kind": "make", "variant": "none", "qty": 1, "cad": null}
+    },
+    "layouts": {
+      "_comment": "Д-55: конструктив — выбор деталей и вариантов; null — деталь не входит; fixed/output — неподвижное и выходное звено",
+      "L1": {"name": "стакан-сепаратор монолитом", "fixed": "ring", "output": "cage",
+             "parts": {"01": "ring_phase", "02": "cup", "03": "row", "04": "body", "05": "thick", "06": null,
+                       "07": "side", "08": "gen", "09": "out", "10": "in", "11": "ring", "12": null}},
+      "L2": {"name": "обечайка + ступица выхода", "fixed": "ring", "output": "cage", "join": "weld | screw | pin",
+             "parts": {"01": "ring_phase", "02": "sleeve", "03": "row", "04": "body", "05": "thick", "06": null,
+                       "07": "side", "08": "gen", "09": "out", "10": "in", "11": "ring", "12": "hub"}}
     }
   },
   "HD": {

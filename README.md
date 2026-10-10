@@ -71,26 +71,28 @@
 
 ## Реестр спецификаций
 
-| Файл | Тип | Источник | Состояние |
-|---|---|---|---|
-| [specs/DECISIONS.md](specs/DECISIONS.md) | журнал | — | ведётся |
-| [archive/DECISIONS_ARCHIVE.md](archive/DECISIONS_ARCHIVE.md) | журнал | — | ведётся |
-| [specs/CODE_PLAN.md](specs/CODE_PLAN.md) | план | доработка кода, `TODO(CP-##)` | ведётся |
-| [specs/CANCELLED.md](specs/CANCELLED.md) | журнал | — | ведётся |
-| [specs/SPEC-01_NAMING.md](specs/SPEC-01_NAMING.md) | spec-first | Д-02 | черновик |
+| Файл                                                                   | Тип | Источник | Состояние |
+|------------------------------------------------------------------------|---|---|---|
+| [specs/DECISIONS.md](specs/DECISIONS.md)                               | журнал | — | ведётся |
+| [archive/DECISIONS_ARCHIVE.md](archive/DECISIONS_ARCHIVE.md)           | журнал | — | ведётся |
+| [specs/CODE_PLAN.md](specs/CODE_PLAN.md)                               | план | доработка кода, `TODO(CP-##)` | ведётся |
+| [specs/CANCELLED.md](specs/CANCELLED.md)                               | журнал | — | ведётся |
+| [specs/SPEC-01_NAMING.md](specs/SPEC-01_NAMING.md)                     | spec-first | Д-02 | черновик |
 | [specs/SPEC-02_PRECISION_EMBEDS.md](specs/SPEC-02_PRECISION_EMBEDS.md) | spec-first | Д-03, Д-04 | черновик |
-| [specs/SPEC-03_PRODUCTS.md](specs/SPEC-03_PRODUCTS.md) | spec-first | Д-24 | черновик |
-| [specs/SPEC-04_ARCHITECTURE.md](specs/SPEC-04_ARCHITECTURE.md) | spec-first | Д-39 | черновик |
-| [specs/products.json](specs/products.json) | данные (номенклатура) | SPEC-03 | rev 7 |
-| [specs/CATALOGS.md](specs/CATALOGS.md) | реестр | `docs/` | черновик |
-| [specs/vendor_prices.json](specs/vendor_prices.json) | данные (заказчик) | поставщики | заполняется |
-| [specs/ptk_input.json](specs/ptk_input.json) | данные (параметры) | заказчик, INS-10 | rev 1 |
-| [specs/SPEC-10_PTK_CALC.md](specs/SPEC-10_PTK_CALC.md) | code-first | `egm/ptk.py`, `templates/SPEC-10_PTK_CALC.md.tmpl`, INS-10 | rev 1 |
-| [specs/ptk_configs.json](specs/ptk_configs.json) | code-first (данные) | `egm/ptk.py` | rev 1 |
-| [specs/catalog_hiwin_hg.json](specs/catalog_hiwin_hg.json) | code-first (БД) | `egm/catalog.py` ← CAT-01, INS-20 | rev 1 |
+| [specs/SPEC-03_PRODUCTS.md](specs/SPEC-03_PRODUCTS.md)                 | spec-first | Д-24 | черновик |
+| [specs/SPEC-04_ARCHITECTURE.md](specs/SPEC-04_ARCHITECTURE.md)         | spec-first | Д-39 | черновик |
+| [specs/products.json](specs/products.json)                             | данные (номенклатура) | SPEC-03 | rev 7 |
+| [specs/CATALOGS.md](specs/CATALOGS.md)                                 | реестр | `docs/` | черновик |
+| [specs/vendor_prices.json](specs/vendor_prices.json)                   | данные (заказчик) | поставщики | заполняется |
+| [specs/ptk_input.json](specs/ptk_input.json)                           | данные (параметры) | заказчик, INS-10 | rev 1 |
+| [specs/SPEC-10_PTK_CALC.md](specs/SPEC-10_PTK_CALC.md)                 | code-first | `egm/ptk.py`, `templates/SPEC-10_PTK_CALC.md.tmpl`, INS-10 | rev 1 |
+| [specs/ptk_configs.json](specs/ptk_configs.json)                       | code-first (данные) | `egm/ptk.py` | rev 1 |
+| [specs/catalog_hiwin_hg.json](specs/catalog_hiwin_hg.json)             | code-first (БД) | `egm/catalog.py` ← CAT-01, INS-20 | rev 1 |
 | [specs/catalog_hiwin_hg_pairs.json](specs/catalog_hiwin_hg_pairs.json) | code-first (БД) | `egm/catalog.py`, Д-10, INS-20 | rev 1 |
-| [reports/checks.md](reports/checks.md) | отчёт | `main.py` | каждый прогон |
-| [reports/catalog_report.md](reports/catalog_report.md) | отчёт | `egm/catalog.py` | каждый прогон |
+| [reports/checks.md](reports/checks.md)                                 | отчёт | `main.py` | каждый прогон |
+| [reports/catalog_report.md](reports/catalog_report.md)                 | отчёт | `egm/catalog.py` | каждый прогон |
+| [specs/stock.json](stock.json)                                         | данные (заказчик) | поставщики | заполняется |
+
 
 ## Описание спецификаций
 

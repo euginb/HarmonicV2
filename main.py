@@ -138,8 +138,11 @@ def run_design():
         return []
     try:
         lim = ptk.load_config(load_json("ptk_input.json"))[0]
+        extra = {"prods": load_json("products.json"),
+                 "bears": load_json("vendor_prices.json").get("bearings", {}),
+                 "stock": load_json("stock.json") if (SPECS / "stock.json").exists() else None}
         res = ptk_design.run(load_json("ptk_design_input.json"),
-                             json.loads(cfg_path.read_text(encoding="utf-8")), lim)
+                             json.loads(cfg_path.read_text(encoding="utf-8")), lim, extra)
     except (KeyError, ValueError, TypeError) as e:
         return [f"ptk_design_input.json: {e!r}"]
     write("specs", "ptk_designs.json", json.dumps(res, ensure_ascii=False, indent=2) + "\n")
