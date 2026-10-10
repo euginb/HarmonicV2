@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Полный снимок репозитория для ИИ одним файлом — AUDIT_BUNDLE.md (INS-90 §3).
 
-Снимок: HEAD, список файлов (`git ls-files`), содержимое текстовых файлов.
+Снимок: HEAD, список файлов (`git ls-files`, UTF-8 без экранирования путей),
+содержимое текстовых файлов. Файлы, которые не удалось прочитать (нет на
+диске, не UTF-8), перечисляются в разделе пропусков с причиной — молча не
+теряются.
 Содержимое файлов можно исключать правилами в синтаксисе .gitignore (Д-27):
 базовые правила SKIP_FILES действуют всегда, профили добавляют свои наборы
 правил по ключам запуска. Исключённый файл остаётся в списке `## Git tree`,
@@ -106,6 +109,14 @@ MAX_FILE_BYTES = 300_000
 
 def run(cmd):
     return subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT).strip()
+
+
+def git_files():
+    """`git ls-files` в UTF-8: core.quotepath=false и -z отключают экранирование
+    не-ASCII путей (иначе кириллица приходит в escape-виде, а такой путь потом
+    не находится на диске и содержимое файла молча пропадает)."""
+    raw = subprocess.check_output(["git", "-c", "core.quotepath=false", "ls-files", "-z"])
+    return [p for p in raw.decode("utf-8").split("\0") if p]
 
 
 def _segment_rx(seg):
@@ -242,7 +253,7 @@ def main(argv=None):
         return 2
 
     head = run(["git", "rev-parse", "HEAD"])
-    files = run(["git", "ls-files"]).splitlines()
+    files = git_files()
     excluded, hits = match_files(files, rules)
     out_path = Path(ns.out)
 
@@ -270,6 +281,7 @@ def main(argv=None):
 
         out.write("## Text file contents\n\n")
 
+        skipped = []
         for rel in files:
             if rel in excluded:
                 continue
@@ -281,7 +293,8 @@ def main(argv=None):
 
             try:
                 size = path.stat().st_size
-            except OSError:
+            except OSError as e:
+                skipped.append((rel, f"нет файла на диске ({e.strerror})"))
                 continue
 
             if size > MAX_FILE_BYTES:
@@ -293,6 +306,7 @@ def main(argv=None):
             try:
                 text = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
+                skipped.append((rel, "файл не в UTF-8 — содержимое не включено"))
                 continue
 
             out.write(f"\n---\n\n")
@@ -303,6 +317,15 @@ def main(argv=None):
                 out.write("\n")
             out.write("```\n")
 
+        if skipped:
+            out.write("Пропущены целиком (не правилами, а из-за ошибок чтения):\n\n")
+            for rel, why in skipped:
+                out.write(f"- `{rel}` — {why}\n")
+            out.write("\n")
+
+    if skipped:
+        print(f"ВНИМАНИЕ: {len(skipped)} файлов не прочитано, список в bundle",
+              file=sys.stderr)
     print(f"Wrote {out_path} ({out_path.stat().st_size} bytes, "
           f"excluded {len(excluded)} of {len(files)} files)")
     return 0
