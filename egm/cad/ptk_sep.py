@@ -6,7 +6,7 @@
 """
 import math
 
-from egm.cad.model import Circle, Contour, Dim, PartModel, Window
+from egm.cad.model import Band, Circle, Contour, Dim, PartModel, Window
 
 
 def build(cfg, part, row=None):
@@ -42,6 +42,18 @@ def build(cfg, part, row=None):
                 (f"cage{k}", w["cage"], f"поворот окон ряда {k}, ° (Д-46)"),
                 (f"z0{k}", w["z0"], f"начало окон ряда {k} от торца, мм"),
                 ("B", s["length"], "длина втулки = ширина пакета")]
+    cup = part.get("cup") or {}
+    if cup.get("hub_d"):                 # CP-45: стакан L1 (.02A) — дно и ступица выхода
+        rb, z = (cup.get("hub_bore") or 0.0) / 2, cup["z_in"]
+        m.thick = z
+        m.bands = [Band(rb, s["r_out"], z, cup["t"]),
+                   Band(rb, cup["hub_d"] / 2, z + cup["t"], cup["hub_l"])]
+        m.notes.append(f"стакан: дно z {z:g}…{z + cup['t']:g}, ступица Ø{cup['hub_d']:g}"
+                       f"×{cup['hub_l']:g}, отв. Ø{2 * rb:g} — в STEP; на развёртке не показаны")
+        m.legend += [("z дна", z, "внутренний торец дна от торца пакета, мм (Д-57)"),
+                     ("t дна", cup["t"], "толщина дна, мм"),
+                     ("ступица", f"Ø{cup['hub_d']:g}×{cup['hub_l']:g}", "посадка .09, длина"),
+                     ("отв. ступицы", 2 * rb, "под .10 — опору конца входного вала")]
     return m
 
 

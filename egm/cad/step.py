@@ -32,6 +32,13 @@ def solid(m, mode="spline"):
     inner = [_inner(cq, [V(x, y, 0) for x, y in m.cut.pts], m.cut_mode or mode)]
     inner += [cq.Wire.makeCircle(h.d / 2, V(h.x, h.y, 0), nz) for h in m.holes]
     body = cq.Solid.extrudeLinear(outer, inner, V(0, 0, m.thick))
+    for b in m.bands:                  # CP-45: ступени вращения (дно и ступица стакана, гнёзда)
+        ring = cq.Solid.makeCylinder(b.r_out, b.h, V(0, 0, b.z0), nz)
+        if b.r_in > 0:
+            ring = ring.cut(cq.Solid.makeCylinder(b.r_in, b.h, V(0, 0, b.z0), nz))
+        body = body.fuse(ring).clean() if b.op == "add" else body.cut(ring)
+        if hasattr(body, "Solids") and len(body.Solids()) == 1:
+            body = body.Solids()[0]
     if m.windows:                      # Д-46: все окна сепаратора — одна булева операция
         tools = [cq.Solid.makeBox(wn.r_out - wn.r_in + 2, wn.w, wn.h,
                                   V(wn.r_in - 1, -wn.w / 2, wn.z0))
@@ -72,4 +79,10 @@ def self_test():
         except Exception as e:
             raise AssertionError(f"step {mode}: {type(e).__name__}: {e}")
         assert abs(v - ref) < 0.01 * ref, (mode, v, ref)
+    from egm.cad.model import Band
+    m2 = PartModel("T2", 3.0, 30.0, Contour(pts),
+                   bands=[Band(5.0, 15.0, 3.0, 2.0), Band(0.0, 7.0, -1.0, 10.0, "cut")])
+    ref2 = math.pi * (375.0 + 400.0 - 48.0)
+    v2 = solid(m2, "spline").Volume()
+    assert abs(v2 - ref2) < 0.01 * ref2, ("ступени Band (CP-45)", v2, ref2)
     return True

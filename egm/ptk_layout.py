@@ -126,6 +126,24 @@ def md_tool(name, r):
             for t in r.get("tooling", [])]
 
 
+def cad_parts(cfg, name, rec):
+    """Детали конструктива для egm.cad (CP-45): .02A стакан | .02B обечайка, .07A/.07B, .11.
+
+    ID — <ID>.<NN><вар>-<проработка>, base — без суффикса (Д-48); покупные .09/.10 — в rec."""
+    cid, rows = cfg["id"], [ph["row"] for ph in cfg["phasing"]]
+    sfx, out, v02 = (f"-{name}" if name else ""), [], rec["parts"].get("02")
+    if v02 in ("cup", "sleeve"):
+        base = f"{cid}.02{'A' if v02 == 'cup' else 'B'}"
+        out.append({"id": base + sfx, "base": base, "rows": rows,
+                    **({"cup": rec["cup"]} if v02 == "cup" else {})})
+    if rec.get("covers"):
+        out += [{"id": f"{cid}.07{s}{sfx}", "base": f"{cid}.07{s}", "rows": rows, "side": s}
+                for s in "AB"]
+    if rec.get("r11"):
+        out.append({"id": f"{cid}.11{sfx}", "base": f"{cid}.11", "rows": rows})
+    return out
+
+
 def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
     """Конструктив проработки -> (запись | None, ошибки, предупреждения)."""
     code = d.get("layout", "L1")
@@ -173,6 +191,8 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
            "r11": r11, "covers": ax["covers"], "cup": ax["cup"], "length": ax["length"],
            "blank": bl}
     rec["tooling"] = tooling(rec, cfg, r_in, r_out)
+    rec.update(shaft_d=shaft_d, ax_gap=o["ax_gap"])
+    rec["cad_parts"] = cad_parts(cfg, d.get("name", ""), rec)
     return rec, err, warn
 
 

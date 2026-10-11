@@ -15,11 +15,11 @@ import sys
 from pathlib import Path
 
 from egm import products, ptk, ptk_design
-from egm.cad import assy, ptk_ecc, ptk_ring, ptk_sep, ptk_spacer, step, svg
+from egm.cad import assy, ptk_cover, ptk_ecc, ptk_ring, ptk_sep, ptk_spacer, step, svg
 
 ROOT = Path(__file__).resolve().parents[2]
 GENERATORS = {"ptk_ring": ptk_ring.build, "ptk_sep": ptk_sep.build, "ptk_ecc": ptk_ecc.build,
-              "ptk_spacer": ptk_spacer.build}
+              "ptk_spacer": ptk_spacer.build, "ptk_cover": ptk_cover.build}
 
 
 def _row(cfg, phase, row):
@@ -93,6 +93,12 @@ def build_assy(arg, configs, prods, step_mode="spline", des=None):
     sh = cfg["geom"]["limits"].get("shaft_d_min") or 0
     print(f"вал Ø{sh:g}, эксцентрики .03 — " + (f"проработка {des['name']} (SPEC-11, Д-48)" if des
           else "предварительные шага 1 (limits.shaft_d_min); окончательные — --design"))
+    lay = cfg.get("layout")
+    if lay:
+        print(f"конструктив {lay['code']}: "
+              + ", ".join(q["id"].split(".", 1)[1] for q in lay.get("cad_parts", []))
+              + f"; .09 {(lay.get('b09') or {}).get('id', 'нет')}, "
+              f".10 {(lay.get('b10') or {}).get('id', 'нет')}; длина {lay['length']:g} мм (CP-45)")
     if step_mode == "off":
         print("step: пропущен (--step off)")
         return

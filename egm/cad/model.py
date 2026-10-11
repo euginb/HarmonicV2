@@ -45,6 +45,15 @@ class Window:
 
 
 @dataclass
+class Band:
+    r_in: float                # кольцо r_in…r_out вокруг оси (0, 0); r_in = 0 — сплошной цилиндр
+    r_out: float
+    z0: float                  # начало по оси, мм (локальная система детали)
+    h: float
+    op: str = "add"            # add — приварить к телу, cut — вырезать (CP-45)
+
+
+@dataclass
 class Dim:
     d: float                   # размер диаметра
     label: str                 # обозначение колонки SPEC-10
@@ -76,3 +85,4 @@ class PartModel:
     windows: list = field(default_factory=list)  # окна Window (сепаратор)
     row: int = 0                                 # ряд вида SVG: окна только этого ряда
     view: str = ""                               # "" — вид по оси; unroll — развёртка втулки (Д-47)
+    bands: list = field(default_factory=list)    # ступени вращения Band: дно, ступица, гнёзда (CP-45)

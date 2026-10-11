@@ -15,22 +15,26 @@ import time
 from pathlib import Path
 
 from egm import products, ptk_profile
-from egm.cad import ptk_ecc, ptk_ring, ptk_sep, ptk_spacer, step
+from egm.cad import ptk_cover, ptk_ecc, ptk_ring, ptk_sep, ptk_spacer, step
 
 LAYERS = {"01": ("01_RING", "венец"), "02": ("02_CAGE", "сепаратор"),
           "03": ("03_ECC", "эксцентрик"), "04": ("04_BODIES", "тела качения"),
-          "05": ("05_SPACER", "межрядные шайбы"),
-          "08": ("08_BEARING", "подшипник генератора"), "ref": ("REF", "примитивы: вал")}
+          "05": ("05_SPACER", "межрядные шайбы"), "07": ("07_COVER", "крышки"),
+          "08": ("08_BEARING", "подшипник генератора"), "09": ("09_BEARING_OUT", "подшипник выхода"),
+          "10": ("10_BEARING_IN", "подшипники входного вала"),
+          "11": ("11_DIST", "дистанционные кольца эксцентриков"), "ref": ("REF", "примитивы: вал")}
 COLORS = {"01": (0.55, 0.57, 0.60), "02": (0.80, 0.60, 0.20), "03": (0.30, 0.50, 0.80),
           "04": (0.85, 0.20, 0.20), "05": (0.45, 0.47, 0.52), "08": (0.20, 0.65, 0.30),
-          "ref": (0.70, 0.70, 0.70)}
+          "07": (0.62, 0.64, 0.68), "09": (0.20, 0.55, 0.25), "10": (0.25, 0.60, 0.35),
+          "11": (0.35, 0.55, 0.85), "ref": (0.70, 0.70, 0.70)}
 VIEWS = [{"name": "ISO", "dir": [1, -1, 1], "layers": "все"},
          {"name": "по оси", "dir": [0, 0, 1], "layers": "все"},
          {"name": "сбоку", "dir": [1, 0, 0], "layers": "все"},
          {"name": "без венцов и сепаратора", "dir": [1, -1, 1], "layers": "03, 04, 08, REF"}]
 SCHEMA = "AP242DIS"
 ALIAS = {"01": "RING", "02": "CAGE", "03": "ECC", "04": "BODY", "05": "SPACER",
-         "08": "BEARING", "ref": "SHAFT"}   # Д-52: имена узлов STEP — только латиница
+         "07": "COVER", "08": "BEARING", "09": "BRG_OUT", "10": "BRG_IN", "11": "DIST",
+         "ref": "SHAFT"}   # Д-52: имена узлов STEP — только латиница
 _ENT = re.compile(r"#(\d+)\s*=\s*([A-Z0-9_]+)\s*\((.*?)\)\s*;", re.S)
 _TOK = re.compile(r"'EGM(\d+)'")
 
@@ -47,6 +51,42 @@ def _base(pid):
 
 def _txt(v):
     return f"{v:g}" if isinstance(v, float) else str(v)
+
+
+def _shaft(cfg):
+    """Вал (REF) -> (z0, длина): с конструктивом шага 2 — от .07A до второй .10 в ступице."""
+    lay = cfg.get("layout") or {}
+    cov, cup, b10 = lay.get("covers"), lay.get("cup") or {}, lay.get("b10") or {}
+    if cov and cup.get("z_in"):
+        z0 = -cov["tA"] - 5.0
+        return z0, cup["z_in"] + b10.get("B", 0.0) - z0
+    return -5.0, cfg["sep"]["length"] + 10
+
+
+def _layout_inst(cfg, rows):
+    """CP-45: экземпляры конструктива шага 2 у корня (cfg["layout"] из ptk_design.apply):
+    .07A [−tA, 0], .07B [W, W + tB], .11 между эксцентриками, .10 в .07A и в ступице, .09 в .07B."""
+    lay, cid = cfg.get("layout") or {}, cfg["id"]
+    cov, cup, W = lay.get("covers"), lay.get("cup") or {}, cfg["sep"]["length"]
+    out = []
+
+    def at(pid, nn, z):
+        out.append({"id": pid, "nn": nn, "x": 0.0, "y": 0.0, "z": z, "ang": 0.0})
+    for q in lay.get("cad_parts", []):
+        nn = _nn(q["id"])
+        if nn == "07" and cov:
+            at(q["id"], nn, -cov["tA"] if q["side"] == "A" else W)
+        elif nn == "11":
+            for r in rows[:-1]:
+                at(q["id"], nn, r["zc"] + cfg["ecc"]["t"] / 2)
+    b09, b10 = lay.get("b09"), lay.get("b10")
+    if b10 and cov:
+        at(f"{cid}.10", "10", -b10["B"])
+    if b10 and cup.get("hub_d") and lay.get("parts", {}).get("02") == "cup":
+        at(f"{cid}.10", "10", cup["z_in"])
+    if b09 and cov:
+        at(f"{cid}.09", "09", W + cov["pocket"][1])
+    return out
 
 
 def plan(cfg):
@@ -82,9 +122,10 @@ def plan(cfg):
     for x in (cfg.get("spacer") or {}).get("pos", []):      # Д-53: шайбы пакета венцов
         root.append({"id": f"{cid}.05{x['variant']}", "nn": "05", "x": 0.0, "y": 0.0,
                      "z": x["z"], "ang": 0.0})
+    root += _layout_inst(cfg, rows)
     if g["limits"].get("shaft_d_min"):
-        root.append({"id": f"{cid}.REF-shaft", "nn": "ref", "x": 0.0, "y": 0.0, "z": -5.0,
-                     "ang": 0.0})
+        root.append({"id": f"{cid}.REF-shaft", "nn": "ref", "x": 0.0, "y": 0.0,
+                     "z": _shaft(cfg)[0], "ang": 0.0})
     return {"rows": rows, "root": root, "B": sep["length"], "pitch": pitch}
 
 
@@ -132,6 +173,16 @@ def item_meta(cfg, prods, pid, nn):
         m.update(code=cfg["roller"], d=g["roller"]["d"], l=g["roller"]["l"])
     elif nn == "08":
         m.update(code=cfg["bearing"], **g["bearing"])
+    elif nn == "07":
+        c, sd = cfg["layout"]["covers"], pid.split(".", 1)[1][2]
+        m.update(side=sd, t=c["t" + sd], D=c["D"], seat=c["seat_" + sd], d_bc=cfg["d_bc"])
+        if sd == "B":
+            m.update(pocket=f"Ø{c['pocket'][0]:g}×{c['pocket'][1]:g}")
+    elif nn == "11":
+        m.update(**cfg["layout"]["r11"])
+    elif nn in ("09", "10"):
+        b = cfg["layout"]["b" + nn]
+        m.update(code=b["id"], d=b["d"], D=b["D"], B=b["B"])
     else:
         m.update(d=g["limits"]["shaft_d_min"])
     return m
@@ -144,7 +195,9 @@ def _r(x):
 def label(cfg, pid, nn):
     """Алиас определения детали (Д-50, Д-52): «ECC (.03D)»; полный ID — только у корня.
     Скобка в конце: FreeCAD у дублей увеличивает хвостовые цифры (.04 → .05 … .152)."""
-    code = {"04": cfg.get("roller"), "08": cfg.get("bearing")}.get(nn)
+    lay = cfg.get("layout") or {}
+    code = {"04": cfg.get("roller"), "08": cfg.get("bearing"),
+            "09": (lay.get("b09") or {}).get("id"), "10": (lay.get("b10") or {}).get("id")}.get(nn)
     suf = pid.split(".", 1)[1] + (f" {code}" if code else "")
     return f"{ALIAS[nn]} (.{suf})"
 
@@ -272,17 +325,19 @@ def _shape(cq, cfg, pid, nn, mode):
         return step.solid(ptk_ecc.build(cfg, part), mode)
     if nn == "05":
         return step.solid(ptk_spacer.build(cfg, part), mode)
+    if nn in ("07", "11"):
+        return step.solid(ptk_cover.build(cfg, part), mode)
     if nn == "04":
         r = g["roller"]
         if r.get("type") == "ball":
             return cq.Solid.makeSphere(r["d"] / 2, V(0, 0, 0), nz, -90, 90, 360)
         return cq.Solid.makeCylinder(r["d"] / 2, r["l"])
-    if nn == "08":
-        b = g["bearing"]
+    if nn in ("08", "09", "10"):
+        b = g["bearing"] if nn == "08" else cfg["layout"]["b" + nn]
         return cq.Solid.extrudeLinear(cq.Wire.makeCircle(b["D"] / 2, V(0, 0, 0), nz),
                                       [cq.Wire.makeCircle(b["d"] / 2, V(0, 0, 0), nz)],
                                       V(0, 0, b["B"]))
-    return cq.Solid.makeCylinder(g["limits"]["shaft_d_min"] / 2, cfg["sep"]["length"] + 10)
+    return cq.Solid.makeCylinder(g["limits"]["shaft_d_min"] / 2, _shaft(cfg)[1])
 
 
 def export(cfg, prods, path, mode="spline"):
@@ -348,10 +403,12 @@ def export(cfg, prods, path, mode="spline"):
             grp = group(sub, bodies_label(r, len(bod)))
             for j, x in enumerate(bod, 1):
                 put(grp, x, f"#{j}")
-    nr = {}
+    nr, many = {}, {}
+    for x in p["root"]:
+        many[x["id"]] = many.get(x["id"], 0) + 1
     for x in p["root"]:
         nm = label(cfg, x["id"], x["nn"])
-        if x["nn"] == "05":                       # Д-53: шайб несколько — номер экземпляра
+        if many[x["id"]] > 1:          # Д-53, CP-45: шайбы, кольца .11, две .10 — номер экземпляра
             nr[x["id"]] = nr.get(x["id"], 0) + 1
             nm += f" #{nr[x['id']]}"
         put(root, x, nm)
@@ -424,6 +481,31 @@ def self_test():
     assert len(seg) == 9 and abs(seg[0][0]) < 1e-6 and abs(seg[-1][1] - p2["B"]) < 1e-6, seg
     assert all(abs(e0[1] - e1[0]) < 1e-6 for e0, e1 in zip(seg, seg[1:])), ("пакет: зазор", seg)
     assert label(cfg, "PTK-T.05B", "05") == "SPACER (.05B)"
+    from egm import ptk_layout                                               # CP-45
+    lay = {"parts": {"02": "cup", "07": "side", "11": "ring"},
+           "covers": {"tA": 6.0, "tB": 14.0, "D": 88.0, "seat_A": 19.0, "seat_B": 42.0,
+                      "pocket": [68.9, 6.0]},
+           "cup": {"z_in": 36.5, "t": 2.0, "hub_d": 30.0, "hub_bore": 19.0, "hub_l": 10.5},
+           "b09": {"id": "61806", "d": 30.0, "D": 42.0, "B": 7.0},
+           "b10": {"id": "61800", "d": 10.0, "D": 19.0, "B": 5.0},
+           "r11": {"n": 3, "h": 1.0, "d_in": 10.0, "d_out": 14.0}, "shaft_d": 10.0, "ax_gap": 0.5}
+    lay["cad_parts"] = ptk_layout.cad_parts(cfg, "K", lay)
+    cfg3 = {**cfg, "layout": lay,
+            "parts": [x for x in parts if ".02" not in x["id"]] + lay["cad_parts"]}
+    p3 = plan(cfg3)
+    W, z = p3["B"], {}
+    for x in p3["root"]:
+        z.setdefault(x["id"], []).append(x["z"])
+    assert z["PTK-T.02A-K"] == [0.0] and z["PTK-T.07A-K"] == [-6.0] and z["PTK-T.07B-K"] == [W], z
+    assert z["PTK-T.10"] == [-5.0, 36.5] and z["PTK-T.09"] == [W + 6.0], z
+    ecc = sorted(x["z"] for r in p3["rows"] for x in r["inst"] if x["nn"] == "03")
+    assert all(abs(e + 7.0 + 1.0 - f) < 1e-6 for e, f in zip(ecc, ecc[1:])), ecc
+    assert sorted(z["PTK-T.11-K"]) == [e + 7.0 for e in ecc[:-1]], (z["PTK-T.11-K"], ecc)
+    assert _shaft(cfg3) == (-11.0, 52.5), _shaft(cfg3)
+    l3 = [label(cfg3, pid, nn) for pid, nn in items(p3)]
+    assert len(set(l3)) == len(l3) and all(x.isascii() and not x[-1].isdigit() for x in l3), l3
+    assert label(cfg3, "PTK-T.10", "10") == "BRG_IN (.10 61800)", l3
+    assert ptk_cover.self_test()
     for s in ("Эксцентрик (.03D)", "it's \\ ok", "φ = 90°"):
         assert step_unstr(step_str(s)[1:-1]) == s, ("кодирование строки STEP", s)
     import tempfile
