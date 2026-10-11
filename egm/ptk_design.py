@@ -190,7 +190,8 @@ def md(res):
          "τ / [τ], МПа | σ см / [σ], МПа | Балансировка | Остаток, г·мм | m пакета, г | "
          "J вх, кг·м² | Статус |", "|---" * 13 + "|"]
     P = ["| Деталь | Как на шаге 1 | Паз, ° | Ряды |", "|---|---|---|---|"]
-    E, W, C = [], [], [ptk_layout.HEAD, "|---" * 10 + "|"]
+    E, W, C, T = [], [], [ptk_layout.HEAD, ptk_layout.RULE], \
+        [ptk_layout.TOOL_HEAD, ptk_layout.TOOL_RULE]
     for r in res:
         s = r.get("shaft")
         if s:
@@ -206,6 +207,7 @@ def md(res):
                   f"{', '.join(str(x) for x in p['rows'])} |" for p in r["parts"]]
             if r.get("layout"):
                 C.append(ptk_layout.md_row(r["name"], r["layout"]))
+                T += ptk_layout.md_tool(r["name"], r["layout"])
         else:
             L.append(f"| {r['name']} | {r['id']} |" + " — |" * 10 + " нет |")
         tag = f"- {r['name']} ({r['id']}): "
@@ -214,6 +216,7 @@ def md(res):
     return {"summary": "\n".join(L) if res else "нет проработок",
             "parts": "\n".join(P) if len(P) > 2 else "нет",
             "layouts": "\n".join(C) if len(C) > 2 else "нет",
+            "tooling": "\n".join(T) if len(T) > 2 else "нет",
             "errors": "\n".join(E) or "нет", "warnings": "\n".join(W) or "нет",
             "theory": THEORY, "n_ok": sum(r["ok"] for r in res), "n_all": len(res)}
 

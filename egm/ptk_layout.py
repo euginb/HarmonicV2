@@ -8,9 +8,13 @@ fixed = ring, output = cage: выход — сепаратор (стакан .02
 import math
 import re
 
-SUP = {"tau_allow": 25.0, "hub_wall": 2.0, "seat_wall": 2.0, "cover_t": 5.0, "ring_w": 2.0}
+SUP = {"tau_allow": 25.0, "hub_wall": 2.0, "seat_wall": 2.0, "ring_w": 2.0,
+       "lip": 1.0, "cup_t": 2.0, "ax_gap": 0.5, "nut_h": 4.0, "out_ext": 2.0}
 HEAD = ("| Проработка | Конструктив | Детали | .09 d×D×B | τ ступицы / [τ], МПа | .10 d×D×B | "
-        ".11 n × h, мм | Крышки t, мм | Длина, мм | Заготовка .02 |")
+        ".11 n × h, мм | Крышки tA / tB, мм | Дно .02 z / t, мм; ступица | Длина, мм | Заготовка .02 |")
+RULE = "|---" * 11 + "|"
+TOOL_HEAD = "| Проработка | Оснастка (Д-57) | Деталь | Размер | Маршрут |"
+TOOL_RULE = "|---" * 5 + "|"
 
 
 def bolt_clear(cid):
@@ -58,6 +62,70 @@ def blanks(r_in, r_out, stock):
             "sheet_len": round(math.pi * (r_in + r_out), 1), "bar": bars[0] if bars else None}
 
 
+def axial(width, row_gap, b09, b10, r_out, cfg, o, covers):
+    """Осевая компоновка (Д-57); z = 0 — торец пакета со стороны входа, W — длина пакета.
+
+    .07A [−tA, 0]: гнездо .10, tA = B.10 + lip. Гайка пакета эксцентриков — за последним рядом,
+    поэтому дно стакана изнутри на z_b = max(W, W − row_gap + nut_h) + ax_gap. .07B [W, W + tB]:
+    карман под дно Ø 2(r_out + ax_gap) глубиной z_b + cup_t + ax_gap − W, за ним гнездо .09
+    и буртик: tB = карман + B.09 + lip. Ступица d.09, длина ax_gap + B.09 + lip + out_ext;
+    отверстие ступицы D.10 сквозь дно — второй .10 на конце входного вала."""
+    warn = []
+    B09, B10 = (b09 or {}).get("B", 0.0), (b10 or {}).get("B", 0.0)
+    D10 = (b10 or {}).get("D", 0.0)
+    z_b = max(width, width - row_gap + o["nut_h"]) + o["ax_gap"]
+    pocket = z_b + o["cup_t"] + o["ax_gap"] - width
+    hub_l = o["ax_gap"] + B09 + o["lip"] + o["out_ext"]
+    if B10 > o["cup_t"] + hub_l + 1e-9:
+        warn.append(f".10 в ступице: B = {B10:g} > длины отверстия {o['cup_t'] + hub_l:g} мм")
+    cov = None
+    if covers:
+        r_pk = r_out + o["ax_gap"]
+        r_lim = float(cfg["d_bc"]) / 2 - bolt_clear(cfg["id"]) / 2 - o["seat_wall"]
+        if r_pk > r_lim + 1e-9:
+            warn.append(f".07B: карман под дно .02 r {r_pk:.2f} > {r_lim:.2f} мм — "
+                        f"стенка до отверстий крепежа < seat_wall")
+        cov = {"tA": round(B10 + o["lip"], 2), "tB": round(pocket + B09 + o["lip"], 2),
+               "D": cfg["d_out"], "seat_A": D10, "seat_B": (b09 or {}).get("D"),
+               "pocket": [round(2 * r_pk, 2), round(pocket, 2)]}
+    cup = {"z_in": round(z_b, 2), "t": o["cup_t"], "hub_d": (b09 or {}).get("d"),
+           "hub_bore": D10, "hub_l": round(hub_l, 2)}
+    length = (cov["tA"] + cov["tB"] if cov else 0.0) + width + o["out_ext"]
+    return {"covers": cov, "cup": cup, "length": round(length, 2)}, warn
+
+
+def tooling(rec, cfg, r_in, r_out):
+    """Оснастка (Д-57) -> [{fx, part, size, route}]: требования калькулятора, не конструкция FX."""
+    out = [{"fx": "разжимная оправка", "part": ".02",
+            "size": f"Ø{2 * r_in:.2f} по dc, длина ≥ {float(cfg['width']):g}",
+            "route": "точение Dc, окна, контроль — все маршруты тонкой стенки"}]
+    if rec["parts"].get("02") == "sleeve":
+        t = (rec.get("blank") or {}).get("sheet")
+        rm = (r_in + r_out) / 2
+        out += [{"fx": "вальцовка", "part": ".02",
+                 "size": (f"лист {t:g}, " if t else "") + f"r ср {rm:.2f}", "route": "weld: из листа"},
+                {"fx": "сварочная оправка с медной подкладкой", "part": ".02",
+                 "size": f"Ø{2 * r_in:.2f} − 2·sheet_allow", "route": "weld: стык на канавке подкладки"},
+                {"fx": "калибровочная оправка (раздача)", "part": ".02",
+                 "size": f"Ø{2 * r_in:.2f} − 2·sheet_allow", "route": "weld: после сварки, до отпуска"}]
+    var = {}
+    for ph in cfg["phasing"]:
+        v = ph.get("variant", "A")
+        var[v] = var.get(v, 0) + 1
+    pk = ", ".join(f"{k}×{n}" for k, n in sorted(var.items()))
+    out.append({"fx": "пакетная оправка венцов", "part": ".01",
+                "size": f"по отв. Dотв {float(cfg['d_bc']):g} (Д-16); пакеты {pk}",
+                "route": ("профиль ЭЭС пакетом в сборе" if len(var) == 1 else
+                          f"профиль ЭЭС пакетами по вариантам ({len(var)}); 1 вариант — Д-57")})
+    return out
+
+
+def md_tool(name, r):
+    """Строки таблицы «Оснастка» SPEC-11."""
+    return [f"| {name} | {t['fx']} | {t['part']} | {t['size']} | {t['route']} |"
+            for t in r.get("tooling", [])]
+
+
 def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
     """Конструктив проработки -> (запись | None, ошибки, предупреждения)."""
     code = d.get("layout", "L1")
@@ -89,22 +157,22 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
                "d_out": round(d11, 2)}
         if d11 < shaft_d + 1.0:
             warn.append(f".11: Ø нар. {d11:.2f} — опорный поясок меньше 0.5 мм")
-    cov = None
-    if "07" in pr:
-        cov = {"t": o["cover_t"], "D": cfg["d_out"], "seat_A": D10, "seat_B": b09["D"] if b09 else None}
     if "12" in pr:
         warn.append(f"{code}: соединение .02–.12 (сварка | винты | штифты) не считается (OQ-12)")
     sep = cfg.get("sep") or {}
     r_in = float(sep.get("r_in", cfg["R_sum"] - 1.1 * a))
     r_out = float(sep.get("r_out", cfg["R_sum"] + 1.1 * a))
+    ax, aw = axial(width, row_gap, b09, b10, r_out, cfg, o, "07" in pr)
+    warn += aw
     bl = blanks(r_in, r_out, stock)
     if bl is not None and not (bl["tube"] or bl["sheet"] or bl["bar"]):
         warn.append(f".02: нет заготовки в stock.json (труба Ø ≥ {bl['tube_need'][0]:g} с отв. ≤ "
                     f"{bl['tube_need'][1]:g}, лист ≥ {bl['sheet_need']:g}, пруток Ø ≥ {bl['tube_need'][0]:g})")
     rec = {"code": code, "name": lay.get("name", ""), "parts": pr, "b09": b09, "b10": b10,
            "tau_hub": round(tau, 1) if tau is not None else None, "tau_allow": o["tau_allow"],
-           "r11": r11, "covers": cov, "length": round(width + 2 * o["cover_t"] * bool(cov), 2),
+           "r11": r11, "covers": ax["covers"], "cup": ax["cup"], "length": ax["length"],
            "blank": bl}
+    rec["tooling"] = tooling(rec, cfg, r_in, r_out)
     return rec, err, warn
 
 
@@ -121,9 +189,11 @@ def md_row(name, r):
         s += [f"пруток Ø{bl['bar']:g}"] if bl["bar"] else []
     tau = f"{r['tau_hub']:g} / {r['tau_allow']:g}" if r["tau_hub"] is not None else "—"
     r11 = f"{r['r11']['n']} × {r['r11']['h']:g}" if r["r11"] else "—"
-    cov = f"{r['covers']['t']:g}" if r["covers"] else "—"
+    cov = f"{r['covers']['tA']:g} / {r['covers']['tB']:g}" if r["covers"] else "—"
+    c = r["cup"]
+    cup = f"{c['z_in']:g} / {c['t']:g}" + (f"; Ø{c['hub_d']:g}×{c['hub_l']:g}" if c["hub_d"] else "")
     return (f"| {name} | {r['code']} — {r['name']} | {', '.join('.' + k for k in sorted(r['parts']))} | "
-            f"{_b(r['b09'])} | {tau} | {_b(r['b10'])} | {r11} | {cov} | {r['length']:g} | "
+            f"{_b(r['b09'])} | {tau} | {_b(r['b10'])} | {r11} | {cov} | {cup} | {r['length']:g} | "
             f"{'; '.join(s) or ('нет stock.json' if bl is None else 'нет')} |")
 
 
@@ -147,12 +217,19 @@ def self_test():
     assert r["b10"]["id"] == "61800" and r["b09"]["id"] == "61806", (r["b09"], r["b10"])
     assert abs(r["tau_hub"] - 22.5) < 0.2, r["tau_hub"]
     assert r["r11"] == {"n": 3, "h": 1.0, "d_in": 10.0, "d_out": 14.0}, r["r11"]
-    assert r["length"] == 43.0 and "12" not in r["parts"], r
+    assert r["length"] == 55.0 and "12" not in r["parts"], r["length"]
+    assert r["covers"]["tA"] == 6.0 and r["covers"]["tB"] == 14.0, r["covers"]
+    assert r["cup"]["z_in"] == 36.5 and r["cup"]["hub_l"] == 10.5, r["cup"]
+    assert [t["fx"] for t in r["tooling"]] == ["разжимная оправка", "пакетная оправка венцов"], \
+        r["tooling"]
+    assert "пакетом в сборе" in r["tooling"][-1]["route"] and len(md_tool("K10", r)) == 2
     b = r["blank"]
     assert b["tube"] == {"D": 70.0, "s": 2.5} and b["sheet"] == 1.5 and b["bar"] == 70.0, b
     assert "61806" in md_row("K10", r)
     r2, e2, w2 = layout(cfg, {"layout": "L2"}, ecc, 10.0, 1.0, prods, bears, stock)
     assert not e2 and any("OQ-12" in x for x in w2), w2
+    assert any("медной" in t["fx"] for t in r2["tooling"]), r2["tooling"]
+    assert any(t["fx"] == "вальцовка" and "лист 1.5" in t["size"] for t in r2["tooling"])
     _, e3, _ = layout({**cfg, "d_bc": 40.0}, {"layout": "L1"}, ecc, 10.0, 1.0, prods, bears, stock)
     assert any(".09" in x for x in e3), e3
     _, e4, _ = layout(cfg, {"layout": "L9"}, ecc, 10.0, 1.0, prods, bears, stock)
