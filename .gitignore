@@ -9,6 +9,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 .idea
+.obsidian
 build/
 specs/task.md
 specs/init.md
