@@ -1,6 +1,6 @@
 # Отчёт построения чертежей (code-first, НЕ ПРАВИТЬ РУКАМИ)
 
-- Запуск: 2026-10-14 21:41
+- Запуск: 2026-10-14 22:27
 - Команда: python -m egm.cad --spec specs/cad_set.yaml
 
 ### 01A — венец
@@ -83,7 +83,7 @@ step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\03D-K10.step (0.2 с)
 
 svg: out\cad\PTK-050-R2X4_2-8M4P2-06A797\02A-K10.svg
 step: строится (spline, 360 точек профиля, 0 отв.)…
-step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\02A-K10.step (19.5 с)
+step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\02A-K10.step (21.4 с)
 ### 07A-K10 — крышка (A — вход, B — выход)
 
 Деталь 07 «крышка (A — вход, B — выход)» исполнения PTK-050-R2X4_2-8M4P2-06A797; ряды пакета: 1, 2, 3, 4.
@@ -119,5 +119,5 @@ assy: out\cad\PTK-050-R2X4_2-8M4P2-06A797\PTK-050-R2X4_2-8M4P2-06A797-K10.assy.j
 вал Ø10, эксцентрики .03 — проработка K10 (SPEC-11, Д-48)
 конструктив L1: 02A-K10, 07A-K10, 07B-K10, 11-K10; .09 61806, .10 61800; длина 55 мм (CP-45)
 step: сборка строится (17 деталей, 227 экземпляров, spline)…
-step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\PTK-050-R2X4_2-8M4P2-06A797-K10.step (20.7 с); метаданные в STEP: 26 узлов (PROPERTY_DEFINITION, Д-50); FreeCAD: макрос tools/freecad_meta.py
+step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\PTK-050-R2X4_2-8M4P2-06A797-K10.step (22.5 с); метаданные в STEP: 26 узлов (PROPERTY_DEFINITION, Д-50); FreeCAD: макрос tools/freecad_meta.py
 отчёт: reports\cad_report.md
