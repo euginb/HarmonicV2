@@ -2,7 +2,8 @@
 # Запуск: python -m egm.cad --spec specs/cad_set.yaml
 #
 # Читает опубликованные specs/ptk_configs.json (результат шага 1) и
-# specs/ptk_designs.json (шаг 2) — их пишет машина; выход — out/cad/<ID>/*.svg|.step.
+# specs/ptk_designs.json (шаг 2) — их пишет машина; выход — out/cad/<ID>/*.svg|.step
+# и отчёт вывода reports/cad_report.md (легенда каждой позиции).
 # Каждая запись items[] — исполнение ЦЕЛИКОМ: строятся все его детали, у которых
 # есть генератор (products.yaml → cad). Поля записи:
 #   id     — исполнение или ID детали из SPEC-10 / ptk_configs.json (префикс без

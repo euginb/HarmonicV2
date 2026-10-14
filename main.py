@@ -95,13 +95,11 @@ def run_ptk(prices):
         errs += [tag + e for e in r["errors"]]
         warns += [tag + w for w in r["warnings"]]
     tpl = (TPL / "SPEC-10_PTK_CALC.md.tmpl").read_text(encoding="utf-8")
-    params = "\n\n".join(f"Крепление `{k}` (режим `{mode}`, Д-33):\n\n" + ptk.params_md(lim, h, fast)
-                         for k, h in mounts.items())
     phasing = "\n\n".join(f"### Крепление `{k}`\n\n" + ptk.phasing_table(lim, h)
                           for k, h in mounts.items())
     text, missing = fill(
         tpl,
-        params=params, rows="\n".join(table),
+        rows="\n".join(table),
         profile=(ptk_profile.theory_md() + "\n\n" + ptk_force.theory_md() + "\n\n"
                  + ptk.profile_table([r for r in rows if not r["excluded"]])),
         errors="\n".join(errs) or "нет", warnings="\n".join(warns) or "нет",

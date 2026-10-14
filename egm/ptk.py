@@ -525,18 +525,6 @@ def phasing_table(lim, holes):
     return head + "\n\n" + "\n".join(rows)
 
 
-def params_md(lim, holes, fast):
-    """Таблица входных параметров прогона для SPEC-10."""
-    rows = ["| Параметр | Значение |", "|---|---|"]
-    for obj, pre in ((lim, "limits"), (holes, "ring_mounts")):
-        for f in fields(obj):
-            rows.append(f"| `{pre}.{f.name}` | {getattr(obj, f.name)} |")
-    f = fast.get(holes.bolt, {})
-    rows.append(f"| `fasteners.{holes.bolt}` | отверстие Ø{f.get('d_clear')}, головка "
-                f"Ø{f.get('dk')}, затяжка {f.get('F_M')} кН |")
-    return "\n".join(rows)
-
-
 def to_rows(results, mounts):
     """Строки ptk_configs.json; M, M_by считаются в calc (Д-41); mounts — для совместимости."""
     return [asdict(r) for r in results]
