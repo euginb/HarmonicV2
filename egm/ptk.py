@@ -7,7 +7,7 @@ zg = i + 1, zsh = i). 4 ряда 0/90/180/270° (Д-08). Отверстия ве
 
 Порядок расчёта (Д-38): u, D_ш, a_ω → R_Σ — наименьший без подреза вершины зуба, с
 перемычкой сепаратора и D_г ≥ Dgen_min → профиль по (6) Янгулова → D_В, α max →
-отверстия, D. Обозначения — Д-37. Параметры — specs/ptk_input.json (INS-10);
+отверстия, D. Обозначения — Д-37. Параметры — specs/ptk_input.yaml (INS-10);
 значения по умолчанию в dataclass — только для self_test() (Д-18).
 """
 import hashlib
@@ -76,7 +76,7 @@ class RingHoles:
 @dataclass
 class PtkResult:
     u: int
-    roller: str                   # ключ vendor_prices.json → rollers
+    roller: str                   # ключ vendor_prices.yaml → rollers
     Drol: float                   # D_ш
     id: str = ""
     n: int = 0                    # тел в ряду
@@ -85,7 +85,7 @@ class PtkResult:
     R_sum: float = 0.0            # R_Σ
     R_by: str = ""                # что задало R_Σ: подрез | сепаратор | генератор
     Dgen: float = 0.0             # D_г
-    bearing: str = ""             # подшипник генератора, ключ vendor_prices.json → bearings (Д-40)
+    bearing: str = ""             # подшипник генератора, ключ vendor_prices.yaml → bearings (Д-40)
     gen: str = "bearing"          # тип генератора: bearing | eccentric (Д-42)
     d_root: float = 0.0           # D_В
     d_tip: float = 0.0            # D_верш
@@ -127,7 +127,7 @@ def _load(cls, d):
 
 
 def load_config(cfg):
-    """specs/ptk_input.json -> (PtkLimits, {ключ: RingHoles}, fasteners, mount_mode) (Д-33)."""
+    """specs/ptk_input.yaml -> (PtkLimits, {ключ: RingHoles}, fasteners, mount_mode) (Д-33)."""
     fast = {k: v for k, v in cfg["fasteners"].items() if not k.startswith("_")}
     raw = cfg.get("ring_mounts") or {"default": cfg["ring_holes"]}
     mounts = {k: _load(RingHoles, v) for k, v in raw.items() if not k.startswith("_")}
@@ -382,7 +382,7 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
         brg = bears.get(bk) if bk else None
         if brg is None:
             r.errors.append(f"нет подшипника генератора с D ≥ {need_D:.1f} и d ≥ {need_d:.1f} мм "
-                            f"в vendor_prices.json → bearings (Д-40)")
+                            f"в vendor_prices.yaml → bearings (Д-40)")
         else:
             R = (brg["D"] + D) / 2
             r.bearing = bk
@@ -550,7 +550,7 @@ def tech_md():
 
 
 def self_test():
-    """Проверки ПО на фиксированных параметрах (не зависят от ptk_input.json)."""
+    """Проверки ПО на фиксированных параметрах (не зависят от ptk_input.yaml)."""
     lim, holes = PtkLimits(), RingHoles()
     fast = {"M4": {"d_clear": 4.5, "dk": 7.0, "F_M": 4.1}}
     bears = {f"T{d}": {"d": d - 12.0, "D": float(d), "B": 7.0, "C": 5.0, "C0": 5.0}

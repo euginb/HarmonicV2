@@ -12,7 +12,7 @@
 
 | Папка | Содержимое | Кто пишет |
 |---|---|---|
-| `specs/` | спецификации (spec-first и code-first), БД JSON, входные параметры `*_input.json` | заказчик; code-first — перенос из `out/specs/` |
+| `specs/` | спецификации (spec-first и code-first); ручные конфиги `*.yaml`, code-first данные и БД — `*.json` | заказчик; code-first — перенос из `out/specs/` |
 | `reports/` | отчёты прогона: сводка проверок, разбор каталогов | перенос из `out/reports/` (Д-14) |
 | `instructions/` | инструкции: к code-first спецификациям, режимы работы с ИИ, подготовка контекста; реестр — `instructions/README.md` (Д-17, Д-25) | правятся напрямую |
 | `templates/` | шаблоны code-first спецификаций | код |
@@ -25,14 +25,16 @@
 
 ## Правила работы с репозиторием
 
-1. **Code-first**: числа живут в коде и `specs/*.json`; `python main.py` пишет
+1. **Code-first**: числа живут в коде и `specs/` (ручные конфиги `*.yaml`,
+   код-первая выдача `*.json`); `python main.py` пишет
    спецификации в `out/specs/`, отчёты в `out/reports/`; они переносятся в
    `specs/` и `reports/` вручную или ключом `--publish` (Д-14). Руками не правятся.
 2. **Spec-first**: технология, методики, договорённости — правятся напрямую.
-   Если число из spec-first попадает в расчёт, оно переносится в код/JSON,
+   Если число из spec-first попадает в расчёт, оно переносится в код/конфиг,
    а документ ссылается на источник, не дублируя значение.
-3. Данные производителей — только из `specs/*.json`, без хардкода в коде.
-4. Входные параметры расчётов — `specs/*_input.json` (Д-18), их смысл — в `instructions/`.
+3. Данные производителей — только из ручных конфигов `specs/*.yaml`, без хардкода в коде.
+4. Входные параметры расчётов — `specs/*.yaml` (Д-18, Д-60), их смысл — комментариями
+   в самих файлах и в `instructions/`.
 5. Решения — `Д-##` в DECISIONS.md, план кода — `CP-##` + `TODO(CP-##)` в коде.
 
 ## Правила взаимодействия с ИИ
@@ -51,11 +53,11 @@
 | начало сессии, «что читать», «пол» | обязательный стартовый набор файлов | §2.4 |
 | `upd.md`, «обновить строку таблицы», «новый файл без diff», `upd_apply.py` | формат upd.md: правки строк таблиц по ключу, новые файлы; запуск утилиты | §2.5 |
 | bundle, `CONTEXT_BUNDLE.md`, `AUDIT_BUNDLE.md`, `context_bundle.py`, `make_audit_bundle.py`, review | подготовка контекста — ссылка на INS-90 (ключи, профили исключения, пределы) | §1, §2 → INS-90 |
-| code-first, `*_input.json`, `vendor_prices.json`, `--publish`, «поменять результат SPEC» | порядок изменения code-first: вход → прогон → перенос; таблица SPEC ↔ INS ↔ входные файлы | §3 |
+| code-first, `*_input.yaml`, `vendor_prices.yaml`, `--publish`, «поменять результат SPEC» | порядок изменения code-first: вход → прогон → перенос; таблица SPEC ↔ INS ↔ входные файлы | §3 |
 | незнакомое сокращение: ПТК, ГК, ЭЭС, ЭХП, HMC/VMC, K1–K3, M1–M4, EGC, `Д-/OQ-/CP-/X-/CAT-##` | глоссарий проекта | §4 |
 | u, z, n, e, Ø дел., венец, сепаратор, генератор волн, ряд | обозначения волнового редуктора ПТК | §5 |
 | H, W, L, WR, HR, P, E, каталожный номер HIWIN | обозначения направляющих — ссылка на INS-20 | §6 |
-| `python -m egm.cad`, чертёж, STEP, SVG, `out/cad/`, `products.json`, `.NN` | генератор 2D/3D по ID, номенклатура деталей — ссылка на INS-30 | §1 → INS-30 |
+| `python -m egm.cad`, чертёж, STEP, SVG, `out/cad/`, `products.yaml`, `cad_set.yaml`, `--spec`, `.NN` | генератор 2D/3D по ID и по спецификации комплекта, номенклатура деталей — ссылка на INS-30 | §1 → INS-30 |
 
 1. ИИ не пишет в репозиторий: изменения — только unified diff; заказчик
    проверяет, применяет, коммитит и пушит; закрывающий прогон `main.py` — у
@@ -84,17 +86,17 @@
 | [specs/SPEC-02_PRECISION_EMBEDS.md](specs/SPEC-02_PRECISION_EMBEDS.md) | spec-first | Д-03, Д-04 | черновик |
 | [specs/SPEC-03_PRODUCTS.md](specs/SPEC-03_PRODUCTS.md)                 | spec-first | Д-24 | черновик |
 | [specs/SPEC-04_ARCHITECTURE.md](specs/SPEC-04_ARCHITECTURE.md)         | spec-first | Д-39 | черновик |
-| [specs/products.json](specs/products.json)                             | данные (номенклатура) | SPEC-03 | rev 7 |
+| [specs/products.yaml](specs/products.yaml)                             | данные (номенклатура) | SPEC-03 | rev 7 |
 | [specs/CATALOGS.md](specs/CATALOGS.md)                                 | реестр | `docs/` | черновик |
-| [specs/vendor_prices.json](specs/vendor_prices.json)                   | данные (заказчик) | поставщики | заполняется |
-| [specs/ptk_input.json](specs/ptk_input.json)                           | данные (параметры) | заказчик, INS-10 | rev 1 |
+| [specs/vendor_prices.yaml](specs/vendor_prices.yaml)                   | данные (заказчик) | поставщики | заполняется |
+| [specs/ptk_input.yaml](specs/ptk_input.yaml)                           | данные (параметры) | заказчик, INS-10 | rev 1 |
 | [specs/SPEC-10_PTK_CALC.md](specs/SPEC-10_PTK_CALC.md)                 | code-first | `egm/ptk.py`, `templates/SPEC-10_PTK_CALC.md.tmpl`, INS-10 | rev 1 |
 | [specs/ptk_configs.json](specs/ptk_configs.json)                       | code-first (данные) | `egm/ptk.py` | rev 1 |
 | [specs/catalog_hiwin_hg.json](specs/catalog_hiwin_hg.json)             | code-first (БД) | `egm/catalog.py` ← CAT-01, INS-20 | rev 1 |
 | [specs/catalog_hiwin_hg_pairs.json](specs/catalog_hiwin_hg_pairs.json) | code-first (БД) | `egm/catalog.py`, Д-10, INS-20 | rev 1 |
 | [reports/checks.md](reports/checks.md)                                 | отчёт | `main.py` | каждый прогон |
 | [reports/catalog_report.md](reports/catalog_report.md)                 | отчёт | `egm/catalog.py` | каждый прогон |
-| [specs/stock.json](stock.json)                                         | данные (заказчик) | поставщики | заполняется |
+| [specs/stock.yaml](stock.yaml)                                         | данные (заказчик) | поставщики | заполняется |
 
 
 ## Описание спецификаций
@@ -108,9 +110,9 @@
 | SPEC-01_NAMING | маркировка станков `S<тип>-<№>-<компоновка>` и ID узлов | при именовании станков, узлов, файлов                                |
 | SPEC-02_PRECISION_EMBEDS | классы точности K1–K3, способы монтажа закладных M1–M4, правила раскроя | при проектировании закладных и литья                                 |
 | CATALOGS | реестр каталогов производителей CAT-## | при добавлении нового каталога                                       |
-| vendor_prices.json | наличие, цена, сроки покупных позиций; тела качения ПТК (`rollers`) | заполняет заказчик (INS-20)                                          |
-| ptk_input.json | входные параметры калькулятора ПТК: ограничения, отверстия венца, крепёж | правит заказчик (INS-10)                                             |
-| SPEC-10_PTK_CALC | расчёт редуктора ПТК по диапазону u и телам качения, с расшифровкой колонок | результат прогона; параметры — в ptk_input.json                      |
+| vendor_prices.yaml | наличие, цена, сроки покупных позиций; тела качения ПТК (`rollers`) | заполняет заказчик (INS-20)                                          |
+| ptk_input.yaml | входные параметры калькулятора ПТК: ограничения, отверстия венца, крепёж | правит заказчик (INS-10)                                             |
+| SPEC-10_PTK_CALC | расчёт редуктора ПТК по диапазону u и телам качения, с расшифровкой колонок | результат прогона; параметры — в ptk_input.yaml                      |
 | ptk_configs.json | те же результаты SPEC-10 в машиночитаемом виде | вход для следующих расчётов                                          |
 | catalog_hiwin_hg.json | БД кареток, рельсов, типоразмеров HIWIN HG из CAT-01 | вход для расчётов станков                                            |
 | catalog_hiwin_hg_pairs.json | совместимые пары рельс+каретка с нашими каталожными номерами EGC | номер пары используется в спецификациях станков (INS-20)             |
@@ -124,7 +126,11 @@
 
 ## Запуск
 
-`python main.py` → `out/specs/`, `out/reports/`; код выхода 0 = все проверки пройдены.
+`python main.py [calc|design|all]` → `out/specs/`, `out/reports/`; код выхода 0 = все
+проверки пройдены. Шаги (Д-60): `calc` — шаг 1 (SPEC-10, `ptk_configs.json`);
+`design` — шаг 2 (SPEC-11) по опубликованному результату шага 1; `all` (по умолчанию) — всё.
 `python main.py --publish` — то же и копирование: `out/reports/` → `reports/`
 всегда, `out/specs/` → `specs/` только при коде выхода 0.
-`python -m egm.cad <ID>[.<NN><вар>]` → `out/cad/<ID>/` — чертежи SVG/STEP по ID (INS-30).
+`python -m egm.cad <ID>[.<NN><вар>]` → `out/cad/<ID>/` — чертежи SVG/STEP по ID (INS-30);
+`python -m egm.cad --spec specs/cad_set.yaml` — комплект чертежей по спецификации (Д-61).
+Ручные конфиги — `specs/*.yaml` (нужен PyYAML: `pip install pyyaml`).

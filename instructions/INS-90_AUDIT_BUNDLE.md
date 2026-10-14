@@ -78,7 +78,7 @@ python tools/context_bundle.py --sha <base-sha> <ключ|путь> [...] > CONT
 |---|---|---|
 | `README.md` (только пол) | 5 | ~30 КБ |
 | `CP-20 Д-24` | 10 | ~38 КБ |
-| `SPEC-10 INS-10 specs/ptk_input.json` | 14 | ~107 КБ |
+| `SPEC-10 INS-10 specs/ptk_input.yaml` | 14 | ~107 КБ |
 
 ### 2.5. Пределы и коды выхода
 

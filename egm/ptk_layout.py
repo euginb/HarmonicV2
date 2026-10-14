@@ -1,6 +1,6 @@
 """Конструктивы ПТК, шаг 2 (Д-55, CP-42): опоры .09/.10, кольца .11, крышки .07, заготовка .02.
 
-Конструктив — набор деталей из products.json → PTK.layouts. Реализована схема
+Конструктив — набор деталей из products.yaml → PTK.layouts. Реализована схема
 fixed = ring, output = cage: выход — сепаратор (стакан .02 в L1, обечайка .02 + ступица .12 в L2).
 Ступица выхода полая: снаружи .09, внутри .10 (опора входного вала); кручение
 τ = 16·M/(π·d³·(1 − β⁴)), β = D.10/d.09. Нагрузки опор по C0 не проверяются (OQ-17).
@@ -47,7 +47,7 @@ def hub_brg(bears, M, D10, o, D_max):
 
 
 def blanks(r_in, r_out, stock):
-    """Заготовка .02 из stock.json: труба, лист (обечайка со швом), пруток (стакан монолитом)."""
+    """Заготовка .02 из stock.yaml: труба, лист (обечайка со швом), пруток (стакан монолитом)."""
     if not stock:
         return None
     ta, sa = float(stock.get("tube_allow", 0.5)), float(stock.get("sheet_allow", 0.3))
@@ -150,7 +150,7 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
     code = d.get("layout", "L1")
     lay = (prods or {}).get("PTK", {}).get("layouts", {}).get(code)
     if lay is None:
-        return None, [f"конструктив {code}: нет в products.json → PTK.layouts (Д-55)"], []
+        return None, [f"конструктив {code}: нет в products.yaml → PTK.layouts (Д-55)"], []
     if lay.get("fixed") != "ring" or lay.get("output") != "cage":
         return None, [f"конструктив {code}: реализован только fixed = ring, output = cage"], []
     err, warn = [], ["нагрузки опор .09/.10 по C0 не проверяются (OQ-17)"]
@@ -159,14 +159,14 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
     M, rows, a = float(cfg.get("M") or 0.0), len(cfg["phasing"]), float(cfg["a_w"])
     b10 = pick_brg(bears, shaft_d)
     if b10 is None:
-        err.append(f".10: нет подшипника с d ≥ {shaft_d:g} мм в vendor_prices.json → bearings")
+        err.append(f".10: нет подшипника с d ≥ {shaft_d:g} мм в vendor_prices.yaml → bearings")
     D10 = b10["D"] if b10 else shaft_d
     D_max = float(cfg["d_bc"]) - bolt_clear(cfg["id"]) - 2 * o["seat_wall"]
     b09, tau = hub_brg(bears, M, D10, o, D_max)
     if b09 is None:
         err.append(f".09: нет подшипника с d ≥ {D10 + 2 * o['hub_wall']:g}, D ≤ {D_max:.1f} мм "
                    f"(гнездо в .07B внутри крепежа Ø{float(cfg['d_bc']):g}) и τ ступицы ≤ "
-                   f"{o['tau_allow']:g} МПа в vendor_prices.json → bearings")
+                   f"{o['tau_allow']:g} МПа в vendor_prices.yaml → bearings")
     width = float(cfg["width"])
     pitch = (width - (rows + 1) * row_gap) / rows
     r11 = None
@@ -185,7 +185,7 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
     warn += aw
     bl = blanks(r_in, r_out, stock)
     if bl is not None and not (bl["tube"] or bl["sheet"] or bl["bar"]):
-        warn.append(f".02: нет заготовки в stock.json (труба Ø ≥ {bl['tube_need'][0]:g} с отв. ≤ "
+        warn.append(f".02: нет заготовки в stock.yaml (труба Ø ≥ {bl['tube_need'][0]:g} с отв. ≤ "
                     f"{bl['tube_need'][1]:g}, лист ≥ {bl['sheet_need']:g}, пруток Ø ≥ {bl['tube_need'][0]:g})")
     rec = {"code": code, "name": lay.get("name", ""), "parts": pr, "b09": b09, "b10": b10,
            "tau_hub": round(tau, 1) if tau is not None else None, "tau_allow": o["tau_allow"],
@@ -215,7 +215,7 @@ def md_row(name, r):
     cup = f"{c['z_in']:g} / {c['t']:g}" + (f"; Ø{c['hub_d']:g}×{c['hub_l']:g}" if c["hub_d"] else "")
     return (f"| {name} | {r['code']} — {r['name']} | {', '.join('.' + k for k in sorted(r['parts']))} | "
             f"{_b(r['b09'])} | {tau} | {_b(r['b10'])} | {r11} | {cov} | {cup} | {r['length']:g} | "
-            f"{'; '.join(s) or ('нет stock.json' if bl is None else 'нет')} |")
+            f"{'; '.join(s) or ('нет stock.yaml' if bl is None else 'нет')} |")
 
 
 def self_test():

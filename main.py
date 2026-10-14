@@ -1,4 +1,10 @@
-"""Точка входа: python main.py [--publish]. Код выхода 0 — все проверки пройдены.
+"""Точка входа: python main.py [calc|design|all] [--publish]. Код выхода 0 — все проверки.
+
+Шаги (Д-60): calc — шаг 1 «Расчёт» (SPEC-10, ptk_configs.json из ptk_input.yaml +
+vendor_prices.yaml); design — шаг 2 «Проработка» (SPEC-11, ptk_designs.json из
+ptk_design_input.yaml по ОПУБЛИКОВАННОМУ specs/ptk_configs.json — связка выход шага 1 →
+вход шага 2); all (по умолчанию) — весь прогон, как прежде: шаг 1 → шаг 2 по его
+результату → проверки products → каталог.
 
 out/specs/   — code-first спецификации и БД -> переносятся в specs/   (Д-14)
 out/reports/ — отчёты прогона               -> переносятся в reports/ (Д-14)
@@ -10,17 +16,13 @@ import shutil
 import sys
 from pathlib import Path
 
-from egm import catalog, naming, products, ptk, ptk_design, ptk_force, ptk_parts, ptk_profile
+from egm import catalog, config, naming, products, ptk, ptk_design, ptk_force, ptk_parts, ptk_profile
 from egm.cad import assy as cad_assy, ptk_ring, ptk_sep, ptk_spacer, step as cad_step
 
 ROOT = Path(__file__).resolve().parent
 SPECS, REPORTS, TPL = ROOT / "specs", ROOT / "reports", ROOT / "templates"
 OUT = ROOT / "out"
 DEST = {"specs": SPECS, "reports": REPORTS}
-
-
-def load_json(name):
-    return json.loads((SPECS / name).read_text(encoding="utf-8"))
 
 
 def write(kind, name, text):
@@ -65,11 +67,11 @@ def publish(ok):
 
 
 def run_ptk(prices):
-    """SPEC-10: калькулятор ПТК по specs/ptk_input.json (Д-16, Д-18)."""
+    """SPEC-10: калькулятор ПТК по specs/ptk_input.yaml (Д-16, Д-18)."""
     try:
-        lim, mounts, fast, mode = ptk.load_config(load_json("ptk_input.json"))
+        lim, mounts, fast, mode = ptk.load_config(config.load("ptk_input.yaml"))
     except (KeyError, ValueError, TypeError) as e:
-        return [f"ptk_input.json: {e!r}"]
+        return [f"ptk_input.yaml: {e!r}"]
     rows = ptk.to_rows(ptk.sweep(prices["rollers"], prices.get("bearings", {}), lim, mounts,
                                  fast, mode), mounts)
     write("specs", "ptk_configs.json", json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
@@ -115,7 +117,7 @@ def run_ptk(prices):
     dup = sorted({i for i in ids if ids.count(i) > 1})
     if dup:
         bad.append(f"ptk: одинаковые ID {dup} — одно тело под разными ключами "
-                   "vendor_prices.json → rollers (Д-22)")
+                   "vendor_prices.yaml → rollers (Д-22)")
     return bad
 
 
@@ -131,20 +133,29 @@ def run_catalog(prices):
     return [f"catalog: {e}" for e in rep["errors"]]
 
 
-def run_design():
-    """SPEC-11: проработка выбранных исполнений, шаг 2 (Д-48); вход — ptk_configs.json прогона."""
-    cfg_path = OUT / "specs" / "ptk_configs.json"
-    if not (SPECS / "ptk_design_input.json").exists() or not cfg_path.exists():
+def run_design(cfg_rows, require=False):
+    """SPEC-11: проработка выбранных исполнений, шаг 2 (Д-48).
+
+    cfg_rows — исполнения шага 1 (ptk_configs.json): полный прогон — свежие из
+    out/specs/, режим design — опубликованные specs/ (связь выход шага 1 → вход
+    шага 2, Д-60)."""
+    if not (SPECS / "ptk_design_input.yaml").exists():
+        if require:
+            return ["ptk_design_input.yaml: файл не найден — проработки designs[] не заданы"]
+        return []
+    if cfg_rows is None:
+        if require:
+            return ["specs/ptk_configs.json: не найден — сначала шаг 1: "
+                    "python main.py calc --publish (Д-60)"]
         return []
     try:
-        lim = ptk.load_config(load_json("ptk_input.json"))[0]
-        extra = {"prods": load_json("products.json"),
-                 "bears": load_json("vendor_prices.json").get("bearings", {}),
-                 "stock": load_json("stock.json") if (SPECS / "stock.json").exists() else None}
-        res = ptk_design.run(load_json("ptk_design_input.json"),
-                             json.loads(cfg_path.read_text(encoding="utf-8")), lim, extra)
+        lim = ptk.load_config(config.load("ptk_input.yaml"))[0]
+        extra = {"prods": config.load("products.yaml"),
+                 "bears": config.load("vendor_prices.yaml").get("bearings", {}),
+                 "stock": config.load("stock.yaml") if (SPECS / "stock.yaml").exists() else None}
+        res = ptk_design.run(config.load("ptk_design_input.yaml"), cfg_rows, lim, extra)
     except (KeyError, ValueError, TypeError) as e:
-        return [f"ptk_design_input.json: {e!r}"]
+        return [f"ptk_design_input.yaml: {e!r}"]
     write("specs", "ptk_designs.json", json.dumps(res, ensure_ascii=False, indent=2) + "\n")
     tpl = (TPL / "SPEC-11_PTK_DESIGN.md.tmpl").read_text(encoding="utf-8")
     text, missing = fill(tpl, **ptk_design.md(res))
@@ -153,38 +164,55 @@ def run_design():
 
 
 def main(argv):
+    args = argv[1:]
+    mode = "all"
+    if args and args[0] in ("calc", "design", "all"):
+        mode = args.pop(0)
     for kind in DEST:
         shutil.rmtree(OUT / kind, ignore_errors=True)
     fails = []
-    for name, test in (("ptk", ptk.self_test), ("naming", naming.self_test),
-                       ("catalog", catalog.self_test), ("products", products.self_test),
-                       ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test),
-                       ("fill", fill_self_test), ("step", cad_step.self_test),
-                       ("force", ptk_force.self_test), ("parts", ptk_parts.self_test),
-                       ("sep_svg", ptk_sep.self_test), ("spacer", ptk_spacer.self_test),
-                       ("assy", cad_assy.self_test),
-                       ("design", ptk_design.self_test)):
+    if mode in ("all", "calc"):         # шаг 1: проверки ПО + расчёт по диапазону (SPEC-10)
+        for name, test in (("config", config.self_test), ("ptk", ptk.self_test),
+                           ("naming", naming.self_test),
+                           ("catalog", catalog.self_test), ("products", products.self_test),
+                           ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test),
+                           ("fill", fill_self_test), ("step", cad_step.self_test),
+                           ("force", ptk_force.self_test), ("parts", ptk_parts.self_test),
+                           ("sep_svg", ptk_sep.self_test), ("spacer", ptk_spacer.self_test),
+                           ("assy", cad_assy.self_test),
+                           ("design", ptk_design.self_test)):
+            try:
+                test()
+            except AssertionError as e:
+                fails.append(f"{name}.self_test: {e!r}")
+            except Exception as e:      # CP-45: не AssertionError — тоже строка в checks.md, прогон идёт
+                import traceback
+                f = traceback.extract_tb(e.__traceback__)[-1]
+                fails.append(f"{name}.self_test: {e!r} ({f.filename.replace(chr(92), '/').rsplit('/', 1)[-1]}:{f.lineno})")
         try:
-            test()
-        except AssertionError as e:
-            fails.append(f"{name}.self_test: {e!r}")
-        except Exception as e:      # CP-45: не AssertionError — тоже строка в checks.md, прогон идёт
-            import traceback
-            f = traceback.extract_tb(e.__traceback__)[-1]
-            fails.append(f"{name}.self_test: {e!r} ({f.filename.replace(chr(92), '/').rsplit('/', 1)[-1]}:{f.lineno})")
-    prices = load_json("vendor_prices.json")
-    fails += run_ptk(prices)
-    fails += run_design()
-    cfg_path = OUT / "specs" / "ptk_configs.json"
-    if cfg_path.exists():
-        fails += products.check(load_json("products.json"), json.loads(cfg_path.read_text(encoding="utf-8")))
-    fails += run_catalog(prices)
+            prices = config.load("vendor_prices.yaml")
+            fails += run_ptk(prices)
+            cfg_path = OUT / "specs" / "ptk_configs.json"
+            rows = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else None
+            if mode == "all":           # шаг 2 — по свежим исполнениям шага 1
+                fails += run_design(rows)
+            if cfg_path.exists():
+                fails += products.check(config.load("products.yaml"),
+                                        json.loads(cfg_path.read_text(encoding="utf-8")))
+            if mode == "all":
+                fails += run_catalog(prices)
+        except (KeyError, ValueError, TypeError) as e:
+            fails.append(f"входные конфигурации: {e!r}")
+    elif mode == "design":              # шаг 2 — по ОПУБЛИКОВАННОМУ шагу 1 (Д-60)
+        cfg_path = SPECS / "ptk_configs.json"
+        rows = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else None
+        fails += run_design(rows, require=True)
     # TODO(CP-03): cost.report(); TODO(CP-04): машины по naming.MACHINES (HMC + VMC)
     write("reports", "checks.md", "# Проверки прогона (code-first, НЕ ПРАВИТЬ РУКАМИ)\n\n"
           + ("\n".join(f"- {f}" for f in fails) or "все пройдены") + "\n")
     ok = not fails
     print("OK" if ok else "FAIL", *fails, sep="\n")
-    if "--publish" in argv[1:]:
+    if "--publish" in args:
         publish(ok)
     return 0 if ok else 1
 

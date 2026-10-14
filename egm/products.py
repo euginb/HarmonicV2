@@ -16,7 +16,7 @@ def item(products, part_id):
     p = parse(part_id)
     prod = products.get(p["prod"])
     if prod is None or p["nn"] not in prod["parts"]:
-        raise KeyError(f"{part_id}: позиции {p['prod']}.{p['nn']} нет в products.json")
+        raise KeyError(f"{part_id}: позиции {p['prod']}.{p['nn']} нет в products.yaml")
     return prod["parts"][p["nn"]]
 
 

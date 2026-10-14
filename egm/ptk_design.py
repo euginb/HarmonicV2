@@ -1,6 +1,6 @@
 """Шаг 2 — проработка выбранного исполнения ПТК (Д-48, CP-38).
 
-Вход: specs/ptk_design_input.json → designs[]; исполнение шага 1 — ptk_configs.json.
+Вход: specs/ptk_design_input.yaml → designs[]; исполнение шага 1 — ptk_configs.json.
 Выход: ptk_designs.json и SPEC-11_PTK_DESIGN.md; детали проработки — <ID>.03<вар>-<name>.
 Исполнение задаётся полным ID или префиксом без хэша (+ bearing, gen): хэш меняется
 с геометрией шага 1 (Д-22), а проработка остаётся привязанной (Д-51).
@@ -140,7 +140,7 @@ def design(cfg, d, lim, keys, extra=None):
 
 
 def run(inp, configs, lim, extra=None):
-    """ptk_design_input.json -> [запись]; ошибка входа — ValueError (в checks.md)."""
+    """ptk_design_input.yaml -> [запись]; ошибка входа — ValueError (в checks.md)."""
     keys = sorted(inp.get("keys", {}).get("table", []), key=lambda k: k["d_max"])
     out, names = [], set()
     for d in inp.get("designs", []):
@@ -163,7 +163,7 @@ def find(designs, cid, name):
         if r["id"] == base and r["name"] == name and r.get("ecc"):
             return r
     raise KeyError(f"проработка {name} для {base} не найдена в specs/ptk_designs.json — "
-                   f"проверить ptk_design_input.json, python main.py --publish (Д-48)")
+                   f"проверить ptk_design_input.yaml, python main.py --publish (Д-48)")
 
 
 def pick(designs, arg, name=None):

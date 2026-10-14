@@ -6,7 +6,10 @@
 из specs/ptk_designs.json; файлы <деталь>-NAME…, сборка <ID>-NAME.step.
 
 --phase φ / --row k — ряд редуктора: строится только венец этого ряда, на чертеже —
-направление его эксцентрика. Данные — specs/ptk_configs.json, specs/products.json.
+направление его эксцентрика.
+--spec specs/cad_set.yaml — комплект чертежей по спецификации (Д-61): записи items[] —
+исполнения целиком (id, design, assy, фильтры rows/parts); ID из командной строки —
+низкоуровневый путь. Данные — specs/ptk_configs.json, specs/products.yaml.
 Коды выхода: 0 — ok; 1 — ID не найден / нет генератора / ошибка геометрии; 2 — аргументы.
 """
 import argparse
@@ -14,7 +17,7 @@ import json
 import sys
 from pathlib import Path
 
-from egm import products, ptk, ptk_design
+from egm import config, products, ptk, ptk_design
 from egm.cad import assy, ptk_cover, ptk_ecc, ptk_ring, ptk_sep, ptk_spacer, step, svg
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,14 +35,16 @@ def _row(cfg, phase, row):
                      f"фазы: {[r['phi'] for r in cfg['phasing']]}")
 
 
-def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=None):
+def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=None, only=None):
+    """only — подмножество позиций {"01", "02"} для спецификации комплекта (Д-61) или None."""
     cfg = ptk_design.apply(ptk.find(configs, arg), des)
     if not cfg["ok"]:
         why = cfg["errors"] or [f"исключено по технологии {cfg.get('excluded')} (Д-45, SPEC-10)"]
         print(f"предупреждение: {cfg['id']} нереализуема: {'; '.join(why)}")
     k = _row(cfg, phase, row)
     parts = [p for p in cfg["parts"] if ("." not in arg or arg in (p["id"], p.get("base")))
-             and (k is None or k in p["rows"])]
+             and (k is None or k in p["rows"])
+             and (only is None or p["id"].split(".", 1)[-1][:2] in only)]
     if not parts:
         raise KeyError(f"{arg}: нет детали (ряд {k}) или она не сгенерирована калькулятором")
     out = ROOT / "out" / "cad" / cfg["id"]
@@ -47,7 +52,7 @@ def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=Non
     for part in parts:
         gen = products.item(prods, part.get("base", part["id"])).get("cad")
         if gen not in GENERATORS:
-            print(f"{part['id']}: генератора нет (products.json → cad)")
+            print(f"{part['id']}: генератора нет (products.yaml → cad)")
             continue
         model = GENERATORS[gen](cfg, part, k)
         name = part["id"].split(".", 1)[1] + (f"-r{k}" if k else "")
@@ -123,10 +128,77 @@ def build_assy(arg, configs, prods, step_mode="spline", des=None):
           + "; FreeCAD: макрос tools/freecad_meta.py")
 
 
+def _resolve(configs, arg):
+    """ID в спецификации -> запись configs: полный, деталь или префикс без хэша (Д-51)."""
+    try:
+        return ptk.find(configs, arg)
+    except KeyError:
+        c = [r for r in configs if r.get("id", "").startswith(arg)]
+        if len(c) == 1:
+            return c[0]
+        if not c:
+            raise
+        raise ValueError(f"{arg}: неоднозначен: {[r['id'] for r in c]} — "
+                         "уточнить полным ID из SPEC-10")
+
+
+def _pick_design(designs, arg, name):
+    """Проработка по ID (полный или префикс без хэша, Д-51) и имени — как шаг 2
+    уточняет prefix+bearing/gen. Не найдена/неоднозначна — ошибка Д-48."""
+    base = arg.split(".")[0]
+    c = [r for r in designs if r["id"] == base and r["name"] == name and r.get("ecc")]
+    if not c:
+        c = [r for r in designs if r["id"].startswith(base) and r["name"] == name and r.get("ecc")]
+    if len(c) == 1:
+        return c[0]
+    if len(c) > 1:
+        raise ValueError(f"{arg}: проработок {name} несколько: {[r['id'] for r in c]} — "
+                         "уточнить полным ID из SPEC-10")
+    ptk_design.find(designs, base, name)        # не найдена — штатная ошибка Д-48
+
+
+def run_spec(spec, configs, prods, designs):
+    """Комплект чертежей по спецификации (YAML, Д-61): записи items[] — исполнения
+    целиком; строятся все детали с генераторами (products.yaml → cad), assy — сборка.
+    Возвращает число записей, окончивших ошибкой."""
+    data = config.load(spec)
+    step_mode = data.get("step", "spline")
+    bad = 0
+    for i, item in enumerate(data.get("items", []), 1):
+        arg = item.get("id")
+        if not arg:
+            print(f"спецификация: запись {i}: нет id")
+            bad += 1
+            continue
+        try:
+            if item.get("design"):
+                des = _pick_design(designs, arg, item["design"])
+                full = des["id"]        # полный ID из записи проработки (текущий хэш)
+            else:
+                des = None
+                full = _resolve(configs, arg)["id"]
+            target = arg if "." in arg else full    # деталь — как задана
+            if des is None:
+                des = ptk_design.pick(designs, target)   # имя из хвоста ID детали или None
+            only = None if item.get("parts", "all") == "all" \
+                else {str(p).zfill(2)[:2] for p in item["parts"]}
+            rows = item.get("rows", "all")
+            if rows == "all":
+                build(target, configs, prods, None, None, step_mode, des, only)
+            else:
+                for k in rows:
+                    build(target, configs, prods, None, k, step_mode, des, only)
+            if item.get("assy"):
+                build_assy(target, configs, prods, step_mode, des)
+        except (KeyError, ValueError) as e:
+            print(f"ошибка: {e}")
+            bad += 1
+    return bad
+
 def main(argv):
     ap = argparse.ArgumentParser(prog="python -m egm.cad", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("ids", nargs="+")
+    ap.add_argument("ids", nargs="*")
     grp = ap.add_mutually_exclusive_group()
     grp.add_argument("--phase", type=float, help="фаза ряда φ, град (row_phases)")
     grp.add_argument("--row", type=int, help="номер ряда 1…rows")
@@ -135,10 +207,18 @@ def main(argv):
     ap.add_argument("--assy", action="store_true",
                     help="сборка исполнения в один STEP: дерево, слои, метаданные (Д-49)")
     ap.add_argument("--design", help="проработка шага 2 из specs/ptk_designs.json (Д-48)")
+    ap.add_argument("--spec", help="спецификация комплекта чертежей (YAML, Д-61), "
+                                   "например specs/cad_set.yaml; вместе с ID не задаётся")
     a = ap.parse_args(argv)
+    if not a.spec and not a.ids:
+        ap.error("укажите ID исполнения/детали или --spec (комплект по спецификации, Д-61)")
+    if a.spec and a.ids:
+        ap.error("--spec и ID вместе не задаются")
     load = lambda n: json.loads((ROOT / "specs" / n).read_text(encoding="utf-8"))
-    configs, prods = load("ptk_configs.json"), load("products.json")
+    configs, prods = load("ptk_configs.json"), config.load("products.yaml")
     designs = load("ptk_designs.json") if (ROOT / "specs" / "ptk_designs.json").exists() else []
+    if a.spec:
+        return 1 if run_spec(a.spec, configs, prods, designs) else 0
     rc = 0
     for arg in a.ids:
         try:
