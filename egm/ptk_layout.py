@@ -130,7 +130,8 @@ def cad_parts(cfg, name, rec):
     """Детали конструктива для egm.cad (CP-45): .02A стакан | .02B обечайка, .07A/.07B, .11.
 
     ID — <ID>.<NN><вар>-<проработка>, base — без суффикса (Д-48); покупные .09/.10 — в rec."""
-    cid, rows = cfg["id"], [ph["row"] for ph in cfg["phasing"]]
+    cid = cfg["id"]
+    rows = [ph.get("row", k + 1) for k, ph in enumerate(cfg["phasing"])]
     sfx, out, v02 = (f"-{name}" if name else ""), [], rec["parts"].get("02")
     if v02 in ("cup", "sleeve"):
         base = f"{cid}.02{'A' if v02 == 'cup' else 'B'}"
@@ -229,7 +230,8 @@ def self_test():
                "parts": {"02": "sleeve", "07": "side", "09": "out", "10": "in", "11": "ring", "12": "hub"}}}}}
     stock = {"tubes": [{"D": 70.0, "s": 5.0}, {"D": 70.0, "s": 2.5}, {"D": 68.0, "s": 1.0}],
              "sheets": [1.0, 1.2, 1.5, 2.0], "bars": [65.0, 70.0, 75.0]}
-    cfg = {"id": "PTK-T-8M4P2-AAAAAA", "M": 100.0, "phasing": [{}] * 4, "a_w": 0.4, "R_sum": 33.5,
+    cfg = {"id": "PTK-T-8M4P2-AAAAAA", "M": 100.0, "phasing": [{"row": k + 1} for k in range(4)],
+           "a_w": 0.4, "R_sum": 33.5,
            "d_bc": 80.0, "d_out": 90.0, "width": 33.0}
     ecc = {"De": 50.0, "t": 7.0}
     r, e, w = layout(cfg, {"layout": "L1"}, ecc, 10.0, 1.0, prods, bears, stock)
@@ -246,6 +248,11 @@ def self_test():
     b = r["blank"]
     assert b["tube"] == {"D": 70.0, "s": 2.5} and b["sheet"] == 1.5 and b["bar"] == 70.0, b
     assert "61806" in md_row("K10", r)
+    ids = [q["id"] for q in r["cad_parts"]]                                   # CP-45
+    assert ids == ["PTK-T-8M4P2-AAAAAA.02A", "PTK-T-8M4P2-AAAAAA.07A", "PTK-T-8M4P2-AAAAAA.07B",
+                   "PTK-T-8M4P2-AAAAAA.11"], ids
+    assert r["cad_parts"][0]["rows"] == [1, 2, 3, 4] and r["cad_parts"][0]["cup"] == r["cup"]
+    assert cad_parts({"id": "X", "phasing": [{}] * 2}, "K", r)[1]["id"] == "X.07A-K"
     r2, e2, w2 = layout(cfg, {"layout": "L2"}, ecc, 10.0, 1.0, prods, bears, stock)
     assert not e2 and any("OQ-12" in x for x in w2), w2
     assert any("медной" in t["fx"] for t in r2["tooling"]), r2["tooling"]

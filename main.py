@@ -168,6 +168,10 @@ def main(argv):
             test()
         except AssertionError as e:
             fails.append(f"{name}.self_test: {e!r}")
+        except Exception as e:      # CP-45: не AssertionError — тоже строка в checks.md, прогон идёт
+            import traceback
+            f = traceback.extract_tb(e.__traceback__)[-1]
+            fails.append(f"{name}.self_test: {e!r} ({f.filename.replace(chr(92), '/').rsplit('/', 1)[-1]}:{f.lineno})")
     prices = load_json("vendor_prices.json")
     fails += run_ptk(prices)
     fails += run_design()
