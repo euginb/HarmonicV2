@@ -11,9 +11,9 @@
 | Инструкция | Назначение | Когда читать | Связанные решения                                                                 |
 |---|---|---|-----------------------------------------------------------------------------------|
 | [README.md](README.md) (INS-00) | реестр инструкций, режимы работы с ИИ, порядок code-first, глоссарий | в начале любой сессии | Д-17, Д-25                                                                        |
-| [INS-10_PTK_CALC.md](INS-10_PTK_CALC.md) | калькулятор ПТК: входные параметры `specs/ptk_input.json` (`limits`, набор креплений `ring_mounts`, `mount_mode`), тела и подшипники `vendor_prices.json → rollers, bearings`, типы генератора и технологические коды Т1–Т4, профиль венца, допускаемый момент, чтение SPEC-10 и `ptk_configs.json`, ID исполнения; шаг 2 — проработка исполнения `ptk_design_input.json`, SPEC-11 | правка параметров ПТК, разбор SPEC-10 | Д-08, Д-16, Д-18, Д-19, Д-22, Д-31, Д-33, Д-38, Д-40…Д-43, Д-45, Д-46, Д-48, Д-51 |
+| [INS-10_PTK_CALC.md](INS-10_PTK_CALC.md) | ПТК, шаги 1–2: правила и flow (calc → выбор исполнения → design), входы и выходы каждого этапа, конфигурация `ptk_input.yaml`, `ptk_design_input.yaml`, `vendor_prices.yaml` (описания параметров — комментариями в YAML, Д-60), чтение SPEC-10/SPEC-11 и `ptk_configs.json`, ID исполнения; справочник — формулы, профиль, фазировка, Т1–Т4, типовые правки | правка параметров ПТК, разбор SPEC-10/SPEC-11 | Д-08, Д-16, Д-18, Д-19, Д-22, Д-31, Д-33, Д-38, Д-40…Д-43, Д-45, Д-46, Д-48, Д-51, Д-60 |
 | [INS-20_CATALOG.md](INS-20_CATALOG.md) | каталог HIWIN HG: разбор `docs/HG-Series-Catalog_opt.md`, БД `catalog_hiwin_hg*.json`, каталожные номера EGC, `reports/catalog_report.md` | правка каталога, цен, подбор направляющих | Д-07, Д-10                                                                        |
-| [INS-30_CAD.md](INS-30_CAD.md) | генератор чертежей 2D/3D по ID: `python -m egm.cad`, выход `out/cad/`, номенклатура `specs/products.json`, состав по умолчанию и его смена | построение чертежей, правка номенклатуры | Д-22, Д-24, Д-30, Д-46…Д-52                                                       |
+| [INS-30_CAD.md](INS-30_CAD.md) | чертежи 2D/3D: комплект по спецификации `specs/cad_set.yaml` (`python -m egm.cad --spec`, Д-61) или по ID (`python -m egm.cad`, низкоуровневый путь); выход `out/cad/`, номенклатура `specs/products.yaml`, состав по умолчанию и его смена | построение комплекта чертежей, правка номенклатуры | Д-22, Д-24, Д-30, Д-46…Д-52, Д-61 |
 | [INS-90_AUDIT_BUNDLE.md](INS-90_AUDIT_BUNDLE.md) | ручная подготовка контекста для ИИ: `tools/context_bundle.py` (по ключам) и `tools/make_audit_bundle.py` (снимок `AUDIT_BUNDLE.md`, профили исключения) | работа с моделью в AI Chat; review | Д-20, Д-21, Д-26, Д-27, Д-28                                                      |
 
 Справочный файл вне раздела: [`HarmonicV2-workflow.md`](../HarmonicV2-workflow.md)
@@ -133,17 +133,19 @@ Code-first спецификация — результат прогона `main.
 
 | Инструкция | Спецификация / БД | Входные файлы |
 |---|---|---|
-| [INS-10_PTK_CALC.md](INS-10_PTK_CALC.md) | `specs/SPEC-10_PTK_CALC.md`, `specs/ptk_configs.json` | `specs/ptk_input.json`, `specs/vendor_prices.json` → `rollers`, `bearings` |
+| [INS-10_PTK_CALC.md](INS-10_PTK_CALC.md) | `specs/SPEC-10_PTK_CALC.md`, `specs/SPEC-11_PTK_DESIGN.md`, `specs/ptk_configs.json`, `specs/ptk_designs.json` | `specs/ptk_input.yaml`, `specs/ptk_design_input.yaml`, `specs/vendor_prices.yaml` → `rollers`, `bearings` |
 | [INS-20_CATALOG.md](INS-20_CATALOG.md) | `specs/catalog_hiwin_hg.json`, `specs/catalog_hiwin_hg_pairs.json`, `reports/catalog_report.md` | `docs/HG-Series-Catalog_opt.md`, `specs/vendor_prices.json` |
 
-1. Правите входной файл (`specs/*_input.json`, `specs/vendor_prices.json`).
+1. Правите входной файл — ручной конфиг `specs/*.yaml` (`ptk_input`, `ptk_design_input`,
+   `vendor_prices`, `products`, `stock`; Д-60).
 2. `python main.py` — результат в `out/specs/` и `out/reports/`.
 3. Смотрите `out/reports/checks.md`: «все пройдены» = код выхода 0.
 4. Переносите результат: вручную или `python main.py --publish` (Д-14).
 5. Коммит.
 
-В JSON ключи, начинающиеся с `_` (`_comment`), — комментарии, код их пропускает.
-Неизвестный параметр (опечатка в имени) — ошибка прогона, а не молчаливое игнорирование.
+Ручные конфиги — YAML: описание каждого параметра — комментарий рядом с ним (Д-60),
+ключи `_comment` больше не используются. Неизвестный параметр (опечатка в имени) —
+ошибка прогона, а не молчаливое игнорирование.
 
 ## 4. Глоссарий проекта
 
