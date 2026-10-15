@@ -34,6 +34,21 @@ def check(products, configs):
     return fails
 
 
+def check_app(app, prods):
+    """Д-64: разделы продуктов в configs/application.yaml (products:) — есть в реестре
+    products.yaml; enabled — при непустой номенклатуре."""
+    fails = []
+    for code, sec in (app.get("products") or {}).items():
+        if not isinstance(sec, dict):
+            fails.append(f"application.yaml: products.{code}: раздел не словарь (Д-64)")
+        elif code not in prods:
+            fails.append(f"application.yaml: products.{code} отсутствует в products.yaml (Д-64)")
+        elif sec.get("enabled") and not (prods[code].get("parts") or {}):
+            fails.append(f"application.yaml: products.{code}: enabled, но номенклатура "
+                         "в products.yaml пуста")
+    return fails
+
+
 def self_test():
     p = parse("PTK-063-R5X8-8M4P2-3F9A1C.01B")
     assert p == {"cfg": "PTK-063-R5X8-8M4P2-3F9A1C", "prod": "PTK", "nn": "01", "var": "B"}, p
@@ -41,4 +56,9 @@ def self_test():
     assert not check(prods, [{"parts": [{"id": "PTK-1-X.01A"}]}])
     assert check(prods, [{"parts": [{"id": "PTK-1-X.09"}]}])
     assert check(prods, [{"parts": [{"id": "bad"}]}])
+    app_prods = {"PTK": {"parts": {"01": {}}}, "HD": {"parts": {}}}
+    assert not check_app({"products": {"PTK": {"enabled": True},
+                                       "HD": {"enabled": False}}}, app_prods)
+    assert check_app({"products": {"XX": {"enabled": True}}}, app_prods)
+    assert check_app({"products": {"HD": {"enabled": True}}}, app_prods)
     return True

@@ -17,6 +17,7 @@
 # [--design NAME] — остаётся для точечных прогонов (INS-30).
 
 step: spline        # контур впадин в STEP: spline — B-сплайн | poly — ломаная | off — без STEP
+                    # приоритет: --step → здесь → configs/application.yaml cad.export.step.mode (Д-64)
 
 items:
   - id: PTK-050-R2X4_2-8M4P2   # исполнение из SPEC-10 (префикс без хэша — Д-51)

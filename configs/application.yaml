@@ -1,0 +1,49 @@
+# Общий конфиг приложения (Д-64, rev 9.4). Формат — YAML (Д-60). Читается кодом
+# (egm/config.py → load_app): данные берутся отсюда, а не из хардкодов в коде.
+# Сами текущие конфиги сюда НЕ вкладываются: в configs: — ссылки (пути от корня
+# репозитория), правятся по своим путям; код резолвит их egm/config.py → cfg_file.
+# Раздел products: — по продукту из реестра configs.products (products.yaml,
+# SPEC-03): новый продукт — свой раздел здесь и запись в products.yaml; полный
+# прогон проверяет разделы (egm/products.py → check_app).
+# Раздел cad: — механизм построения чертежей (INS-30 §7): SVG и 3D-экспорт в двух
+# форматах — основной STEP и альтернативный FreeCAD (.FCStd).
+
+app:
+  name: HarmonicV2
+
+paths:                      # каталоги от корня репозитория
+  specs: specs              # ручные конфиги и code-first данные (Д-14, Д-60)
+  reports: reports          # отчёты прогона
+  templates: templates      # шаблоны SPEC-10/SPEC-11
+  out: out                  # рабочая папка прогона (в git не хранится)
+
+configs:                    # пучок текущих конфигов — ссылки, не вложенные копии (Д-64)
+  products: specs/products.yaml              # перечень изделий и номенклатура деталей (SPEC-03)
+  vendor_prices: specs/vendor_prices.yaml    # тела качения и подшипники — вход шага 1
+  stock: specs/stock.yaml                    # остатки склада (файл не обязателен)
+  cad_set: specs/cad_set.yaml                # комплект чертежей (Д-61)
+  catalog_md: docs/HG-Series-Catalog_opt.md  # каталог HIWIN HG — источник CAT-01
+
+products:                   # по продукту из реестра configs.products (Д-64)
+  PTK:
+    enabled: true           # номенклатура и расчёт настроены (SPEC-10/SPEC-11)
+    configs:                # входные конфиги продукта — шаги 1 и 2 (Д-60)
+      input: specs/ptk_input.yaml                # шаг 1 «Расчёт» (SPEC-10)
+      design_input: specs/ptk_design_input.yaml  # шаг 2 «Проработка» (SPEC-11)
+  HD:
+    enabled: false          # заготовка: номенклатура в products.yaml пуста (TODO(CP-09))
+    configs: {}             # входные конфиги ГК — по мере проработки
+
+cad:                        # механизм построения чертежей (INS-30 §7)
+  out_dir: out/cad                            # каталог вывода чертежей
+  report: reports/cad_report.md               # отчёт прогона (Д-14, Д-62)
+  svg:
+    enabled: true                             # 2D-вид по оси (1:1, мм)
+  export:                   # 3D-экспорт из одной геометрии (Д-30, Д-32) — форматы
+    step:                   # основной формат — STEP (CP-29)
+      enabled: true
+      mode: spline          # контур впадин (INS-30 §6): spline — B-сплайн | poly — ломаная
+    freecad:                # альтернативный формат — FreeCAD, .FCStd (rev 9.4)
+      enabled: false        # включить — true; нужен установленный FreeCAD
+      format: FCStd
+      command: FreeCADCmd   # головной FreeCAD: freecadcmd | FreeCADCmd | полный путь

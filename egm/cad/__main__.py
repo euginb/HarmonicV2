@@ -10,6 +10,8 @@
 --spec specs/cad_set.yaml — комплект чертежей по спецификации (Д-61): записи items[] —
 исполнения целиком (id, design, assy, фильтры rows/parts); ID из командной строки —
 низкоуровневый путь. Данные — specs/ptk_configs.json, specs/products.yaml.
+Механизм и форматы 3D-экспорта — configs/application.yaml → cad: (Д-64): STEP —
+основной, FCStd (FreeCAD) — альтернативный; без FreeCAD/CadQuery — «пропущен».
 Пути в выводе — от корня репозитория; весь вывод консоли дублируется в
 reports/cad_report.md (Д-14, переписывается каждым запуском; в конце лога — куда
 сохранён) с легендой каждой позиции: что это за чертёж и что это за деталь.
@@ -22,9 +24,21 @@ from datetime import datetime
 from pathlib import Path
 
 from egm import config, products, ptk, ptk_design
-from egm.cad import assy, ptk_cover, ptk_ecc, ptk_ring, ptk_sep, ptk_spacer, step, svg
+from egm.cad import assy, freecad, ptk_cover, ptk_ecc, ptk_ring, ptk_sep, ptk_spacer, step, svg
 
 ROOT = Path(__file__).resolve().parents[2]
+APP = config.load_app()                     # общий конфиг приложения (Д-64)
+_CAD = APP.get("cad") or {}
+_EXP = _CAD.get("export") or {}
+_STEP = _EXP.get("step") or {}
+_FC = _EXP.get("freecad") or {}
+CAD_OUT = ROOT / (_CAD.get("out_dir") or "out/cad")          # каталог чертежей (Д-64)
+CAD_REPORT = _CAD.get("report") or "reports/cad_report.md"   # отчёт прогона (Д-14)
+SVG_ON = (_CAD.get("svg") or {}).get("enabled", True)
+STEP_ON = _STEP.get("enabled", True)            # основной экспорт — STEP (Д-32)
+STEP_MODE = _STEP.get("mode", "spline")         # контур впадин по умолчанию (INS-30 §6)
+FC_ON = _FC.get("enabled", False)               # альтернативный экспорт — FCStd (Д-64)
+FC_CMD = _FC.get("command") or freecad.DEFAULT_COMMAND
 GENERATORS = {"ptk_ring": ptk_ring.build, "ptk_sep": ptk_sep.build, "ptk_ecc": ptk_ecc.build,
               "ptk_spacer": ptk_spacer.build, "ptk_cover": ptk_cover.build}
 
@@ -69,7 +83,7 @@ _CONSOLE = _Report()      # по умолчанию — только консо�
 def _open_report(argv):
     """Отчёт прогона reports/cad_report.md (Д-14): переписывается каждым запуском,
     в конце лога печатается, куда он сохранён."""
-    rep = _Report(ROOT / "reports" / "cad_report.md")
+    rep = _Report(ROOT / CAD_REPORT)
     rep.only("# Отчёт построения чертежей (code-first, НЕ ПРАВИТЬ РУКАМИ)\n")
     rep.only(f"- Запуск: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     rep.only(f"- Команда: python -m egm.cad {' '.join(argv)}\n")
@@ -110,6 +124,40 @@ def _row(cfg, phase, row):
                      f"фазы: {[r['phi'] for r in cfg['phasing']]}")
 
 
+def _export_fc(model, fcstd_path, step_mode, pid, rep, step_file=None):
+    """Альтернативный экспорт .FCStd (Д-64): включается в configs/application.yaml
+    (cad.export.freecad.enabled). Геометрия та же, что у STEP (Д-30, Д-32): FreeCAD
+    импортирует STEP и сохраняет документ (egm/cad/freecad.py). Без FreeCAD/CadQuery/
+    STEP — «freecad: пропущен», прогон не падает; ошибка конвертации — ValueError."""
+    if not FC_ON:
+        return
+    try:
+        import cadquery  # noqa: F401
+    except Exception as e:
+        rep.say(f"freecad: пропущен — cadquery не импортируется в {sys.executable}: "
+                f"{type(e).__name__}: {e}")
+        return
+    temp = False
+    if step_file is None or not Path(step_file).exists():
+        if model is None:
+            rep.say("freecad: пропущен — STEP не строился (step: off)")
+            return
+        step_file = fcstd_path.with_suffix(".tmp.step")
+        step.export(model, step_file, step_mode)
+        temp = True
+    try:
+        dt = freecad.export(step_file, fcstd_path, FC_CMD)
+    except FileNotFoundError as e:
+        rep.say(f"freecad: пропущен — {e}")
+        return
+    except ValueError as e:
+        raise ValueError(f"{pid}: {e}")
+    finally:
+        if temp:
+            Path(step_file).unlink(missing_ok=True)
+    rep.say(f"freecad: {_rel(fcstd_path)} ({dt:.1f} с, {freecad.FORMAT})")
+
+
 def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=None,
           only=None, rep=_CONSOLE):
     """only — подмножество позиций {"01", "02"} для спецификации комплекта (Д-61) или None."""
@@ -123,7 +171,7 @@ def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=Non
              and (only is None or p["id"].split(".", 1)[-1][:2] in only)]
     if not parts:
         raise KeyError(f"{arg}: нет детали (ряд {k}) или она не сгенерирована калькулятором")
-    out = ROOT / "out" / "cad" / cfg["id"]
+    out = CAD_OUT / cfg["id"]
     out.mkdir(parents=True, exist_ok=True)
     for part in parts:
         prod = products.item(prods, part.get("base", part["id"]))
@@ -134,16 +182,23 @@ def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=Non
         name = part["id"].split(".", 1)[1] + (f"-r{k}" if k else "")
         _legend(rep, cfg, part, gen, des, name, prod)
         model = GENERATORS[gen](cfg, part, k)
-        (out / f"{name}.svg").write_text(svg.render(model), encoding="utf-8", newline="\n")
-        rep.say(f"svg: {_rel(out / (name + '.svg'))}")
-        if step_mode == "off":
-            rep.say("step: пропущен (--step off)")
+        if SVG_ON:
+            (out / f"{name}.svg").write_text(svg.render(model), encoding="utf-8",
+                                             newline="\n")
+            rep.say(f"svg: {_rel(out / (name + '.svg'))}")
+        else:
+            rep.say("svg: пропущен (application.yaml → cad.svg.enabled)")
+        if step_mode == "off" or not STEP_ON:
+            rep.say("step: пропущен " + ("(--step off)" if step_mode == "off"
+                                         else "(application.yaml → cad.export.step.enabled)"))
+            _export_fc(model, out / f"{name}.FCStd", step_mode, part["id"], rep)
             continue
         try:
             import cadquery  # noqa: F401
         except Exception as e:   # не только ImportError: DLL OCP, numpy, другой venv
             rep.say(f"step: пропущен — cadquery не импортируется в {sys.executable}: "
                     f"{type(e).__name__}: {e}")
+            _export_fc(model, out / f"{name}.FCStd", step_mode, part["id"], rep)
             continue
         rep.say(f"step: строится ({step_mode}, {len(model.cut.pts)} точек профиля, "
                 f"{len(model.holes)} отв.)…", flush=True)
@@ -154,6 +209,8 @@ def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=Non
             import traceback
             traceback.print_exc()
             raise ValueError(f"{part['id']}: ошибка построения STEP (traceback выше)")
+        _export_fc(model, out / f"{name}.FCStd", step_mode, part["id"], rep,
+                   step_file=out / f"{name}.step")
 
 
 def build_assy(arg, configs, prods, step_mode="spline", des=None, rep=_CONSOLE):
@@ -163,7 +220,7 @@ def build_assy(arg, configs, prods, step_mode="spline", des=None, rep=_CONSOLE):
     if not cfg.get("sep") or not cfg.get("ecc"):
         raise ValueError(f"{cfg['id']}: нет деталей .02/.03 (нереализуемо или исключено) — "
                          f"сборка не строится")
-    out = ROOT / "out" / "cad" / cfg["id"]
+    out = CAD_OUT / cfg["id"]
     out.mkdir(parents=True, exist_ok=True)
     p = assy.plan(cfg)
     man = out / f"{tag}.assy.json"
@@ -183,14 +240,16 @@ def build_assy(arg, configs, prods, step_mode="spline", des=None, rep=_CONSOLE):
                 + ", ".join(q["id"].split(".", 1)[1] for q in lay.get("cad_parts", []))
                 + f"; .09 {(lay.get('b09') or {}).get('id', 'нет')}, "
                 f".10 {(lay.get('b10') or {}).get('id', 'нет')}; длина {lay['length']:g} мм (CP-45)")
-    if step_mode == "off":
-        rep.say("step: пропущен (--step off)")
+    if step_mode == "off" or not STEP_ON:
+        rep.say("step: пропущен " + ("(--step off)" if step_mode == "off"
+                                     else "(application.yaml → cad.export.step.enabled)"))
         return
     try:
         import cadquery  # noqa: F401
     except Exception as e:
         rep.say(f"step: пропущен — cadquery не импортируется в {sys.executable}: "
                 f"{type(e).__name__}: {e}")
+        _export_fc(None, out / f"{tag}.FCStd", step_mode, cfg["id"], rep)
         return
     n = sum(len(r["inst"]) for r in p["rows"]) + len(p["root"])
     rep.say(f"step: сборка строится ({len(assy.items(p))} деталей, {n} экземпляров, "
@@ -205,6 +264,7 @@ def build_assy(arg, configs, prods, step_mode="spline", des=None, rep=_CONSOLE):
     rep.say(f"step: {_rel(path)} ({dt:.1f} с); метаданные в STEP: "
             + (f"{meta} узлов (PROPERTY_DEFINITION, Д-50)" if meta else "нет — только в .assy.json")
             + "; FreeCAD: макрос tools/freecad_meta.py")
+    _export_fc(None, out / f"{tag}.FCStd", step_mode, cfg["id"], rep, step_file=path)
 
 
 def _resolve(configs, arg):
@@ -241,7 +301,7 @@ def run_spec(spec, configs, prods, designs, rep=_CONSOLE):
     целиком; строятся все детали с генераторами (products.yaml → cad), assy — сборка.
     Возвращает число записей, окончивших ошибкой."""
     data = config.load(spec)
-    step_mode = data.get("step", "spline")
+    step_mode = data.get("step") or STEP_MODE   # приоритет: файл комплекта → Д-64
     bad = 0
     for i, item in enumerate(data.get("items", []), 1):
         arg = item.get("id")
@@ -281,8 +341,9 @@ def main(argv):
     grp = ap.add_mutually_exclusive_group()
     grp.add_argument("--phase", type=float, help="фаза ряда φ, град (row_phases)")
     grp.add_argument("--row", type=int, help="номер ряда 1…rows")
-    ap.add_argument("--step", choices=("spline", "poly", "off"), default="spline",
-                    help="контур впадин в STEP: B-сплайн | ломаная | без STEP")
+    ap.add_argument("--step", choices=("spline", "poly", "off"), default=None,
+                    help="контур впадин в STEP: B-сплайн | ломаная | без STEP "
+                         "(по умолчанию — step: комплекта или cad.export.step.mode, Д-64)")
     ap.add_argument("--assy", action="store_true",
                     help="сборка исполнения в один STEP: дерево, слои, метаданные (Д-49)")
     ap.add_argument("--design", help="проработка шага 2 из specs/ptk_designs.json (Д-48)")
@@ -294,7 +355,8 @@ def main(argv):
     if a.spec and a.ids:
         ap.error("--spec и ID вместе не задаются")
     load = lambda n: json.loads((ROOT / "specs" / n).read_text(encoding="utf-8"))
-    configs, prods = load("ptk_configs.json"), config.load("products.yaml")
+    configs, prods = load("ptk_configs.json"), config.load(
+        config.cfg_file(APP, "configs.products"))
     designs = load("ptk_designs.json") if (ROOT / "specs" / "ptk_designs.json").exists() else []
     rep = _open_report(argv)
     try:
@@ -304,10 +366,11 @@ def main(argv):
         for arg in a.ids:
             try:
                 des = ptk_design.pick(designs, arg, a.design)
+                mode = a.step or STEP_MODE      # --step → иначе application.yaml (Д-64)
                 if a.assy:
-                    build_assy(arg, configs, prods, a.step, des, rep)
+                    build_assy(arg, configs, prods, mode, des, rep)
                 else:
-                    build(arg, configs, prods, a.phase, a.row, a.step, des, None, rep)
+                    build(arg, configs, prods, a.phase, a.row, mode, des, None, rep)
             except (KeyError, ValueError) as e:
                 rep.say(f"ошибка: {e}")
                 rc = 1

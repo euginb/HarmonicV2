@@ -6,6 +6,9 @@ ptk_design_input.yaml по ОПУБЛИКОВАННОМУ specs/ptk_configs.json
 вход шага 2); all (по умолчанию) — весь прогон, как прежде: шаг 1 → шаг 2 по его
 результату → проверки products → каталог.
 
+Конфигурация — configs/application.yaml (Д-64): пути, ссылки на пучок конфигов
+(configs:), разделы продуктов (products.PTK — входы шагов 1 и 2), механизм чертежей (cad:).
+
 out/specs/   — code-first спецификации и БД -> переносятся в specs/   (Д-14)
 out/reports/ — отчёты прогона               -> переносятся в reports/ (Д-14)
 --publish    — скопировать самому: reports — всегда, specs — только при коде 0.
@@ -17,11 +20,15 @@ import sys
 from pathlib import Path
 
 from egm import catalog, config, naming, products, ptk, ptk_design, ptk_force, ptk_parts, ptk_profile
-from egm.cad import assy as cad_assy, ptk_ring, ptk_sep, ptk_spacer, step as cad_step
+from egm.cad import assy as cad_assy, freecad as cad_freecad, ptk_ring, ptk_sep, ptk_spacer, step as cad_step
 
 ROOT = Path(__file__).resolve().parent
-SPECS, REPORTS, TPL = ROOT / "specs", ROOT / "reports", ROOT / "templates"
-OUT = ROOT / "out"
+APP = config.load_app()                     # общий конфиг приложения (Д-64)
+PATHS = APP.get("paths") or {}
+SPECS = ROOT / PATHS.get("specs", "specs")      # каталоги — application.yaml (Д-64)
+REPORTS = ROOT / PATHS.get("reports", "reports")
+TPL = ROOT / PATHS.get("templates", "templates")
+OUT = ROOT / PATHS.get("out", "out")
 DEST = {"specs": SPECS, "reports": REPORTS}
 
 
@@ -67,11 +74,12 @@ def publish(ok):
 
 
 def run_ptk(prices):
-    """SPEC-10: калькулятор ПТК по specs/ptk_input.yaml (Д-16, Д-18)."""
+    """SPEC-10: калькулятор ПТК по входу шага 1 (application.yaml → products.PTK, Д-64)."""
     try:
-        lim, mounts, fast, mode = ptk.load_config(config.load("ptk_input.yaml"))
+        lim, mounts, fast, mode = ptk.load_config(
+            config.load(config.cfg_file(APP, "products.PTK.configs.input")))
     except (KeyError, ValueError, TypeError) as e:
-        return [f"ptk_input.yaml: {e!r}"]
+        return [f"products.PTK.configs.input: {e!r}"]
     rows = ptk.to_rows(ptk.sweep(prices["rollers"], prices.get("bearings", {}), lim, mounts,
                                  fast, mode), mounts)
     write("specs", "ptk_configs.json", json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
@@ -121,7 +129,7 @@ def run_ptk(prices):
 
 def run_catalog(prices):
     """CP-02: CAT-01 -> catalog_hiwin_hg.json, пары (Д-10), отчёт проверок."""
-    md = ROOT / "docs" / "HG-Series-Catalog_opt.md"
+    md = config.cfg_file(APP, "configs.catalog_md")
     db = catalog.parse_md(md.read_text(encoding="utf-8"), source=md.name)
     pairs = catalog.build_pairs(db)
     rep = catalog.validate(db, pairs, prices)
@@ -137,9 +145,10 @@ def run_design(cfg_rows, require=False):
     cfg_rows — исполнения шага 1 (ptk_configs.json): полный прогон — свежие из
     out/specs/, режим design — опубликованные specs/ (связь выход шага 1 → вход
     шага 2, Д-60)."""
-    if not (SPECS / "ptk_design_input.yaml").exists():
+    if not config.cfg_file(APP, "products.PTK.configs.design_input").exists():
         if require:
-            return ["ptk_design_input.yaml: файл не найден — проработки designs[] не заданы"]
+            return ["products.PTK.configs.design_input: файл не найден — "
+                    "проработки designs[] не заданы"]
         return []
     if cfg_rows is None:
         if require:
@@ -147,13 +156,17 @@ def run_design(cfg_rows, require=False):
                     "python main.py calc --publish (Д-60)"]
         return []
     try:
-        lim = ptk.load_config(config.load("ptk_input.yaml"))[0]
-        extra = {"prods": config.load("products.yaml"),
-                 "bears": config.load("vendor_prices.yaml").get("bearings", {}),
-                 "stock": config.load("stock.yaml") if (SPECS / "stock.yaml").exists() else None}
-        res = ptk_design.run(config.load("ptk_design_input.yaml"), cfg_rows, lim, extra)
+        lim = ptk.load_config(
+            config.load(config.cfg_file(APP, "products.PTK.configs.input")))[0]
+        stock = config.cfg_file(APP, "configs.stock")
+        extra = {"prods": config.load(config.cfg_file(APP, "configs.products")),
+                 "bears": config.load(
+                     config.cfg_file(APP, "configs.vendor_prices")).get("bearings", {}),
+                 "stock": config.load(stock) if stock.exists() else None}
+        res = ptk_design.run(config.load(
+            config.cfg_file(APP, "products.PTK.configs.design_input")), cfg_rows, lim, extra)
     except (KeyError, ValueError, TypeError) as e:
-        return [f"ptk_design_input.yaml: {e!r}"]
+        return [f"входные конфиги шага 2 (Д-64): {e!r}"]
     write("specs", "ptk_designs.json", json.dumps(res, ensure_ascii=False, indent=2) + "\n")
     tpl = (TPL / "SPEC-11_PTK_DESIGN.md.tmpl").read_text(encoding="utf-8")
     text, missing = fill(tpl, **ptk_design.md(res))
@@ -175,6 +188,7 @@ def main(argv):
                            ("catalog", catalog.self_test), ("products", products.self_test),
                            ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test),
                            ("fill", fill_self_test), ("step", cad_step.self_test),
+                           ("freecad", cad_freecad.self_test),
                            ("force", ptk_force.self_test), ("parts", ptk_parts.self_test),
                            ("sep_svg", ptk_sep.self_test), ("spacer", ptk_spacer.self_test),
                            ("assy", cad_assy.self_test),
@@ -188,14 +202,16 @@ def main(argv):
                 f = traceback.extract_tb(e.__traceback__)[-1]
                 fails.append(f"{name}.self_test: {e!r} ({f.filename.replace(chr(92), '/').rsplit('/', 1)[-1]}:{f.lineno})")
         try:
-            prices = config.load("vendor_prices.yaml")
+            prods = config.load(config.cfg_file(APP, "configs.products"))
+            prices = config.load(config.cfg_file(APP, "configs.vendor_prices"))
+            fails += products.check_app(APP, prods)   # Д-64: разделы продуктов есть в реестре
             fails += run_ptk(prices)
             cfg_path = OUT / "specs" / "ptk_configs.json"
             rows = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else None
             if mode == "all":           # шаг 2 — по свежим исполнениям шага 1
                 fails += run_design(rows)
             if cfg_path.exists():
-                fails += products.check(config.load("products.yaml"),
+                fails += products.check(prods,
                                         json.loads(cfg_path.read_text(encoding="utf-8")))
             if mode == "all":
                 fails += run_catalog(prices)
