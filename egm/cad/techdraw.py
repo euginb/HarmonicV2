@@ -63,10 +63,11 @@ def scale_txt(s):
 
 
 def extent(m):
-    """Габарит детали по PartModel -> (Ø, z0, z1): основное тело, ступени Band, окна."""
-    zs = ([0.0, m.thick] + [z for b in m.bands for z in (b.z0, b.z0 + b.h)]
-          + [z for w in m.windows for z in (w.z0, w.z0 + w.h)])
-    d = max([m.d_out] + [2 * b.r_out for b in m.bands])
+    """Габарит детали по PartModel -> (Ø, z0, z1): основное тело и ступени Band add;
+    вырезы (Band cut, окна) габарит не увеличивают (Д-66)."""
+    add = [b for b in m.bands if b.op == "add"]
+    zs = [0.0, m.thick] + [z for b in add for z in (b.z0, b.z0 + b.h)]
+    d = max([m.d_out] + [2 * b.r_out for b in add])
     return d, min(zs), max(zs)
 
 
@@ -276,7 +277,7 @@ def self_test():
     assert record("X.02", "02", sep, "CAGE (.02)", "")["notes"][-1].startswith("развёртка")
     cov = PartModel("X.07B", 14.0, 88.0, c, bands=[Band(0.0, 21.0, -6.0, 6.0)])
     ln = [c_ for c_ in checks(cov, "07") if c_["kind"] == "length"][0]
-    assert (ln["sym"], ln["value"], free_z(cov)) == ("L", 20.0, 7.0), (ln, free_z(cov))
+    assert (ln["sym"], ln["value"], free_z(cov)) == ("t", 14.0, 7.0), (ln, free_z(cov))
     ecc = PartModel("X.03B", 7.0, 50.0, c, cx=(0.4, 0.0))
     ce = [c_ for c_ in checks(ecc, "03") if c_["kind"] == "center"]
     assert compare(ce, {"центр D": [0.4, 0.005]})[0]["ok"], ce

@@ -4,13 +4,21 @@
 Стадия 1 (синтаксис): CRLF/BOM/UTF-16 патча, строки diff --git / new file mode /
 deleted file mode, счётчики @@, пустые строки без префикса, пути без a/ b/.
 Стадия 2 (сверка с рабочим деревом, для изменяемых и удаляемых файлов):
-  * hunk ищется в реальном файле (сравнение без учёта хвостовых пробелов);
+  * hunk ищется в реальном файле (сравнение без учёта ведущих и хвостовых
+    пробелов — отступы контекста в патче часто не совпадают с файлом);
   * строки ' ' и '-' берутся из файла дословно;
+  * если контекст совпал только с точностью до ведущих пробелов, отступ
+    добавленной строки ('+') берётся из файла (у ближайшей контекстной
+    строки), а не из патча;
+  * если строгих кандидатов нет, первая/последняя строка контекста может
+    совпасть как префикс строки файла (обрезан хвост) — в diff идёт строка
+    файла;
   * контекст добирается до 3 строк с каждой стороны (иначе git apply
     привязывает hunk без хвостового контекста к концу файла);
   * расставляется '\\ No newline at end of file';
   * сохраняется стиль окончаний строк файла (LF/CRLF).
-Стадия 2 устойчива к ошибкам ИИ в номерах строк: hunk ищется по содержимому по
+Стадия 2 устойчива к ошибкам ИИ в номерах строк, отступах контекста и обрезанных
+хвостах его строк: hunk ищется по содержимому по
 всему файлу, а не только после предыдущего; найденные hunk'и сортируются по
 позиции в файле (порядок в патче может не совпадать с ним), уже применённые
 hunk'и распознаются и пропускаются, а в сообщении «не найден» указывается
@@ -134,13 +142,33 @@ def read_target(root, rel):
 
 def find(flines, old, hint, lo, occupied=()):
     """Позиция (0-based) блока old в flines, начиная со строки lo; участки occupied
-    (уже занятые другими hunk'ами) пропускаются; из кандидатов — ближайший к hint."""
-    key = [s.rstrip() for s in old]
+    (уже занятые другими hunk'ами) пропускаются; из кандидатов — ближайший к hint.
+    Сравнение — без учёта ведущих и хвостовых пробелов: отступ контекста в патче
+    может не совпадать с файлом (для '+' строк он затем берётся из файла). Если
+    строгих кандидатов нет — первая и последняя строки блока могут совпасть как
+    ПРЕФИКС строки файла (обрезан хвост контекста в патче), с предупреждением."""
+    key = [s.strip() for s in old]
     n = len(key)
-    cands = [p for p in range(lo, len(flines) - n + 1)
-             if all(flines[p + k].rstrip() == key[k] for k in range(n))
-             and not any(p < b and p + n > a for a, b in occupied)]
-    return min(cands, key=lambda p: abs(p - hint)) if cands else None
+
+    def cands(edges):
+        out = []
+        for p in range(lo, len(flines) - n + 1):
+            if any(p < b and p + n > a for a, b in occupied):
+                continue
+            if all(flines[p + k].strip() == key[k]
+                   or (edges and k in (0, n - 1) and key[k]
+                       and flines[p + k].strip().startswith(key[k]))
+                   for k in range(n)):
+                out.append(p)
+        return out
+
+    c = cands(False)
+    if not c:
+        c = cands(True)
+        if c:
+            warn("хвост первой/последней строки контекста в патче обрезан — "
+                 "в diff взята строка файла")
+    return min(c, key=lambda p: abs(p - hint)) if c else None
 
 
 def already_applied(flines, body, occupied=()):
@@ -160,7 +188,7 @@ def diagnose(flines, old, hint, lo, occupied):
     best_m, best_p = -1, 0
     for p in range(max(1, len(flines))):
         m = 0
-        while m < len(old) and p + m < len(flines) and flines[p + m].rstrip() == old[m].rstrip():
+        while m < len(old) and p + m < len(flines) and flines[p + m].strip() == old[m].strip():
             m += 1
         if m > best_m or (m == best_m and abs(p - hint) < abs(best_p - hint)):
             best_m, best_p = m, p
@@ -296,13 +324,37 @@ def emit_modified(root, path, f, hdr):
         s = max(prev_end, p - max(0, CTX - lead))
         e = min(nxt, p + n + max(0, CTX - trail))
         out = [(" ", flines[j]) for j in range(s, p)]
+        # Контекст мог совпасть только без учёта ведущих пробелов — тогда отступ
+        # добавляемых строк ('+') берём из файла (у ближайшей контекстной строки).
+        fline, k0 = {}, p
+        for bi, (kind, t, _) in enumerate(body):
+            if kind in " -":
+                fline[bi] = flines[k0]
+                k0 += 1
+
+        def adopt(t, bi, ln):
+            if not t.strip():
+                return t
+            for j in sorted(fline, key=lambda j: (abs(j - bi), 0 if j < bi else 1)):
+                ftext = fline[j]
+                if not ftext.strip():
+                    continue  # пустая контекстная строка отступ не задаёт
+                ptext = body[j][1]
+                plead = ptext[:len(ptext) - len(ptext.lstrip())]
+                flead = ftext[:len(ftext) - len(ftext.lstrip())]
+                if plead != flead:
+                    warn(f"{path}: строка патча {ln}: отступ добавленной строки взят из файла")
+                    return flead + t.lstrip()
+                return t
+            return t
+
         k = p
-        for kind, t, _ in body:
+        for bi, (kind, t, ln) in enumerate(body):
             if kind in " -":
                 out.append((kind, flines[k]))  # дословно из файла
                 k += 1
             else:
-                out.append(("+", t))
+                out.append(("+", adopt(t, bi, ln)))
         out += [(" ", flines[j]) for j in range(k, e)]
         if e == len(flines) and not final_nl:
             fix_eof(out)
@@ -347,6 +399,8 @@ def main(argv):
     if not args:
         sys.exit(__doc__)
     src = Path(args[0])
+    if not src.is_file():
+        die(f"файл патча не найден: {src}")
     dst = Path(args[1]) if len(args) > 1 else src.with_suffix(".fixed.diff")
     base, files = parse(read_patch(src))
     if not files:
