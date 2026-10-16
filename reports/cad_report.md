@@ -1,6 +1,6 @@
 # Отчёт построения чертежей (code-first, НЕ ПРАВИТЬ РУКАМИ)
 
-- Запуск: 2026-10-14 22:27
+- Запуск: 2026-10-16 15:14
 - Команда: python -m egm.cad --spec specs/cad_set.yaml
 
 ### 01A — венец
@@ -11,7 +11,7 @@
 
 svg: out\cad\PTK-050-R2X4_2-8M4P2-06A797\01A.svg
 step: строится (spline, 1224 точек профиля, 10 отв.)…
-step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\01A.step (0.1 с)
+step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\01A.step (0.4 с)
 ### 01B — венец
 
 Деталь 01 «венец» исполнения PTK-050-R2X4_2-8M4P2-06A797, вариант B; ряды пакета: 2, 4.
@@ -83,7 +83,7 @@ step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\03D-K10.step (0.2 с)
 
 svg: out\cad\PTK-050-R2X4_2-8M4P2-06A797\02A-K10.svg
 step: строится (spline, 360 точек профиля, 0 отв.)…
-step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\02A-K10.step (21.4 с)
+step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\02A-K10.step (20.0 с)
 ### 07A-K10 — крышка (A — вход, B — выход)
 
 Деталь 07 «крышка (A — вход, B — выход)» исполнения PTK-050-R2X4_2-8M4P2-06A797; ряды пакета: 1, 2, 3, 4.
@@ -116,8 +116,9 @@ step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\11-K10.step (0.0 с)
 Сборка исполнения PTK-050-R2X4_2-8M4P2-06A797 одним STEP (Д-49): дерево рядов и деталей, слои, атрибуты CAx-IF; дубль дерева и метаданных — out\cad\PTK-050-R2X4_2-8M4P2-06A797\PTK-050-R2X4_2-8M4P2-06A797-K10.assy.json (Д-50). Эксцентрики и вал — проработка K10 (шаг 2, SPEC-11).
 
 assy: out\cad\PTK-050-R2X4_2-8M4P2-06A797\PTK-050-R2X4_2-8M4P2-06A797-K10.assy.json
+techdraw: 12 чертежей деталей в out\cad\PTK-050-R2X4_2-8M4P2-06A797\PTK-050-R2X4_2-8M4P2-06A797-K10.assy.json → drawings; листы и размеры по 3D — макрос tools/freecad_techdraw.py во FreeCAD (Д-65)
 вал Ø10, эксцентрики .03 — проработка K10 (SPEC-11, Д-48)
 конструктив L1: 02A-K10, 07A-K10, 07B-K10, 11-K10; .09 61806, .10 61800; длина 55 мм (CP-45)
 step: сборка строится (17 деталей, 227 экземпляров, spline)…
-step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\PTK-050-R2X4_2-8M4P2-06A797-K10.step (22.5 с); метаданные в STEP: 26 узлов (PROPERTY_DEFINITION, Д-50); FreeCAD: макрос tools/freecad_meta.py
+step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\PTK-050-R2X4_2-8M4P2-06A797-K10.step (20.9 с); метаданные в STEP: 26 узлов (PROPERTY_DEFINITION, Д-50); FreeCAD: макрос tools/freecad_meta.py
 отчёт: reports\cad_report.md
