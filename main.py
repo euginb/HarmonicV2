@@ -20,7 +20,8 @@ import sys
 from pathlib import Path
 
 from egm import catalog, config, naming, products, ptk, ptk_design, ptk_force, ptk_parts, ptk_profile
-from egm.cad import assy as cad_assy, freecad as cad_freecad, ptk_ring, ptk_sep, ptk_spacer, step as cad_step
+from egm.cad import (assy as cad_assy, freecad as cad_freecad, ptk_ring, ptk_sep, ptk_spacer,
+                     step as cad_step, techdraw as cad_techdraw)
 
 ROOT = Path(__file__).resolve().parent
 APP = config.load_app()                     # общий конфиг приложения (Д-64)
@@ -192,6 +193,7 @@ def main(argv):
                            ("force", ptk_force.self_test), ("parts", ptk_parts.self_test),
                            ("sep_svg", ptk_sep.self_test), ("spacer", ptk_spacer.self_test),
                            ("assy", cad_assy.self_test),
+                           ("techdraw", cad_techdraw.self_test),
                            ("design", ptk_design.self_test)):
             try:
                 test()
