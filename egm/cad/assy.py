@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 from egm import products, ptk_profile
-from egm.cad import ptk_cover, ptk_ecc, ptk_ring, ptk_sep, ptk_spacer, step
+from egm.cad import ptk_cover, ptk_ecc, ptk_ring, ptk_sep, ptk_spacer, step, techdraw
 
 LAYERS = {"01": ("01_RING", "венец"), "02": ("02_CAGE", "сепаратор"),
           "03": ("03_ECC", "эксцентрик"), "04": ("04_BODIES", "тела качения"),
@@ -309,24 +309,51 @@ def manifest(cfg, prods, p):
             "items": {pid: {"nn": nn, "label": label(cfg, pid, nn), "layer": LAYERS[nn][0],
                             **item_meta(cfg, prods, pid, nn)} for pid, nn in items(p)},
             "labels": nodes(cfg, prods, p),
+            "drawings": drawings(cfg, prods, p),
             "tree": [{"row": r["row"], "label": row_label(r), "phi": r["phi"], "s": r["s"],
                       "zc": round(r["zc"], 3), "inst": [_r(x) for x in r["inst"]]} for r in p["rows"]],
             "root": [_r(x) for x in p["root"]]}
 
 
+_GEN = {"01": ptk_ring.build, "02": ptk_sep.build, "03": ptk_ecc.build,
+        "05": ptk_spacer.build, "07": ptk_cover.build, "11": ptk_cover.build}
+
+
+def part_model(cfg, pid, nn):
+    """PartModel детали сборки (Д-32): из неё строится STEP и берутся эталоны чертежа (Д-65);
+    покупные .04, .08, .09, .10 и вал — None. Венец и сепаратор — по первому ряду варианта."""
+    part = next((q for q in cfg["parts"] if q["id"] == pid), None)
+    if nn not in _GEN or part is None:
+        return None
+    if nn in ("01", "02"):
+        return _GEN[nn](cfg, part, part["rows"][0])
+    return _GEN[nn](cfg, part)
+
+
+def drawings(cfg, prods, p):
+    """<ID>.assy.json → drawings (Д-65): на каждое определение с генератором — эталоны
+    проверок, легенда, примечания, формат (egm/cad/techdraw.py). Геометрию листа макрос
+    берёт из STEP. Ошибка модели — запись {"label", "error"}, сборка не прерывается."""
+    out = {}
+    for pid, nn in items(p):
+        if nn not in _GEN:
+            continue
+        lab = label(cfg, pid, nn)
+        try:
+            name = item_meta(cfg, prods, pid, nn).get("name", "")
+            out[pid] = techdraw.record(pid, nn, part_model(cfg, pid, nn), lab, name)
+        except (AttributeError, KeyError, TypeError, ValueError) as e:
+            out[pid] = {"label": lab, "error": f"{type(e).__name__}: {e}"}
+    return out
+
+
 def _shape(cq, cfg, pid, nn, mode):
     g, V, nz = cfg["geom"], cq.Vector, cq.Vector(0, 0, 1)
-    part = next((q for q in cfg["parts"] if q["id"] == pid), None)
-    if nn == "01":
-        return step.solid(ptk_ring.build(cfg, part, part["rows"][0]), mode)
-    if nn == "02":
-        return step.solid(ptk_sep.build(cfg, part, part["rows"][0]), mode)
-    if nn == "03":
-        return step.solid(ptk_ecc.build(cfg, part), mode)
-    if nn == "05":
-        return step.solid(ptk_spacer.build(cfg, part), mode)
-    if nn in ("07", "11"):
-        return step.solid(ptk_cover.build(cfg, part), mode)
+    if nn in _GEN:
+        m = part_model(cfg, pid, nn)
+        if m is None:
+            raise ValueError(f"{pid}: детали нет в cfg['parts']")
+        return step.solid(m, mode)
     if nn == "04":
         r = g["roller"]
         if r.get("type") == "ball":
@@ -481,6 +508,7 @@ def self_test():
     assert len(seg) == 9 and abs(seg[0][0]) < 1e-6 and abs(seg[-1][1] - p2["B"]) < 1e-6, seg
     assert all(abs(e0[1] - e1[0]) < 1e-6 for e0, e1 in zip(seg, seg[1:])), ("пакет: зазор", seg)
     assert label(cfg, "PTK-T.05B", "05") == "SPACER (.05B)"
+    assert part_model(cfg, "PTK-T.04", "04") is None, "покупные — без чертежа (Д-65)"
     from egm import ptk_layout                                               # CP-45
     lay = {"parts": {"02": "cup", "07": "side", "11": "ring"},
            "covers": {"tA": 6.0, "tB": 14.0, "D": 88.0, "seat_A": 19.0, "seat_B": 42.0,

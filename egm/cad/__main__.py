@@ -231,6 +231,12 @@ def build_assy(arg, configs, prods, step_mode="spline", des=None, rep=_CONSOLE):
                    encoding="utf-8", newline="\n")
     _legend_assy(rep, cfg, tag, des, man)
     rep.say(f"assy: {_rel(man)}")
+    dr = data.get("drawings") or {}
+    bad = [f"{k}: {v['error']}" for k, v in dr.items() if "error" in v]
+    rep.say(f"techdraw: {len(dr) - len(bad)} чертежей деталей в {_rel(man)} → drawings; "
+            "листы и размеры по 3D — макрос tools/freecad_techdraw.py во FreeCAD (Д-65)")
+    for b in bad:
+        rep.say(f"techdraw: пропущен {b}")
     sh = cfg["geom"]["limits"].get("shaft_d_min") or 0
     rep.say(f"вал Ø{sh:g}, эксцентрики .03 — " + (f"проработка {des['name']} (SPEC-11, Д-48)" if des
             else "предварительные шага 1 (limits.shaft_d_min); окончательные — --design"))
