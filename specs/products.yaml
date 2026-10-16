@@ -11,18 +11,21 @@ PTK:
     "01":
       name: "венец (жёсткое колесо)"
       kind: make
+      material: [ШХ15]                 # марки по предпочтению — specs/materials.yaml (Д-67)
       variant: ring_phase   # варианты .01A, .01B — по сдвигу сверловки s (Д-19)
       qty: rows
       cad: ptk_ring
     "02":
       name: сепаратор
       kind: make
+      material: [38Х2МЮА, 40Х, 40ХН2МА, 20ХН3А]   # заготовка — первая марка с формой в stock.yaml
       variant: layout       # буква по конструктиву (Д-54, Д-55): A — стакан (cup), B — обечайка (sleeve); без конструктива — одна деталь: variant: none, qty: 1
       qty: 1
       cad: ptk_sep
     "03":
       name: эксцентрик генератора
       kind: make
+      material: [40Х]                  # предварительно; ШХ15 при качении тел по эксцентрику (OQ-21)
       variant: row          # .03A… — по ряду k: паз шпонки на угле key_angle − φk (Д-46); единый вал — variant: none, qty: 1
       qty: rows
       cad: ptk_ecc
@@ -35,6 +38,7 @@ PTK:
     "05":
       name: межрядная шайба
       kind: make
+      material: ["45"]                 # предварительно (OQ-21)
       variant: thick        # A — у торцов пакета, B — между рядами — по толщине h (Д-53)
       qty: rows+1
       cad: ptk_spacer
@@ -47,6 +51,7 @@ PTK:
     "07":
       name: "крышка (A — вход, B — выход)"
       kind: make
+      material: ["45"]                 # предварительно (OQ-21)
       variant: side         # A — вход, B — выход (Д-54)
       qty: 2
       cad: ptk_cover
@@ -71,12 +76,14 @@ PTK:
     "11":
       name: дистанционное кольцо эксцентриков
       kind: make
+      material: ["45"]                 # предварительно (OQ-21)
       variant: none
       qty: rows-1
       cad: ptk_cover
     "12":
       name: ступица выхода
       kind: make
+      material: [40Х]                  # предварительно (OQ-21)
       variant: none
       qty: 1
       cad: null

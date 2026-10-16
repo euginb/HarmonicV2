@@ -330,6 +330,35 @@ def part_model(cfg, pid, nn):
     return _GEN[nn](cfg, part)
 
 
+_MATS = None
+
+
+def _mats():
+    """specs/materials.yaml (Д-67) — читается один раз; нет файла или ключа — {}."""
+    global _MATS
+    if _MATS is None:
+        from egm import config
+        try:
+            p = config.cfg_file(config.load_app(), "configs.materials")
+            _MATS = config.load(p) if p.exists() else {}
+        except Exception:
+            _MATS = {}
+    return _MATS
+
+
+def material(cfg, prods, pid, nn):
+    """Графа 3 основной надписи (Д-67): .02 — марка заготовки, выбранной на шаге 2
+    (layout.blank.material); иначе первая марка products.yaml → material; нет — ""."""
+    from egm import materials as MAT
+    grade = ((cfg.get("layout") or {}).get("blank") or {}).get("material") if nn == "02" else None
+    if not grade:
+        try:
+            grade = (products.item(prods, _base(pid)).get("material") or [None])[0]
+        except (KeyError, ValueError):
+            grade = None
+    return MAT.title(_mats(), grade)
+
+
 def drawings(cfg, prods, p):
     """<ID>.assy.json → drawings (Д-65): на каждое определение с генератором — эталоны
     проверок, легенда, примечания, формат (egm/cad/techdraw.py). Геометрию листа макрос
@@ -342,6 +371,7 @@ def drawings(cfg, prods, p):
         try:
             name = item_meta(cfg, prods, pid, nn).get("name", "")
             out[pid] = techdraw.record(pid, nn, part_model(cfg, pid, nn), lab, name)
+            out[pid]["material"] = material(cfg, prods, pid, nn)
         except (AttributeError, KeyError, TypeError, ValueError) as e:
             out[pid] = {"label": lab, "error": f"{type(e).__name__}: {e}"}
     return out

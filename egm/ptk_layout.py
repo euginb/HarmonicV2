@@ -8,10 +8,12 @@ fixed = ring, output = cage: выход — сепаратор (стакан .02
 import math
 import re
 
+from egm import materials as MAT
+
 SUP = {"tau_allow": 25.0, "hub_wall": 2.0, "seat_wall": 2.0, "ring_w": 2.0,
        "lip": 1.0, "cup_t": 2.0, "ax_gap": 0.5, "nut_h": 4.0, "out_ext": 2.0}
 HEAD = ("| Проработка | Конструктив | Детали | .09 d×D×B | τ ступицы / [τ], МПа | .10 d×D×B | "
-        ".11 n × h, мм | Крышки tA / tB, мм | Дно .02 z / t, мм; ступица | Длина, мм | Заготовка .02 |")
+        ".11 n × h, мм | Крышки tA / tB, мм | Дно .02 z / t, мм; ступица | Длина, мм | Заготовка .02: марка, формы |")
 RULE = "|---" * 11 + "|"
 TOOL_HEAD = "| Проработка | Оснастка (Д-57) | Деталь | Размер | Маршрут |"
 TOOL_RULE = "|---" * 5 + "|"
@@ -46,20 +48,39 @@ def hub_brg(bears, M, D10, o, D_max):
     return None, None
 
 
-def blanks(r_in, r_out, stock):
-    """Заготовка .02 из stock.yaml: труба, лист (обечайка со швом), пруток (стакан монолитом)."""
+def _fit(forms, Dn, Dv, need):
+    """Формы одной марки -> (труба | None, лист | None, пруток | None)."""
+    tubes = sorted((t for t in forms.get("tubes", [])
+                    if t["D"] >= Dn - 1e-9 and t["D"] - 2 * t["s"] <= Dv + 1e-9),
+                   key=lambda t: (t["D"], t["s"]))
+    sheets = sorted(s for s in forms.get("sheets", []) if s >= need - 1e-9)
+    bars = sorted(b for b in forms.get("bars", []) if b >= Dn - 1e-9)
+    return tubes[0] if tubes else None, sheets[0] if sheets else None, bars[0] if bars else None
+
+
+def blanks(r_in, r_out, stock, mats=None):
+    """Заготовка .02 из stock.yaml (Д-56, Д-67): марки — по порядку mats (products.yaml →
+    PTK.parts."02".material); берётся первая марка с подходящей формой: труба, лист
+    (обечайка со швом), пруток (стакан монолитом); прочие подходящие — alt.
+    Без mats — все марки stock.yaml; старый формат без марок — марка None."""
     if not stock:
         return None
     ta, sa = float(stock.get("tube_allow", 0.5)), float(stock.get("sheet_allow", 0.3))
     Dn, Dv, need = 2 * r_out + 2 * ta, 2 * r_in - 2 * ta, r_out - r_in + 2 * sa
-    tubes = sorted((t for t in stock.get("tubes", [])
-                    if t["D"] >= Dn - 1e-9 and t["D"] - 2 * t["s"] <= Dv + 1e-9),
-                   key=lambda t: (t["D"], t["s"]))
-    sheets = sorted(s for s in stock.get("sheets", []) if s >= need - 1e-9)
-    bars = sorted(b for b in stock.get("bars", []) if b >= Dn - 1e-9)
-    return {"tube": tubes[0] if tubes else None, "tube_need": [round(Dn, 2), round(Dv, 2)],
-            "sheet": sheets[0] if sheets else None, "sheet_need": round(need, 2),
-            "sheet_len": round(math.pi * (r_in + r_out), 1), "bar": bars[0] if bars else None}
+    by = MAT.stock_by_material(stock)
+    tried = [str(m) for m in mats] if mats else [m for m in by if m is not None]
+    order = [None] if None in by else [m for m in tried if m in by]
+    fits = {}
+    for m in order:
+        f = _fit(by[m], Dn, Dv, need)
+        if any(x is not None for x in f):
+            fits[m] = f
+    pick = next(iter(fits), None)
+    tube, sheet, bar = fits.get(pick, (None, None, None))
+    return {"material": pick, "alt": [m for m in fits if m != pick], "tried": tried,
+            "tube": tube, "tube_need": [round(Dn, 2), round(Dv, 2)],
+            "sheet": sheet, "sheet_need": round(need, 2),
+            "sheet_len": round(math.pi * (r_in + r_out), 1), "bar": bar}
 
 
 def axial(width, row_gap, b09, b10, r_out, cfg, o, covers):
@@ -183,9 +204,10 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
     r_out = float(sep.get("r_out", cfg["R_sum"] + 1.1 * a))
     ax, aw = axial(width, row_gap, b09, b10, r_out, cfg, o, "07" in pr)
     warn += aw
-    bl = blanks(r_in, r_out, stock)
+    bl = blanks(r_in, r_out, stock, MAT.part_materials(prods, "PTK", "02"))
     if bl is not None and not (bl["tube"] or bl["sheet"] or bl["bar"]):
-        warn.append(f".02: нет заготовки в stock.yaml (труба Ø ≥ {bl['tube_need'][0]:g} с отв. ≤ "
+        warn.append(".02: нет заготовки" + (f" из {', '.join(bl['tried'])}" if bl["tried"] else "")
+                    + f" в stock.yaml (труба Ø ≥ {bl['tube_need'][0]:g} с отв. ≤ "
                     f"{bl['tube_need'][1]:g}, лист ≥ {bl['sheet_need']:g}, пруток Ø ≥ {bl['tube_need'][0]:g})")
     rec = {"code": code, "name": lay.get("name", ""), "parts": pr, "b09": b09, "b10": b10,
            "tau_hub": round(tau, 1) if tau is not None else None, "tau_allow": o["tau_allow"],
@@ -208,6 +230,10 @@ def md_row(name, r):
         s += [f"труба {bl['tube']['D']:g}×{bl['tube']['s']:g}"] if bl["tube"] else []
         s += [f"лист {bl['sheet']:g}, L {bl['sheet_len']:g}"] if bl["sheet"] else []
         s += [f"пруток Ø{bl['bar']:g}"] if bl["bar"] else []
+        if bl.get("material") and s:
+            s = [f"{bl['material']}: {s[0]}"] + s[1:]
+        if bl.get("alt"):
+            s.append("также " + ", ".join(bl["alt"]))
     tau = f"{r['tau_hub']:g} / {r['tau_allow']:g}" if r["tau_hub"] is not None else "—"
     r11 = f"{r['r11']['n']} × {r['r11']['h']:g}" if r["r11"] else "—"
     cov = f"{r['covers']['tA']:g} / {r['covers']['tB']:g}" if r["covers"] else "—"
@@ -247,6 +273,16 @@ def self_test():
     assert "пакетом в сборе" in r["tooling"][-1]["route"] and len(md_tool("K10", r)) == 2
     b = r["blank"]
     assert b["tube"] == {"D": 70.0, "s": 2.5} and b["sheet"] == 1.5 and b["bar"] == 70.0, b
+    st2 = {"tube_allow": 0.5, "sheet_allow": 0.3,
+           "materials": {"08пс": {"sheets": [3.0]}, "40Х": {"bars": [70.0]},
+                         "40ХН2МА": {"tubes": [{"D": 73.0, "s": 14.0}]}}}
+    b2 = blanks(32.5, 34.0, st2, ["40ХН2МА", "40Х"])
+    assert (b2["material"], b2["tube"]["D"], b2["alt"], b2["sheet"]) == \
+        ("40ХН2МА", 73.0, ["40Х"], None), b2
+    b3 = blanks(32.5, 34.0, st2, ["20ХН3А"])
+    assert b3["material"] is None and not (b3["tube"] or b3["sheet"] or b3["bar"]), b3
+    b4 = blanks(32.5, 34.0, st2)
+    assert b4["material"] == "08пс" and b4["sheet"] == 3.0, b4
     assert "61806" in md_row("K10", r)
     ids = [q["id"] for q in r["cad_parts"]]                                   # CP-45
     assert ids == ["PTK-T-8M4P2-AAAAAA.02A", "PTK-T-8M4P2-AAAAAA.07A", "PTK-T-8M4P2-AAAAAA.07B",

@@ -21,6 +21,7 @@ configs:                    # пучок текущих конфигов — с�
   products: specs/products.yaml              # перечень изделий и номенклатура деталей (SPEC-03)
   vendor_prices: specs/vendor_prices.yaml    # тела качения и подшипники — вход шага 1
   stock: specs/stock.yaml                    # остатки склада (файл не обязателен)
+  materials: specs/materials.yaml            # марки: графа 3, термообработка (Д-67)
   cad_set: specs/cad_set.yaml                # комплект чертежей (Д-61)
   catalog_md: docs/HG-Series-Catalog_opt.md  # каталог HIWIN HG — источник CAT-01
 

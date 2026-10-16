@@ -275,9 +275,12 @@ def self_test():
     win = [(c_["value"], c_["z"]) for c_ in checks(sep, "02") if c_["kind"] == "windows"]
     assert win == [(2, 2.5), (1, 7.5)], win
     assert record("X.02", "02", sep, "CAGE (.02)", "")["notes"][-1].startswith("развёртка")
-    cov = PartModel("X.07B", 14.0, 88.0, c, bands=[Band(0.0, 21.0, -6.0, 6.0)])
+    cov = PartModel("X.07B", 14.0, 88.0, c, bands=[Band(0.0, 21.0, -6.0, 6.0, "cut")])
     ln = [c_ for c_ in checks(cov, "07") if c_["kind"] == "length"][0]
     assert (ln["sym"], ln["value"], free_z(cov)) == ("t", 14.0, 7.0), (ln, free_z(cov))
+    hub = PartModel("X.02", 10.0, 68.0, c, bands=[Band(0.0, 21.0, -6.0, 6.0, "add")])
+    lh = [c_ for c_ in checks(hub, "02") if c_["kind"] == "length"][0]
+    assert (lh["sym"], lh["value"]) == ("L", 16.0), lh
     ecc = PartModel("X.03B", 7.0, 50.0, c, cx=(0.4, 0.0))
     ce = [c_ for c_ in checks(ecc, "03") if c_["kind"] == "center"]
     assert compare(ce, {"центр D": [0.4, 0.005]})[0]["ok"], ce
