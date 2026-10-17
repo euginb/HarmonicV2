@@ -58,17 +58,11 @@ def _fit(forms, Dn, Dv, need):
     return tubes[0] if tubes else None, sheets[0] if sheets else None, bars[0] if bars else None
 
 
-# Формы заготовки .02 по конструктиву (Д-68, TECH-01): стакан монолитом (cup, L1) — пруток;
-# обечайка (sleeve, L2) — труба или лист (маршрут weld).
-FORMS_BY_02 = {"cup": ("bars",), "sleeve": ("tubes", "sheets")}
-
-
-def blanks(r_in, r_out, stock, mats=None, forms=MAT.FORMS):
-    """Заготовка .02 из stock.yaml (Д-56, Д-67, Д-68): марки — по порядку mats (products.yaml →
-    PTK.parts."02".material); берётся первая марка, у которой есть подходящая форма из forms
-    (FORMS_BY_02 по конструктиву); прочие подходящие — alt/alt_fit (альтернативы с формами),
-    марки без подходящей формы — missing. Без mats — все марки stock.yaml; старый формат без
-    марок — марка None."""
+def blanks(r_in, r_out, stock, mats=None):
+    """Заготовка .02 из stock.yaml (Д-56, Д-67): марки — по порядку mats (products.yaml →
+    PTK.parts."02".material); берётся первая марка с подходящей формой: труба, лист
+    (обечайка со швом), пруток (стакан монолитом); прочие подходящие — alt.
+    Без mats — все марки stock.yaml; старый формат без марок — марка None."""
     if not stock:
         return None
     ta, sa = float(stock.get("tube_allow", 0.5)), float(stock.get("sheet_allow", 0.3))
@@ -78,14 +72,12 @@ def blanks(r_in, r_out, stock, mats=None, forms=MAT.FORMS):
     order = [None] if None in by else [m for m in tried if m in by]
     fits = {}
     for m in order:
-        f = _fit({k: v for k, v in by[m].items() if k in forms}, Dn, Dv, need)
+        f = _fit(by[m], Dn, Dv, need)
         if any(x is not None for x in f):
             fits[m] = f
     pick = next(iter(fits), None)
     tube, sheet, bar = fits.get(pick, (None, None, None))
     return {"material": pick, "alt": [m for m in fits if m != pick], "tried": tried,
-            "alt_fit": {m: list(fits[m]) for m in fits if m != pick},
-            "missing": [m for m in tried if m not in fits], "forms": list(forms),
             "tube": tube, "tube_need": [round(Dn, 2), round(Dv, 2)],
             "sheet": sheet, "sheet_need": round(need, 2),
             "sheet_len": round(math.pi * (r_in + r_out), 1), "bar": bar}
@@ -212,8 +204,7 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
     r_out = float(sep.get("r_out", cfg["R_sum"] + 1.1 * a))
     ax, aw = axial(width, row_gap, b09, b10, r_out, cfg, o, "07" in pr)
     warn += aw
-    bl = blanks(r_in, r_out, stock, MAT.part_materials(prods, "PTK", "02"),
-                FORMS_BY_02.get(pr.get("02"), MAT.FORMS))
+    bl = blanks(r_in, r_out, stock, MAT.part_materials(prods, "PTK", "02"))
     if bl is not None and not (bl["tube"] or bl["sheet"] or bl["bar"]):
         warn.append(".02: нет заготовки" + (f" из {', '.join(bl['tried'])}" if bl["tried"] else "")
                     + f" в stock.yaml (труба Ø ≥ {bl['tube_need'][0]:g} с отв. ≤ "
@@ -232,25 +223,17 @@ def _b(b):
     return f"{b['id']} {b['d']:g}×{b['D']:g}×{b['B']:g}" if b else "нет"
 
 
-def _forms_txt(tube, sheet, bar, sheet_len):
-    """Формы одной марки -> ["труба D×s", "лист t, L", "пруток ØD"]."""
-    s = [f"труба {tube['D']:g}×{tube['s']:g}"] if tube else []
-    s += [f"лист {sheet:g}, L {sheet_len:g}"] if sheet else []
-    s += [f"пруток Ø{bar:g}"] if bar else []
-    return s
-
-
 def md_row(name, r):
     """Строка таблицы «Конструктив» SPEC-11."""
     bl, s = r["blank"], []
     if bl:
-        s = _forms_txt(bl["tube"], bl["sheet"], bl["bar"], bl["sheet_len"])
+        s += [f"труба {bl['tube']['D']:g}×{bl['tube']['s']:g}"] if bl["tube"] else []
+        s += [f"лист {bl['sheet']:g}, L {bl['sheet_len']:g}"] if bl["sheet"] else []
+        s += [f"пруток Ø{bl['bar']:g}"] if bl["bar"] else []
         if bl.get("material") and s:
-            s = [f"{bl['material']}: {', '.join(s)}"]
-        for m, f in (bl.get("alt_fit") or {}).items():
-            s.append(f"альтернатива {m}: {', '.join(_forms_txt(*f, bl['sheet_len']))}")
-        if bl.get("missing"):
-            s.append("нет подходящей заготовки: " + ", ".join(bl["missing"]))
+            s = [f"{bl['material']}: {s[0]}"] + s[1:]
+        if bl.get("alt"):
+            s.append("также " + ", ".join(bl["alt"]))
     tau = f"{r['tau_hub']:g} / {r['tau_allow']:g}" if r["tau_hub"] is not None else "—"
     r11 = f"{r['r11']['n']} × {r['r11']['h']:g}" if r["r11"] else "—"
     cov = f"{r['covers']['tA']:g} / {r['covers']['tB']:g}" if r["covers"] else "—"
@@ -289,8 +272,7 @@ def self_test():
         r["tooling"]
     assert "пакетом в сборе" in r["tooling"][-1]["route"] and len(md_tool("K10", r)) == 2
     b = r["blank"]
-    assert b["bar"] == 70.0 and (b["tube"] == {"D": 70.0, "s": 2.5}) == ("tubes" in b["forms"]) \
-        and (b["sheet"] == 1.5) == ("sheets" in b["forms"]), b
+    assert b["tube"] == {"D": 70.0, "s": 2.5} and b["sheet"] == 1.5 and b["bar"] == 70.0, b
     st2 = {"tube_allow": 0.5, "sheet_allow": 0.3,
            "materials": {"08пс": {"sheets": [3.0]}, "40Х": {"bars": [70.0]},
                          "40ХН2МА": {"tubes": [{"D": 73.0, "s": 14.0}]}}}
@@ -301,11 +283,6 @@ def self_test():
     assert b3["material"] is None and not (b3["tube"] or b3["sheet"] or b3["bar"]), b3
     b4 = blanks(32.5, 34.0, st2)
     assert b4["material"] == "08пс" and b4["sheet"] == 3.0, b4
-    b5 = blanks(32.5, 34.0, st2, ["38Х2МЮА", "40ХН2МА", "40Х"], FORMS_BY_02["cup"])
-    assert (b5["material"], b5["bar"], b5["tube"], b5["missing"]) == \
-        ("40Х", 70.0, None, ["38Х2МЮА", "40ХН2МА"]), b5
-    b6 = blanks(32.5, 34.0, st2, ["40Х", "40ХН2МА"])
-    assert b6["alt_fit"] == {"40ХН2МА": [{"D": 73.0, "s": 14.0}, None, None]}, b6
     assert "61806" in md_row("K10", r)
     ids = [q["id"] for q in r["cad_parts"]]                                   # CP-45
     assert ids == ["PTK-T-8M4P2-AAAAAA.02A", "PTK-T-8M4P2-AAAAAA.07A", "PTK-T-8M4P2-AAAAAA.07B",

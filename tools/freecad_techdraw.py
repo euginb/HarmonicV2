@@ -440,9 +440,6 @@ def _report(path, data, rep):
 
 def apply(path, doc=None, pdf=True):
     doc = doc or App.ActiveDocument
-    if doc is None:
-        raise RuntimeError("нет открытого документа: открыть <ID>.step или запустить "
-                           "tools/freecad_egm.py (откроет STEP сам)")
     TD, TS = _td(path)
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
@@ -457,11 +454,6 @@ def apply(path, doc=None, pdf=True):
         f.write(TS.template_svg(_ns(TS.NS)))
     grp = doc.getObject(GROUP) or doc.addObject("App::DocumentObjectGroup", GROUP)
     src = _sources(doc, {r["label"] for r in drw.values() if "label" in r})
-    miss = sorted({r["label"] for r in drw.values() if "label" in r} - set(src))
-    if miss:
-        have = sorted({_strip(o.Label) for o in doc.Objects})
-        App.Console.PrintWarning("EGM TechDraw: нет формы для меток: " + ", ".join(miss)
-                                 + "\n  метки в документе (первые 30): " + ", ".join(have[:30]) + "\n")
     rep = []
     for pid, rec in drw.items():
         lab = rec.get("label", pid)
@@ -476,60 +468,16 @@ def apply(path, doc=None, pdf=True):
                 head, table = f"ошибка: {type(e).__name__}: {e}", []
             rep.append((pid, lab, head, table))
     _report(path, data, rep)
-    _show(doc)
     return rep
-
-
-def _show(doc):
-    """Открыть первый лист во вкладке: иначе листы есть только в дереве (DRW …)."""
-    if not App.GuiUp:
-        return
-    pg = next((o for o in doc.Objects if o.TypeId == "TechDraw::DrawPage"
-               and TAG in o.PropertiesList), None)
-    if pg is not None:
-        try:
-            pg.ViewObject.doubleClicked()
-        except Exception:
-            pass
-
-
-def summary(path, rep):
-    """Итог для окна сообщения: сколько листов, где отчёт, что не построено."""
-    bad = [f"{lab}: {head}" for _, lab, head, _ in rep if head.startswith(("пропущен", "ошибка"))]
-    return (f"Чертежей: {len(rep) - len(bad)} из {len(rep)}; листы — объекты «DRW …» в дереве.\n"
-            f"Отчёт: {_stem(path)}.techdraw.md"
-            + (("\nНе построены:\n" + "\n".join(bad[:10])) if bad else ""))
-
-
-def box(title, text, error=False):
-    """Сообщение в Report view и окном — результат виден, даже если панель отчёта закрыта."""
-    (App.Console.PrintError if error else App.Console.PrintMessage)(text + "\n")
-    if App.GuiUp:
-        try:
-            from PySide import QtGui
-            (QtGui.QMessageBox.critical if error else QtGui.QMessageBox.information)(
-                None, title, text)
-        except Exception:
-            pass
 
 
 def run():
     from PySide import QtGui
-    App.Console.PrintMessage(f"EGM TechDraw: старт (__name__ = {__name__}, FreeCAD "
-                             f"{'.'.join(App.Version()[:3])}, Python {sys.version.split()[0]})\n")
     path = QtGui.QFileDialog.getOpenFileName(None, "EGM TechDraw: <ID>.assy.json", "",
                                              "assy (*.assy.json)")[0]
-    if not path:
-        App.Console.PrintMessage("EGM TechDraw: файл не выбран\n")
-        return
-    try:
-        rep = apply(path)
-    except Exception:
-        import traceback
-        box("EGM TechDraw — ошибка", traceback.format_exc(), True)
-        return
-    box("EGM TechDraw", summary(path, rep))
+    if path:
+        apply(path)
 
 
-if __name__ != "freecad_techdraw":         # макрос FreeCAD (Д-66); при импорте из freecad_egm — нет
+if __name__ == "__main__":
     run()
