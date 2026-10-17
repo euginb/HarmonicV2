@@ -194,6 +194,9 @@ def main(argv):
                            ("sep_svg", ptk_sep.self_test), ("spacer", ptk_spacer.self_test),
                            ("assy", cad_assy.self_test),
                            ("techdraw", cad_techdraw.self_test),
+                           ("techdraw_sheet", __import__("egm.cad.techdraw_sheet", fromlist=["self_test"]).self_test),
+                           ("materials", __import__("egm.materials", fromlist=["self_test"]).self_test),
+                           ("materials_cfg", __import__("egm.materials", fromlist=["check_repo"]).check_repo),
                            ("design", ptk_design.self_test)):
             try:
                 test()
