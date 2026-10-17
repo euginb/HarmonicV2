@@ -367,6 +367,47 @@ def _pdf(page, path, rec):
         return None
 
 
+WAIT_S = 180.0                                  # предел ожидания HLR видов листа, с (Д-70)
+
+
+def _ready(v):
+    """У вида есть проекция (HLR TechDraw — в фоновом потоке, Д-70)."""
+    try:
+        return v.getEdgeByIndex(0) is not None
+    except Exception:
+        return False
+
+
+def _coarse(v):
+    """Запасной HLR (Д-70): полигональная проекция, если точная не пришла за WAIT_S."""
+    try:
+        v.CoarseView = True
+        return True
+    except Exception:
+        return False
+
+
+def _wait(views, timeout=WAIT_S):
+    """recompute() возвращается раньше фонового HLR — отсюда «has no
+    geometry yet» у косметики и пустые размеры. Ждём кромки у видов, прокачивая
+    очередь Qt; возвращает (виды без геометрии, секунды) — Д-70."""
+    import time
+    try:
+        from PySide import QtCore
+        pump = QtCore.QCoreApplication.processEvents
+    except Exception:
+        def pump():
+            return None
+    t0 = time.time()
+    left = [k for k, v in views.items() if v is not None]
+    while True:
+        pump()
+        left = [k for k in left if not _ready(views[k])]
+        if not left or time.time() - t0 > timeout:
+            return left, time.time() - t0
+        time.sleep(0.1)
+
+
 def _one(TD, TS, doc, grp, tpl, pid, rec, shape, path, pdf):
     meas = measure(shape, rec["checks"])
     res = TD.compare(rec["checks"], meas, rec.get("tol", TD.TOL))
@@ -387,11 +428,19 @@ def _one(TD, TS, doc, grp, tpl, pid, rec, shape, path, pdf):
     for b in sh["blocks"]:
         _symbol(doc, page, pid, b, TS.SYM_SCALE)
     front, s = views["front"], sh["scale"]
+    doc.recompute()
+    late, dt = _wait(views)
+    coarse = [k for k in late if _coarse(views[k])]
+    if coarse:
+        doc.recompute()
+        late, dt2 = _wait({k: views[k] for k in late}, 60.0)
+        dt += dt2
     cos = [r for r in res if r["kind"] in TD.COSMETIC and not isinstance(r["step"], (list, str))
            and r["step"] is not None]
-    for r in cos:
-        _cosmetic(front, r["step"] / 2, STYLE[r["kind"]])
+    nocos = [r["sym"] for r in cos if "front" in late
+             or not _cosmetic(front, r["step"] / 2, STYLE[r["kind"]])]
     doc.recompute()
+    _wait({k: v for k, v in views.items() if k not in late}, 30.0)
     put, noedge, used, k = 0, [], set(), 0
     for r in res:
         v = r["step"]
@@ -418,6 +467,9 @@ def _one(TD, TS, doc, grp, tpl, pid, rec, shape, path, pdf):
     out = _pdf(page, path, rec) if pdf else None
     head = (f"лист «{page.Label}», A3 {sh['scale_txt']}; размеров на листе {put}; "
             f"предупреждений {len(warn)}; без кромки на виде: {', '.join(noedge) or '—'}"
+            f"; HLR {dt:.1f} с" + (f" (грубый: {', '.join(coarse)})" if coarse else "")
+            + (f"; без геометрии видов: {', '.join(late)}" if late else "")
+            + (f"; косметика не добавлена: {', '.join(nocos)}" if nocos else "")
             + (f"; компоновка: {'; '.join(sh['overflow'])}" if sh["overflow"] else "")
             + (f"; PDF {os.path.basename(out)}" if out else ""))
     return head, TD.md_table(res)
