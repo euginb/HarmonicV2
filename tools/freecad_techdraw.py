@@ -141,10 +141,7 @@ def _rho(w, step=0.05):
 def _split(ws):
     oi = max(range(len(ws)), key=lambda i: ws[i].BoundBox.DiagonalLength)
     holes, inner = [], []
-    for i, w in enumerate(ws
-
-```text
-):
+    for i, w in enumerate(ws):
         if i == oi:
             continue
         c = _circ(w)

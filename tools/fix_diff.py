@@ -2,7 +2,9 @@
 """fix_diff.py — нормализация unified diff от ИИ под git apply / patch -p1.
 
 Стадия 1 (синтаксис): CRLF/BOM/UTF-16 патча, строки diff --git / new file mode /
-deleted file mode, счётчики @@, пустые строки без префикса, пути без a/ b/.
+deleted file mode, счётчики @@, пустые строки без префикса, пути без a/ b/;
+переименования и копирования (rename/copy from/to); C-квотинг путей git —
+октальные \\NNN декодируются в UTF-8 (не-ASCII имена файлов, пробелы).
 Стадия 2 (сверка с рабочим деревом, для изменяемых и удаляемых файлов):
   * hunk ищется в реальном файле (сравнение без учёта ведущих и хвостовых
     пробелов — отступы контекста в патче часто не совпадают с файлом);
@@ -17,6 +19,8 @@ deleted file mode, счётчики @@, пустые строки без пре�
     привязывает hunk без хвостового контекста к концу файла);
   * расставляется '\\ No newline at end of file';
   * сохраняется стиль окончаний строк файла (LF/CRLF).
+Для переименования/копирования hunk'и сверяются со старым путём (содержимое
+до переименования); чистое переименование без правок проходит как есть.
 Стадия 2 устойчива к ошибкам ИИ в номерах строк, отступах контекста и обрезанных
 хвостах его строк: hunk ищется по содержимому по
 всему файлу, а не только после предыдущего; найденные hunk'и сортируются по
@@ -38,9 +42,10 @@ from pathlib import Path
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$")
 BASE_RE = re.compile(r"^#\s*base:\s*([0-9a-fA-F]{7,40})")
 FENCE_RE = re.compile(r"^(```|~~~)")  # markdown-обрамление из чата; строка diff так начинаться не может
-
+GITLINE_Q_RE = re.compile(r'^diff --git ("(?:[^"\\]|\\.)*") (".*")$')  # оба пути в C-кавычках git
 GIT_META = ("diff --git ", "index ", "new file mode", "deleted file mode",
-            "old mode", "new mode", "similarity index", "rename from", "rename to")
+            "old mode", "new mode", "similarity index", "dissimilarity index",
+            "rename from", "rename to", "copy from", "copy to")
 DEV_NULL = "/dev/null"
 CTX = 3
 NO_EOL = ("\\", " No newline at end of file")
@@ -55,6 +60,74 @@ def warn(msg):
     WARNINGS.append(msg)
 
 
+# ---------- C-квотинг путей git (не-ASCII имена: кириллица и т. п.) ----------
+
+UNQUOTE_ESC = {"a": 7, "b": 8, "f": 12, "n": 10, "r": 13, "t": 9, "v": 11,
+               "\\": 92, '"': 34}
+OCT_RE = re.compile(r"[0-7]{1,3}")
+
+
+def unquote(p):
+    """C-строка git '"a/\\320\\242..."' (октальные \\NNN — байты UTF-8) -> путь.
+    Строка без кавычек возвращается как есть."""
+    if len(p) < 2 or p[0] != '"' or p[-1] != '"':
+        return p
+    out, body, i = bytearray(), p[1:-1], 0
+    while i < len(body):
+        c = body[i]
+        if c != "\\":
+            out += c.encode("utf-8")
+            i += 1
+            continue
+        n = body[i + 1] if i + 1 < len(body) else ""
+        if n in UNQUOTE_ESC:
+            out.append(UNQUOTE_ESC[n])
+            i += 2
+        elif n in "01234567":
+            m = OCT_RE.match(body, i + 1)
+            out.append(int(m[0], 8) & 0xFF)
+            i += 1 + len(m[0])
+        else:  # не распознанный экран — обратный слэш как есть
+            out.append(92)
+            i += 1
+    try:
+        return out.decode("utf-8")
+    except UnicodeDecodeError:
+        return out.decode("latin-1")
+
+
+def qp(path):
+    """Путь для diff --git / --- +++ / rename from|to: не-ASCII остаётся сырым
+    UTF-8 (родной формат git при core.quotepath=false); C-кавычки — только для
+    управляющих символов, '"' и '\\'."""
+    bs = path.encode("utf-8")
+    if not any(b < 0x20 or b in (0x22, 0x5C) or b == 0x7F for b in bs):
+        return path
+    out = bytearray(b'"')
+    for b in bs:
+        if b in (0x22, 0x5C):
+            out += b"\\" + bytes([b])
+        elif b < 0x20 or b == 0x7F:
+            out += ("\\%03o" % b).encode("ascii")
+        else:
+            out.append(b)
+    out += b'"'
+    return out.decode("latin-1")  # байты не-ASCII; при записи encode('utf-8') вернёт их же
+
+
+def parse_gitline(ln):
+    """Пути из 'diff --git a/X b/Y', в том числе полностью в C-кавычках git."""
+    m = GITLINE_Q_RE.match(ln.strip())
+    if m:
+        return strip_ab(unquote(m[1])), strip_ab(unquote(m[2]))
+    rest = ln.strip()[len("diff --git "):]
+    if rest.startswith("a/"):
+        j = rest.find(" b/")
+        if j > 0:
+            return rest[2:j], rest[j + 3:]
+    return None, None  # пути доберутся позже по ---/+++ или rename from/to
+
+
 # ---------- стадия 1: разбор патча ----------
 
 def read_patch(path):
@@ -63,11 +136,16 @@ def read_patch(path):
     return text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
 
 
+def strip_ab(p):
+    return p[2:] if p.startswith(("a/", "b/")) else p
+
+
 def clean_path(p):
     p = p.split("\t")[0].strip()
+    p = unquote(p)
     if p == DEV_NULL:
         return None
-    return p[2:] if p.startswith(("a/", "b/")) else p
+    return strip_ab(p)
 
 
 def is_file_header(lines, i):
@@ -75,8 +153,15 @@ def is_file_header(lines, i):
             and lines[i + 1].startswith("+++ ") and lines[i + 2].startswith("@@ "))
 
 
+def new_file_rec(line_no, old=None, new=None):
+    return {"old": old, "new": new, "hunks": [], "line": line_no, "hdr": False,
+            "rename_from": None, "rename_to": None,
+            "new_file": False, "deleted": False}
+
+
 def parse(lines):
-    """-> (base_sha|None, [ {old,new,line,hunks:[{old_start,tail,line,body:[[kind,text,lineno]]}]} ])
+    """-> (base_sha|None, [ {old,new,rename_from,rename_to,new_file,deleted,line,
+    hunks:[{old_start,tail,line,body:[[kind,text,lineno]]}]} ])
     kind: ' ', '-', '+', '?' (пустая строка без префикса — смысл уточняется позже)."""
     files, cur, hunk, base, i = [], None, None, None, 0
     while i < len(lines):
@@ -86,10 +171,22 @@ def parse(lines):
             hunk = None  # закрывающее обрамление завершает hunk
             i += 1
             continue
-        if is_file_header(lines, i):
-            cur = {"old": clean_path(ln[4:]), "new": clean_path(lines[i + 1][4:]),
-                   "hunks": [], "line": i + 1}
+        if ln.startswith("diff --git "):
+            old, new = parse_gitline(ln)
+            cur = new_file_rec(i + 1, old, new)
             files.append(cur)
+            hunk = None
+            i += 1
+            continue
+        if is_file_header(lines, i):
+            if cur is None or cur["hdr"]:
+                cur = new_file_rec(i + 1)
+                files.append(cur)
+            cur["hdr"] = True
+            # ---/+++ главнее diff --git: у нового файла слева /dev/null,
+            # у удалённого справа /dev/null; для rename значения совпадают
+            cur["old"] = clean_path(ln[4:])
+            cur["new"] = clean_path(lines[i + 1][4:])
             hunk = None
             i += 2
             continue
@@ -103,6 +200,19 @@ def parse(lines):
             continue
         if ln.startswith(GIT_META):
             hunk = None
+            if cur is not None:
+                if ln.startswith("rename from "):
+                    cur["rename_from"] = clean_path(ln[12:])
+                elif ln.startswith("rename to "):
+                    cur["rename_to"] = clean_path(ln[10:])
+                elif ln.startswith("copy from "):
+                    cur["rename_from"] = clean_path(ln[10:])
+                elif ln.startswith("copy to "):
+                    cur["rename_to"] = clean_path(ln[8:])
+                elif ln.startswith("new file mode"):
+                    cur["new_file"] = True
+                elif ln.startswith("deleted file mode"):
+                    cur["deleted"] = True
             i += 1
             continue
         if hunk is None:
@@ -235,11 +345,11 @@ def emit_new(f, root, path, hdr):
     hdr.append("new file mode 100644")
     if not body:
         return hdr
-    return hdr + ["--- /dev/null", f"+++ b/{path}", f"@@ -0,0 +1,{len(body)} @@"] + \
+    return hdr + ["--- /dev/null", f"+++ {qp('b/' + path)}", f"@@ -0,0 +1,{len(body)} @@"] + \
         ["+" + t for _, t, _ in body]
 
 
-def emit_deleted(root, path, hdr):
+def emit_deleted(root, path, f, hdr):
     flines, eol, final_nl = read_target(root, path)
     hdr.append("deleted file mode 100644")
     if not flines:
@@ -247,7 +357,8 @@ def emit_deleted(root, path, hdr):
     out = [("-", t) for t in flines]
     if not final_nl:
         fix_eof(out)
-    return hdr + [f"--- a/{path}", "+++ /dev/null", f"@@ -1,{len(flines)} +0,0 @@"] + render(out, eol)
+    return hdr + [f"--- {qp('a/' + path)}", "+++ /dev/null", f"@@ -1,{len(flines)} +0,0 @@"] + \
+        render(out, eol)
 
 
 def merge_close(flines, located):
@@ -309,13 +420,13 @@ def locate(path, flines, hunks):
     return merge_close(flines, located)  # смежные hunk'и сливаются, чтобы не терять контекст
 
 
-def emit_modified(root, path, f, hdr):
-    flines, eol, final_nl = read_target(root, path)
-    located = locate(path, flines, f["hunks"])
+def emit_modified(root, old, new, f, hdr):
+    flines, eol, final_nl = read_target(root, old)
+    located = locate(old, flines, f["hunks"])
     if not located:
-        warn(f"{path}: нет изменений — файл пропущен")
+        warn(f"{old}: нет изменений — файл пропущен")
         return []
-    res = hdr + [f"--- a/{path}", f"+++ b/{path}"]
+    res = hdr + [f"--- {qp('a/' + old)}", f"+++ {qp('b/' + new)}"]
     delta, prev_end = 0, 0
     for idx, (p, n, body, tail) in enumerate(located):
         nxt = located[idx + 1][0] if idx + 1 < len(located) else len(flines)
@@ -343,7 +454,7 @@ def emit_modified(root, path, f, hdr):
                 plead = ptext[:len(ptext) - len(ptext.lstrip())]
                 flead = ftext[:len(ftext) - len(ftext.lstrip())]
                 if plead != flead:
-                    warn(f"{path}: строка патча {ln}: отступ добавленной строки взят из файла")
+                    warn(f"{old}: строка патча {ln}: отступ добавленной строки взят из файла")
                     return flead + t.lstrip()
                 return t
             return t
@@ -367,19 +478,39 @@ def emit_modified(root, path, f, hdr):
     return res
 
 
+def emit_renamed(f, root, old, new):
+    """Переименование/копирование: заголовок rename from/to; hunk'и сверяются со
+    старым путём (содержимое до переименования), файл переносит сам git apply."""
+    hdr = [f"diff --git {qp('a/' + old)} {qp('b/' + new)}"]
+    if f["new_file"]:
+        hdr.append("new file mode 100644")
+    if f["deleted"]:
+        hdr.append("deleted file mode 100644")
+    hdr.append(f"rename from {qp(old)}")
+    hdr.append(f"rename to {qp(new)}")
+    if not f["hunks"]:
+        warn(f"{old} -> {new}: переименование без правок содержимого")
+        return hdr
+    return emit_modified(root, old, new, f, hdr)
+
+
 def emit_file(f, root):
     old, new = f["old"], f["new"]
+    if f["rename_from"] is not None:
+        old = f["rename_from"]
+    if f["rename_to"] is not None:
+        new = f["rename_to"]
     if old is None and new is None:
         die(f"строка {f['line']}: оба пути /dev/null")
     if old and new and old != new:
-        die(f"{old} -> {new}: переименование не поддерживается")
+        return emit_renamed(f, root, old, new)
     path = old or new
-    hdr = [f"diff --git a/{path} b/{path}"]
+    hdr = [f"diff --git {qp('a/' + path)} {qp('b/' + path)}"]
     if old is None:
         return emit_new(f, root, path, hdr)
     if new is None:
-        return emit_deleted(root, path, hdr)
-    return emit_modified(root, path, f, hdr)
+        return emit_deleted(root, path, f, hdr)
+    return emit_modified(root, path, path, f, hdr)
 
 
 def git_head(root):
@@ -410,7 +541,7 @@ def main(argv):
         warn(f"патч построен от {base[:12]}, HEAD = {head[:12]}; контекст сверен с рабочим деревом")
     seen, out = set(), []
     for f in files:
-        path = f["old"] or f["new"]
+        path = f["old"] or f["new"] or f["rename_from"] or f["rename_to"]
         if path in seen:
             die(f"{path}: файл встречается в патче дважды — объедините блоки")
         seen.add(path)

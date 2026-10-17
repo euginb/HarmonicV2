@@ -197,6 +197,7 @@ def main(argv):
                            ("techdraw_sheet", __import__("egm.cad.techdraw_sheet", fromlist=["self_test"]).self_test),
                            ("materials", __import__("egm.materials", fromlist=["self_test"]).self_test),
                            ("materials_cfg", __import__("egm.materials", fromlist=["check_repo"]).check_repo),
+                           ("srccheck", __import__("egm.srccheck", fromlist=["self_test"]).self_test),
                            ("design", ptk_design.self_test)):
             try:
                 test()
