@@ -74,13 +74,26 @@ def apply(path, pdf=True):
 
 def run():
     from PySide import QtGui
+    App.Console.PrintMessage(f"EGM: старт (__name__ = {__name__}, FreeCAD "
+                             f"{'.'.join(App.Version()[:3])}, Python {sys.version.split()[0]})\n")
     path = QtGui.QFileDialog.getOpenFileName(None, "EGM: <ID>.assy.json", "",
                                              "assy (*.assy.json)")[0]
-    if path:
-        apply(path)
+    if not path:
+        App.Console.PrintMessage("EGM: файл не выбран\n")
+        return
+    try:
+        n, rep = apply(path)
+    except Exception:
+        import traceback
+        msg = traceback.format_exc()
+        App.Console.PrintError(msg + "\n")
+        QtGui.QMessageBox.critical(None, "EGM — ошибка", msg)
+        return
+    import freecad_techdraw
+    freecad_techdraw.box("EGM", f"Метаданные: {n} объектов.\n" + freecad_techdraw.summary(path, rep))
 
 
-if __name__ == "__main__":
+if __name__ != "freecad_egm":              # макрос FreeCAD (Д-66)
     args = [a for a in sys.argv[1:] if a.endswith(".assy.json")]
     if args:
         apply(args[0], pdf=App.GuiUp)
