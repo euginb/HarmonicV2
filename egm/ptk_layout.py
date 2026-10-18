@@ -9,6 +9,7 @@ import math
 import re
 
 from egm import materials as MAT
+from egm import ptk_join
 
 SUP = {"tau_allow": 25.0, "hub_wall": 2.0, "seat_wall": 2.0, "ring_w": 2.0,
        "lip": 1.0, "cup_t": 2.0, "ax_gap": 0.5, "nut_h": 4.0, "out_ext": 2.0}
@@ -48,10 +49,10 @@ def hub_brg(bears, M, D10, o, D_max):
     return None, None
 
 
-def _fit(forms, Dn, Dv, need):
+def _fit(forms, Dn, Dv, need, st=None):
     """Формы одной марки -> (труба | None, лист | None, пруток | None)."""
     tubes = sorted((t for t in forms.get("tubes", [])
-                    if t["D"] >= Dn - 1e-9 and t["D"] - 2 * t["s"] <= Dv + 1e-9),
+                    if ptk_join.tube_ok(t, Dn, Dv, st)),
                    key=lambda t: (t["D"], t["s"]))
     sheets = sorted(s for s in forms.get("sheets", []) if s >= need - 1e-9)
     bars = sorted(b for b in forms.get("bars", []) if b >= Dn - 1e-9)
@@ -78,7 +79,7 @@ def blanks(r_in, r_out, stock, mats=None, forms=MAT.FORMS):
     order = [None] if None in by else [m for m in tried if m in by]
     fits = {}
     for m in order:
-        f = _fit({k: v for k, v in by[m].items() if k in forms}, Dn, Dv, need)
+        f = _fit({k: v for k, v in by[m].items() if k in forms}, Dn, Dv, need, stock)
         if any(x is not None for x in f):
             fits[m] = f
     pick = next(iter(fits), None)
@@ -205,15 +206,25 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
                "d_out": round(d11, 2)}
         if d11 < shaft_d + 1.0:
             warn.append(f".11: Ø нар. {d11:.2f} — опорный поясок меньше 0.5 мм")
-    if "12" in pr:
-        warn.append(f"{code}: соединение .02–.12 (сварка | винты | штифты) не считается (OQ-12)")
     sep = cfg.get("sep") or {}
     r_in = float(sep.get("r_in", cfg["R_sum"] - 1.1 * a))
     r_out = float(sep.get("r_out", cfg["R_sum"] + 1.1 * a))
-    ax, aw = axial(width, row_gap, b09, b10, r_out, cfg, o, "07" in pr)
+    mats02, jn, r_pk = MAT.part_materials(prods, "PTK", "02"), None, r_out
+    if "12" in pr:                                                             # Д-72, OQ-12
+        jn = ptk_join.choose(M, r_in, r_out, stock, mats02, d.get("join"), cfg.get("n"))
+        if jn["pick"] is None:
+            (err if stock else warn).append(f"{code}: соединение .02–.12 — " + ptk_join.why(jn))
+        else:
+            r_pk = max(r_out, jn["pick"]["geom"]["D"] / 2)
+            if jn["pick"]["pins"]["L"] > o["cup_t"] + 1e-9:
+                warn.append(f".12: пояс соединения {jn['pick']['pins']['L']:g} мм > cup_t "
+                            f"{o['cup_t']:g} — длина изделия без пояса (CP-63)")
+    ax, aw = axial(width, row_gap, b09, b10, r_pk, cfg, o, "07" in pr)
     warn += aw
-    bl = blanks(r_in, r_out, stock, MAT.part_materials(prods, "PTK", "02"),
+    bl = blanks(r_in, r_out, stock, mats02,
                 FORMS_BY_02.get(pr.get("02"), MAT.FORMS))
+    if bl is not None and jn and jn["pick"]:
+        bl.update(material=jn["pick"]["material"], tube=jn["pick"]["tube"])
     if bl is not None and not (bl["tube"] or bl["sheet"] or bl["bar"]):
         warn.append(".02: нет заготовки" + (f" из {', '.join(bl['tried'])}" if bl["tried"] else "")
                     + f" в stock.yaml (труба Ø ≥ {bl['tube_need'][0]:g} с отв. ≤ "
@@ -221,7 +232,7 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
     rec = {"code": code, "name": lay.get("name", ""), "parts": pr, "b09": b09, "b10": b10,
            "tau_hub": round(tau, 1) if tau is not None else None, "tau_allow": o["tau_allow"],
            "r11": r11, "covers": ax["covers"], "cup": ax["cup"], "length": ax["length"],
-           "blank": bl}
+           "blank": bl, "join": jn}
     rec["tooling"] = tooling(rec, cfg, r_in, r_out)
     rec.update(shaft_d=shaft_d, ax_gap=o["ax_gap"])
     rec["cad_parts"] = cad_parts(cfg, d.get("name", ""), rec)
@@ -256,6 +267,8 @@ def md_row(name, r):
     cov = f"{r['covers']['tA']:g} / {r['covers']['tB']:g}" if r["covers"] else "—"
     c = r["cup"]
     cup = f"{c['z_in']:g} / {c['t']:g}" + (f"; Ø{c['hub_d']:g}×{c['hub_l']:g}" if c["hub_d"] else "")
+    if r.get("join"):
+        cup += "; " + ptk_join.short(r["join"])
     return (f"| {name} | {r['code']} — {r['name']} | {', '.join('.' + k for k in sorted(r['parts']))} | "
             f"{_b(r['b09'])} | {tau} | {_b(r['b10'])} | {r11} | {cov} | {cup} | {r['length']:g} | "
             f"{'; '.join(s) or ('нет stock.yaml' if bl is None else 'нет')} |")
@@ -313,7 +326,10 @@ def self_test():
     assert r["cad_parts"][0]["rows"] == [1, 2, 3, 4] and r["cad_parts"][0]["cup"] == r["cup"]
     assert cad_parts({"id": "X", "phasing": [{}] * 2}, "K", r)[1]["id"] == "X.07A-K"
     r2, e2, w2 = layout(cfg, {"layout": "L2"}, ecc, 10.0, 1.0, prods, bears, stock)
-    assert not e2 and any("OQ-12" in x for x in w2), w2
+    j2 = r2["join"]["pick"]
+    assert not e2 and (j2["scheme"], j2["pins"]["n"]) == ("insert", 8) and \
+        r2["blank"]["tube"] == {"D": 70.0, "s": 2.5}, (e2, r2["join"])
+    assert "соединение insert" in md_row("K", r2)
     assert any("медной" in t["fx"] for t in r2["tooling"]), r2["tooling"]
     assert any(t["fx"] == "вальцовка" and "лист 1.5" in t["size"] for t in r2["tooling"])
     _, e3, _ = layout({**cfg, "d_bc": 40.0}, {"layout": "L1"}, ecc, 10.0, 1.0, prods, bears, stock)

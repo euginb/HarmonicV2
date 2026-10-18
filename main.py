@@ -198,6 +198,7 @@ def main(argv):
                            ("materials", __import__("egm.materials", fromlist=["self_test"]).self_test),
                            ("materials_cfg", __import__("egm.materials", fromlist=["check_repo"]).check_repo),
                            ("srccheck", __import__("egm.srccheck", fromlist=["self_test"]).self_test),
+                           ("join", __import__("egm.ptk_join", fromlist=["self_test"]).self_test),
                            ("design", ptk_design.self_test)):
             try:
                 test()

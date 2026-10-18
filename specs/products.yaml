@@ -111,7 +111,7 @@ PTK:
       name: "обечайка + ступица выхода"
       fixed: ring
       output: cage
-      join: "weld | screw | pin"
+      join: "collar | insert"          # Д-72: схема .02B–.12 (egm/ptk_join.py); сварка 40Х исключена
       parts:
         "01": ring_phase
         "02": sleeve
