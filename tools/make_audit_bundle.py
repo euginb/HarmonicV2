@@ -96,6 +96,21 @@ PROFILES = {
             "tools/": "служебные утилиты (fix_diff, context_bundle, make_audit_bundle)",
         },
     ),
+    "tools_context": (
+        "без специальных служебных утилит",
+        {
+            "tools/context_bundle.py": "служебные утилиты (fix_diff, context_bundle, make_audit_bundle)",
+            "tools/fix_diff.py": "служебные утилиты (fix_diff, context_bundle, make_audit_bundle)",
+            "tools/make_audit_bundle.py": "служебные утилиты (fix_diff, context_bundle, make_audit_bundle)",
+            "tools/upd_apply.py": "служебные утилиты (fix_diff, context_bundle, make_audit_bundle)",
+        },
+    ),
+    "tech": (
+        "без информации по технологиям",
+        {
+            "docs/Технология изготовления/TECH-02*": "Электроды ЭЭС для профиля венца",
+        },
+    ),
     "workflow": (
         "без референсной копии порядка работы Super Agent",
         {
