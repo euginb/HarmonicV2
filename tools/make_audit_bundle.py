@@ -73,6 +73,7 @@ PROFILES = {
         "без инструкций к code-first спецификациям",
         {
             "instructions/INS-20*": "инструкция к каталогу HIWIN HG",
+            "instructions/INS-90*": "Ручная подготовка контекста для ИИ",
         },
     ),
     "ins": (
