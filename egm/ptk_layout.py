@@ -59,9 +59,22 @@ def _fit(forms, Dn, Dv, need, st=None):
     return tubes[0] if tubes else None, sheets[0] if sheets else None, bars[0] if bars else None
 
 
-# Формы заготовки .02 по конструктиву (Д-68, TECH-01): стакан монолитом (cup, L1) — пруток;
-# обечайка (sleeve, L2) — труба или лист (маршрут weld).
-FORMS_BY_02 = {"cup": ("bars",), "sleeve": ("tubes", "sheets")}
+# Формы заготовки .02 по исполнению (Д-68, Д-73, TECH-01): стакан монолитом (cup, .02A, L1) — пруток;
+# обечайка с буртом (collar, .02B, L2) — толстостенная труба; обечайка без бурта (plain, .02C, L3) —
+# труба или лист (маршрут weld).
+FORMS_BY_02 = {"cup": ("bars",), "collar": ("tubes",), "plain": ("tubes", "sheets")}
+# Буквы исполнений по ключу варианта (Д-73) — если в products.yaml → parts.<NN>.variants нет таблицы.
+V_DEF = {"02": {"cup": "A", "collar": "B", "plain": "C"}, "12": {"spigot": "A", "insert": "B"}}
+
+
+def variant_letter(prods, nn, key):
+    """Буква исполнения детали nn по ключу варианта конструктива: products.yaml → PTK.parts.<nn>.variants
+    ({A: {key: cup, …}}), иначе V_DEF; нет — ""."""
+    vs = (((prods or {}).get("PTK", {}).get("parts", {}).get(nn) or {}).get("variants") or {})
+    for k, v in vs.items():
+        if isinstance(v, dict) and v.get("key") == key:
+            return str(k)
+    return V_DEF.get(nn, {}).get(key, "")
 
 
 def blanks(r_in, r_out, stock, mats=None, forms=MAT.FORMS):
@@ -129,7 +142,7 @@ def tooling(rec, cfg, r_in, r_out):
     out = [{"fx": "разжимная оправка", "part": ".02",
             "size": f"Ø{2 * r_in:.2f} по dc, длина ≥ {float(cfg['width']):g}",
             "route": "точение Dc, окна, контроль — все маршруты тонкой стенки"}]
-    if rec["parts"].get("02") == "sleeve":
+    if rec["parts"].get("02") == "plain":            # weld — только обечайка без бурта .02C (L3, Д-73)
         t = (rec.get("blank") or {}).get("sheet")
         rm = (r_in + r_out) / 2
         out += [{"fx": "вальцовка", "part": ".02",
@@ -157,14 +170,16 @@ def md_tool(name, r):
 
 
 def cad_parts(cfg, name, rec):
-    """Детали конструктива для egm.cad (CP-45): .02A стакан | .02B обечайка, .07A/.07B, .11.
+    """Детали конструктива для egm.cad (CP-45, Д-73): .02A стакан | .02B обечайка с буртом |
+    .02C обечайка без бурта, .07A/.07B, .11; ступица .12A/.12B — CP-63.
 
     ID — <ID>.<NN><вар>-<проработка>, base — без суффикса (Д-48); покупные .09/.10 — в rec."""
     cid = cfg["id"]
     rows = [ph.get("row", k + 1) for k, ph in enumerate(cfg["phasing"])]
     sfx, out, v02 = (f"-{name}" if name else ""), [], rec["parts"].get("02")
-    if v02 in ("cup", "sleeve"):
-        base = f"{cid}.02{'A' if v02 == 'cup' else 'B'}"
+    l02 = (rec.get("var") or {}).get("02") or V_DEF["02"].get(v02, "")
+    if l02:
+        base = f"{cid}.02{l02}"
         out.append({"id": base + sfx, "base": base, "rows": rows,
                     **({"cup": rec["cup"]} if v02 == "cup" else {})})
     if rec.get("covers"):
@@ -176,8 +191,24 @@ def cad_parts(cfg, name, rec):
 
 
 def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
-    """Конструктив проработки -> (запись | None, ошибки, предупреждения)."""
-    code = d.get("layout", "L1")
+    """Конструктив проработки -> (запись | None, ошибки, предупреждения).
+    d["layout"] — код или список кодов (Д-73): из списка берётся первый без ошибок (есть заготовка,
+    проходят штифты); отклонённые — в предупреждении."""
+    codes = d.get("layout") or "L1"
+    if isinstance(codes, str):
+        return _one(cfg, d, codes, ecc, shaft_d, row_gap, prods, bears, stock)
+    rej = []
+    for code in codes:
+        r, e, w = _one(cfg, d, str(code), ecc, shaft_d, row_gap, prods, bears, stock)
+        if r is not None and not e:
+            return r, e, w + [f"конструктив {code} выбран из {', '.join(map(str, codes))}"
+                              + (": " + "; ".join(rej) if rej else "")]
+        rej.append(f"{code} — " + "; ".join(e))
+    return r, e, w
+
+
+def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
+    """Один конструктив code -> (запись | None, ошибки, предупреждения)."""
     lay = (prods or {}).get("PTK", {}).get("layouts", {}).get(code)
     if lay is None:
         return None, [f"конструктив {code}: нет в products.yaml → PTK.layouts (Д-55)"], []
@@ -211,7 +242,9 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
     r_out = float(sep.get("r_out", cfg["R_sum"] + 1.1 * a))
     mats02, jn, r_pk = MAT.part_materials(prods, "PTK", "02"), None, r_out
     if "12" in pr:                                                             # Д-72, OQ-12
-        jn = ptk_join.choose(M, r_in, r_out, stock, mats02, d.get("join"), cfg.get("n"))
+        jopt = {**(d.get("join") or {}),                    # схему задаёт конструктив (Д-73)
+                **({"join": lay["join"]} if lay.get("join") in ptk_join.SCHEMES else {})}
+        jn = ptk_join.choose(M, r_in, r_out, stock, mats02, jopt, cfg.get("n"))
         if jn["pick"] is None:
             (err if stock else warn).append(f"{code}: соединение .02–.12 — " + ptk_join.why(jn))
         else:
@@ -233,6 +266,7 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
            "tau_hub": round(tau, 1) if tau is not None else None, "tau_allow": o["tau_allow"],
            "r11": r11, "covers": ax["covers"], "cup": ax["cup"], "length": ax["length"],
            "blank": bl, "join": jn}
+    rec["var"] = {nn: variant_letter(prods, nn, pr[nn]) for nn in ("02", "12") if pr.get(nn)}
     rec["tooling"] = tooling(rec, cfg, r_in, r_out)
     rec.update(shaft_d=shaft_d, ax_gap=o["ax_gap"])
     rec["cad_parts"] = cad_parts(cfg, d.get("name", ""), rec)
@@ -269,7 +303,8 @@ def md_row(name, r):
     cup = f"{c['z_in']:g} / {c['t']:g}" + (f"; Ø{c['hub_d']:g}×{c['hub_l']:g}" if c["hub_d"] else "")
     if r.get("join"):
         cup += "; " + ptk_join.short(r["join"])
-    return (f"| {name} | {r['code']} — {r['name']} | {', '.join('.' + k for k in sorted(r['parts']))} | "
+    var = r.get("var") or {}
+    return (f"| {name} | {r['code']} — {r['name']} | {', '.join('.' + k + var.get(k, '') for k in sorted(r['parts']))} | "
             f"{_b(r['b09'])} | {tau} | {_b(r['b10'])} | {r11} | {cov} | {cup} | {r['length']:g} | "
             f"{'; '.join(s) or ('нет stock.yaml' if bl is None else 'нет')} |")
 
@@ -282,8 +317,10 @@ def self_test():
     prods = {"PTK": {"layouts": {
         "L1": {"name": "стакан", "fixed": "ring", "output": "cage",
                "parts": {"02": "cup", "07": "side", "09": "out", "10": "in", "11": "ring", "12": None}},
-        "L2": {"name": "обечайка", "fixed": "ring", "output": "cage",
-               "parts": {"02": "sleeve", "07": "side", "09": "out", "10": "in", "11": "ring", "12": "hub"}}}}}
+        "L2": {"name": "обечайка с буртом", "fixed": "ring", "output": "cage", "join": "collar",
+               "parts": {"02": "collar", "07": "side", "09": "out", "10": "in", "11": "ring", "12": "spigot"}},
+        "L3": {"name": "обечайка без бурта", "fixed": "ring", "output": "cage", "join": "insert",
+               "parts": {"02": "plain", "07": "side", "09": "out", "10": "in", "11": "ring", "12": "insert"}}}}}
     stock = {"tubes": [{"D": 70.0, "s": 5.0}, {"D": 70.0, "s": 2.5}, {"D": 68.0, "s": 1.0}],
              "sheets": [1.0, 1.2, 1.5, 2.0], "bars": [65.0, 70.0, 75.0]}
     cfg = {"id": "PTK-T-8M4P2-AAAAAA", "M": 100.0, "phasing": [{"row": k + 1} for k in range(4)],
@@ -325,13 +362,24 @@ def self_test():
                    "PTK-T-8M4P2-AAAAAA.11"], ids
     assert r["cad_parts"][0]["rows"] == [1, 2, 3, 4] and r["cad_parts"][0]["cup"] == r["cup"]
     assert cad_parts({"id": "X", "phasing": [{}] * 2}, "K", r)[1]["id"] == "X.07A-K"
-    r2, e2, w2 = layout(cfg, {"layout": "L2"}, ecc, 10.0, 1.0, prods, bears, stock)
-    j2 = r2["join"]["pick"]
-    assert not e2 and (j2["scheme"], j2["pins"]["n"]) == ("insert", 8) and \
-        r2["blank"]["tube"] == {"D": 70.0, "s": 2.5}, (e2, r2["join"])
-    assert "соединение insert" in md_row("K", r2)
-    assert any("медной" in t["fx"] for t in r2["tooling"]), r2["tooling"]
-    assert any(t["fx"] == "вальцовка" and "лист 1.5" in t["size"] for t in r2["tooling"])
+    assert r["var"] == {"02": "A"} and ".02A, " in md_row("K10", r), r["var"]       # Д-73
+    assert variant_letter({"PTK": {"parts": {"12": {"variants": {"X": {"key": "insert"}}}}}},
+                          "12", "insert") == "X" and variant_letter(None, "12", "spigot") == "A"
+    r2, e2, _ = layout(cfg, {"layout": "L2"}, ecc, 10.0, 1.0, prods, bears, stock)
+    assert any("collar: нет трубы" in x for x in e2) and r2["var"] == {"02": "B", "12": "A"}, \
+        (e2, r2["var"])
+    rc, ec, _ = layout(cfg, {"layout": "L3"}, ecc, 10.0, 1.0, prods, bears, stock)
+    jc = rc["join"]["pick"]
+    assert not ec and (jc["scheme"], jc["pins"]["n"]) == ("insert", 8) and \
+        rc["blank"]["tube"] == {"D": 70.0, "s": 2.5}, (ec, rc["join"])
+    assert rc["var"] == {"02": "C", "12": "B"} and ".02C, " in md_row("K", rc) and \
+        ".12B" in md_row("K", rc) and "соединение insert" in md_row("K", rc)
+    assert rc["cad_parts"][0]["id"] == "PTK-T-8M4P2-AAAAAA.02C", rc["cad_parts"]
+    assert any("медной" in t["fx"] for t in rc["tooling"]), rc["tooling"]
+    assert any(t["fx"] == "вальцовка" and "лист 1.5" in t["size"] for t in rc["tooling"])
+    assert not any(t["fx"] == "вальцовка" for t in r2["tooling"])
+    rl, el, wl = layout(cfg, {"layout": ["L2", "L3"]}, ecc, 10.0, 1.0, prods, bears, stock)
+    assert not el and rl["code"] == "L3" and any("L2 —" in x for x in wl), wl
     _, e3, _ = layout({**cfg, "d_bc": 40.0}, {"layout": "L1"}, ecc, 10.0, 1.0, prods, bears, stock)
     assert any(".09" in x for x in e3), e3
     _, e4, _ = layout(cfg, {"layout": "L9"}, ecc, 10.0, 1.0, prods, bears, stock)
