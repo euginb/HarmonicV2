@@ -17,7 +17,8 @@ from egm import materials as MAT
 
 JOIN = {"join": "auto", "join_order": ["collar", "insert"], "pin_d": [3.0, 4.0, 5.0],
         "pin_n": [4, 6, 8, 10, 12, 16], "edge_k": 1.5, "pin_depth_k": 1.5, "pin_web": 2.0,
-        "tau_pin": 80.0, "sig_wall": 150.0, "sig_hub": 150.0, "c_in": 1.0, "c_out": 1.0}
+        "tau_pin": 80.0, "sig_wall": 150.0, "sig_hub": 150.0, "c_in": 1.0, "c_out": 1.0,
+        "pin_gap": 0.5}
 SCHEMES = ("collar", "insert")
 
 
@@ -53,15 +54,47 @@ def check(M, g, d, n, o):
     return s, bad
 
 
-def pins(M, g, o, n_win=None):
-    """Наименьший Ø, затем наименьшее n; при n_win — n | n_win (деление окон) -> dict | None."""
-    for d in sorted(o["pin_d"]):
+def pin_cat(pins):
+    """vendor_prices.yaml → pins -> {Ø: {key, l — стандартные длины, std}} (Д-74); не dict — пропуск."""
+    out = {}
+    for k, v in (pins or {}).items():
+        if isinstance(v, dict) and v.get("d") and v.get("l"):
+            out[float(v["d"])] = {"key": str(k), "l": sorted(float(x) for x in v["l"]),
+                                  "std": str(v.get("std", ""))}
+    return out
+
+
+def pin_len(d, need, cat):
+    """Наименьшая стандартная длина ≥ need из каталога -> (l | None, обозначение)."""
+    c = (cat or {}).get(float(d))
+    l = next((x for x in c["l"] if x >= need - 1e-9), None) if c else None
+    if l is None:
+        return None, ""
+    return l, f"Штифт {d:g}×{l:g} {c['std']}".strip()
+
+
+def pins(M, g, o, n_win=None, cat=None):
+    """Наименьший Ø, затем наименьшее n; при n_win — n | n_win (деление окон) -> dict | None.
+    cat — каталог (pin_cat): Ø только из каталога, длина l — наименьшая стандартная ≥ t + h
+    (стенка .02 + глубина в .12); гнездо в .12 — l − t + pin_gap (Д-74)."""
+    ds = sorted(o["pin_d"])
+    if cat:
+        ds = [d for d in ds if float(d) in cat]
+    for d in ds:
+        need = g["t"] + o["pin_depth_k"] * d
+        l, des = pin_len(d, need, cat)
+        if cat and l is None:
+            continue
         ok = [n for n in sorted(o["pin_n"]) if not check(M, g, d, n, o)[1]]
         if n_win:
             ok = [n for n in ok if int(n_win) % n == 0] or ok
         if ok:
             s, _ = check(M, g, d, ok[0], o)
-            return {"d": d, "n": ok[0], **{k: round(v, 1) for k, v in s.items()}}
+            q = {"d": d, "n": ok[0], **{k: round(v, 1) for k, v in s.items()}}
+            q.update(t=round(g["t"], 2), need=round(need, 2), l=l, des=des,
+                     key=f"{cat[float(d)]['key']}x{l:g}" if l else "",
+                     hole12=round((l or need) - g["t"] + o["pin_gap"], 2))
+            return q
     return None
 
 
@@ -69,9 +102,11 @@ def _area(t):
     return t["D"] ** 2 - (t["D"] - 2 * t["s"]) ** 2
 
 
-def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None):
-    """Схема по доступности заготовок -> {pick | None, variants, tried, lim}."""
+def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None, cat=None):
+    """Схема по доступности заготовок -> {pick | None, variants, tried, lim}.
+    cat — каталог штифтов (pin_cat); нет — из opt["pin_cat"] (Д-74)."""
     o = {**JOIN, **(opt or {})}
+    cat = cat if cat is not None else o.get("pin_cat")
     order = [o["join"]] if o["join"] in SCHEMES else [s for s in o["join_order"] if s in SCHEMES]
     by = MAT.stock_by_material(stock) if stock else {}
     tried = [str(m) for m in mats] if mats else [m for m in by if m is not None]
@@ -87,12 +122,12 @@ def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None):
             if ts:
                 fit[m] = min(ts, key=_area)
         var.append({"scheme": s, "geom": {k: round(v, 2) for k, v in g.items()},
-                    "pins": pins(M, g, o, n_win), "need": need, "fit": fit})
+                    "pins": pins(M, g, o, n_win, cat), "need": need, "fit": fit})
     pick = next(({"scheme": v["scheme"], "material": m, "tube": v["fit"][m], "pins": v["pins"],
                   "geom": v["geom"]} for m in tried for v in var if v["pins"] and m in v["fit"]),
                 None)
     return {"pick": pick, "variants": var, "tried": tried,
-            "lim": {"sig_wall": o["sig_wall"], "tau_pin": o["tau_pin"]}}
+            "lim": {"sig_wall": o["sig_wall"], "tau_pin": o["tau_pin"], "sig_hub": o["sig_hub"]}}
 
 
 def why(jn):
@@ -118,6 +153,27 @@ def short(jn):
             f"σсм {q['sig_wall']:g}/{jn['lim']['sig_wall']:g} МПа, пояс {q['L']:g} мм")
 
 
+JOIN_HEAD = ("| Проработка | Схема | Заготовка .02 | Штифты n × Ø × l | Обозначение | Гнездо в .12, мм | "
+             "τ штифта / [τ], МПа | σсм стенки / [σ], МПа | σсм ступицы / [σ], МПа | "
+             "Срез к торцу / [τ], МПа | Пояс L, мм |")
+JOIN_RULE = "|---" * 11 + "|"
+
+
+def join_row(name, jn):
+    """Строка таблицы «Соединение .02–.12» SPEC-11 (Д-74); отказ — причины по схемам."""
+    p = jn["pick"]
+    if p is None:
+        return f"| {name} | нет | {why(jn).replace(' | ', '; ')} |" + " — |" * 8
+    t, q, lim = p["tube"], p["pins"], jn["lim"]
+    m = f"{p['material']} " if p["material"] else ""
+    nd = f"{q['n']} × Ø{q['d']:g}" + (f" × {q['l']:g}" if q.get("l") else "")
+    des = f"{q['des']} ({q['key']})" if q.get("des") else "нет vendor_prices.yaml → pins"
+    return (f"| {name} | {p['scheme']} | {m}труба {t['D']:g}×{t['s']:g} | {nd} | {des} | "
+            f"{q.get('hole12', q['L']):g} | {q['tau']:g} / {lim['tau_pin']:g} | "
+            f"{q['sig_wall']:g} / {lim['sig_wall']:g} | {q['sig_hub']:g} / {lim.get('sig_hub', 0):g} | "
+            f"{q['tau_edge']:g} / {0.6 * lim['sig_wall']:g} | {q['L']:g} |")
+
+
 def self_test():
     """PTK-050 (r 33.06…33.94, M 100): collar — 73×7, 6×Ø3; insert — 73×5, 8×Ø3; выбор по наличию."""
     st = {"tube_allow": 0.5, "sheet_allow": 0.3, "tube_tol_D": 0.008, "tube_tol_s": 0.15,
@@ -137,4 +193,15 @@ def self_test():
     j3 = choose(100.0, r_in, r_out, st1, ["40ХН2МА"])
     assert j3["pick"] is None and "нет трубы" in why(j3), why(j3)
     assert pins(100.0, geometry("insert", r_in, r_out, JOIN), JOIN, 50)["n"] == 10
+    cat = pin_cat({"P3": {"d": 3.0, "l": [8, 10, 12], "std": "ГОСТ 24296-93"}, "_c": "x",
+                   "P4": {"d": 4.0, "l": [10, 12]}})
+    assert sorted(cat) == [3.0, 4.0] and pin_len(3.0, 5.38, cat) == (8.0, "Штифт 3×8 ГОСТ 24296-93")
+    assert pin_len(3.0, 13.0, cat) == (None, "") and pin_len(5.0, 1.0, cat) == (None, "")
+    jc = choose(100.0, r_in, r_out, st1, ["40Х"], cat=cat)
+    q = jc["pick"]["pins"]
+    assert (q["d"], q["l"], q["key"]) == (3.0, 8.0, "P3x8") and abs(q["hole12"] - 7.62) < 0.01, q
+    assert choose(100.0, r_in, r_out, st1, ["40Х"], {"pin_cat": cat})["pick"]["pins"]["l"] == 8.0
+    assert choose(100.0, r_in, r_out, st1, ["40Х"], {"pin_d": [5.0]}, cat=cat)["pick"] is None
+    assert "Штифт 3×8" in join_row("K", jc) and join_row("K", jc).count("|") == 12, join_row("K", jc)
+    assert join_row("K", j3).count("|") == 12, join_row("K", j3)
     return True

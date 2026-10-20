@@ -190,11 +190,13 @@ def cad_parts(cfg, name, rec):
     return out
 
 
-def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
+def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None, pins=None):
     """Конструктив проработки -> (запись | None, ошибки, предупреждения).
     d["layout"] — код или список кодов (Д-73): из списка берётся первый без ошибок (есть заготовка,
-    проходят штифты); отклонённые — в предупреждении."""
+    проходят штифты); отклонённые — в предупреждении. pins — vendor_prices.yaml → pins (Д-74)."""
     codes = d.get("layout") or "L1"
+    if pins:
+        d = {**d, "join": {**(d.get("join") or {}), "pin_cat": ptk_join.pin_cat(pins)}}
     if isinstance(codes, str):
         return _one(cfg, d, codes, ecc, shaft_d, row_gap, prods, bears, stock)
     rej = []
@@ -267,6 +269,7 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
            "r11": r11, "covers": ax["covers"], "cup": ax["cup"], "length": ax["length"],
            "blank": bl, "join": jn}
     rec["var"] = {nn: variant_letter(prods, nn, pr[nn]) for nn in ("02", "12") if pr.get(nn)}
+    rec["var_name"] = {nn: variant_name(prods, nn, pr[nn]) for nn in rec["var"]}
     rec["tooling"] = tooling(rec, cfg, r_in, r_out)
     rec.update(shaft_d=shaft_d, ax_gap=o["ax_gap"])
     rec["cad_parts"] = cad_parts(cfg, d.get("name", ""), rec)
@@ -307,6 +310,66 @@ def md_row(name, r):
     return (f"| {name} | {r['code']} — {r['name']} | {', '.join('.' + k + var.get(k, '') for k in sorted(r['parts']))} | "
             f"{_b(r['b09'])} | {tau} | {_b(r['b10'])} | {r11} | {cov} | {cup} | {r['length']:g} | "
             f"{'; '.join(s) or ('нет stock.yaml' if bl is None else 'нет')} |")
+
+
+def variant_name(prods, nn, key):
+    """Краткое имя исполнения: products.yaml → PTK.parts.<nn>.variants.<буква>.name до «:» / «;»."""
+    vs = (((prods or {}).get("PTK", {}).get("parts", {}).get(nn) or {}).get("variants") or {})
+    for v in vs.values():
+        if isinstance(v, dict) and v.get("key") == key:
+            return re.split(r"[:;]", str(v.get("name", "")))[0].strip()
+    return ""
+
+
+def _vname(r, nn):
+    """Ячейка исполнения «.02B — обечайка с буртом…»; детали нет — «нет»."""
+    if nn not in r["parts"]:
+        return "нет (ступица — часть .02)" if nn == "12" else "нет"
+    v, n = (r.get("var") or {}).get(nn, ""), (r.get("var_name") or {}).get(nn, "")
+    return f".{nn}{v}" + (f" — {n}" if n else "")
+
+
+def _blank_rows(name, bl):
+    """Строки таблицы «Заготовка .02»: выбранная марка, альтернативы, марки без заготовки."""
+    if bl is None:
+        return [f"| {name} | — | нет stock.yaml | — |"]
+    out, s = [], _forms_txt(bl["tube"], bl["sheet"], bl["bar"], bl["sheet_len"])
+    if s:
+        out.append(f"| {name} | {bl.get('material') or '—'} | выбрана | {', '.join(s)} |")
+    for m, f in (bl.get("alt_fit") or {}).items():
+        out.append(f"| {name} | {m} | альтернатива | {', '.join(_forms_txt(*f, bl['sheet_len']))} |")
+    if bl.get("missing"):
+        out.append(f"| {name} | {', '.join(bl['missing'])} | нет подходящей заготовки | — |")
+    return out or [f"| {name} | — | нет | — |"]
+
+
+def md_tables(items):
+    """Раздел «Конструктив» SPEC-11 (Д-74): [(проработка, запись)] -> таблицы: состав;
+    опоры, кольца, крышки, дно; соединение .02–.12 (если есть L2/L3); заготовка .02."""
+    A = ["### Состав", "", "| Проработка | Конструктив | Сепаратор .02 | Ступица .12 | Детали | "
+         "Длина, мм |", "|---" * 6 + "|"]
+    B = ["### Опоры, кольца, крышки, дно", "",
+         "| Проработка | .09 d×D×B | τ ступицы / [τ], МПа | .10 d×D×B | .11 n × h, мм | "
+         "Крышки .07A / .07B, мм | Дно .02 z / t, мм | Ступица Ø × L, мм |", "|---" * 8 + "|"]
+    J = ["### Соединение .02–.12 (Д-72, Д-74)", "", ptk_join.JOIN_HEAD, ptk_join.JOIN_RULE]
+    S = ["### Заготовка .02 (Д-67, Д-68)", "", "| Проработка | Марка | Статус | Формы |",
+         "|---" * 4 + "|"]
+    for name, r in items:
+        var, c = r.get("var") or {}, r["cup"]
+        det = ", ".join("." + k + var.get(k, "") for k in sorted(r["parts"]))
+        A.append(f"| {name} | {r['code']} — {r['name']} | {_vname(r, '02')} | {_vname(r, '12')} | "
+                 f"{det} | {r['length']:g} |")
+        tau = f"{r['tau_hub']:g} / {r['tau_allow']:g}" if r["tau_hub"] is not None else "—"
+        r11 = f"{r['r11']['n']} × {r['r11']['h']:g}" if r["r11"] else "—"
+        cov = f"{r['covers']['tA']:g} / {r['covers']['tB']:g}" if r["covers"] else "—"
+        hub = f"Ø{c['hub_d']:g} × {c['hub_l']:g}" if c["hub_d"] else "—"
+        B.append(f"| {name} | {_b(r['b09'])} | {tau} | {_b(r['b10'])} | {r11} | {cov} | "
+                 f"{c['z_in']:g} / {c['t']:g} | {hub} |")
+        if r.get("join"):
+            J.append(ptk_join.join_row(name, r["join"]))
+        S += _blank_rows(name, r["blank"])
+    out = A + [""] + B + ([""] + J if len(J) > 4 else []) + [""] + S
+    return "\n".join(out)
 
 
 def self_test():
@@ -385,4 +448,12 @@ def self_test():
     _, e4, _ = layout(cfg, {"layout": "L9"}, ecc, 10.0, 1.0, prods, bears, stock)
     assert e4 and "L9" in e4[0], e4
     assert layout(cfg, {}, ecc, 10.0, 1.0, prods, bears, None)[0]["blank"] is None
+    t = md_tables([("K10", r), ("K", rc), ("K2", r2)])                           # Д-74
+    assert "61806" in t and "| K10 | L1 — стакан |" in t and "нет (ступица — часть .02)" in t, t
+    assert "### Соединение" in t and "| K | insert |" in t and ".02C, " in t, t
+    assert "| K2 | нет |" in t and "collar: нет трубы" in t, t
+    assert md_tables([("K10", r)]).count("### ") == 3
+    rp, _, _ = layout(cfg, {"layout": "L3"}, ecc, 10.0, 1.0, prods, bears, stock,
+                      {"P3": {"d": 3.0, "l": [8, 10], "std": "ГОСТ 24296-93"}})
+    assert rp["join"]["pick"]["pins"]["des"] == "Штифт 3×8 ГОСТ 24296-93", rp["join"]
     return True

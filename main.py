@@ -163,6 +163,8 @@ def run_design(cfg_rows, require=False):
         extra = {"prods": config.load(config.cfg_file(APP, "configs.products")),
                  "bears": config.load(
                      config.cfg_file(APP, "configs.vendor_prices")).get("bearings", {}),
+                 "pins": config.load(
+                     config.cfg_file(APP, "configs.vendor_prices")).get("pins", {}),
                  "stock": config.load(stock) if stock.exists() else None}
         res = ptk_design.run(config.load(
             config.cfg_file(APP, "products.PTK.configs.design_input")), cfg_rows, lim, extra)
