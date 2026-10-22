@@ -6,7 +6,7 @@
 """
 import math
 
-from egm.cad.model import Band, Circle, Contour, Dim, PartModel, Window
+from egm.cad.model import Band, Circle, Contour, Dim, PartModel, PinHole, Window
 
 
 def build(cfg, part, row=None):
@@ -54,6 +54,34 @@ def build(cfg, part, row=None):
                      ("t дна", cup["t"], "толщина дна, мм"),
                      ("ступица", f"Ø{cup['hub_d']:g}×{cup['hub_l']:g}", "посадка .09, длина"),
                      ("отв. ступицы", 2 * rb, "под .10 — опору конца входного вала")]
+    jn = part.get("join") or {}
+    if jn:                               # CP-63: .02B — бурт (collar), .02C — стенка под .12B (insert)
+        W, z, L = s["length"], jn["z"], jn["L"]
+        ins = jn["scheme"] == "insert"
+        end = z + L if ins else z
+        if end > W + 1e-9:
+            m.bands.append(Band(s["r_in"], s["r_out"], W, end - W))
+        r0, r1 = (s["r_in"], s["r_out"]) if ins else (jn["d"] / 2, jn["D"] / 2)
+        if not ins:
+            m.bands.append(Band(r0, r1, z, L))
+        m.pins = [PinHole(a, jn["pin_z"], jn["pin_d"], r0 - 1.0, r1 + 1.0) for a in jn["pin_a"]]
+        pl = f"×{jn['pin_l']:g}" if jn.get("pin_l") else ""
+        m.notes.append((f"обечайка .02C без бурта: стенка до z {end:g} под дно-вставку .12B" if ins else
+                        f"бурт .02B Ø{2 * r0:g}/Ø{2 * r1:g} на z {z:g}…{z + L:g}: поясок .12A — в отверстии")
+                       + f"; штифты {jn['pin_n']}×Ø{jn['pin_d']:g}{pl} радиально на z {jn['pin_z']:g}, "
+                       "по осям окон последнего ряда (Д-76) — в STEP; на развёртке не показаны")
+        m.legend += [("z стыка", z, "начало пояса / дна .12 от торца пакета, мм (Д-76)"),
+                     ("Lп", L, "осевая длина пояса: 2·edge_k·d (Д-72)"),
+                     ("штифты", f"{jn['pin_n']}×Ø{jn['pin_d']:g}{pl}", "ГОСТ 24296-93; в .02 — H7 до ХТО (TECH-01)"),
+                     ("z штифтов", jn["pin_z"], "ось отверстий от торца пакета, мм"),
+                     ("угол шт. 1", jn["pin_a"][0], "ось окна последнего ряда, ° (Д-76)")]
+        if not ins:
+            m.legend += [("dб", jn["d"], "отверстие бурта: dс − 2·c_in"),
+                         ("Dб", jn["D"], "наружный Ø бурта: Dс + 2·c_out")]
+        w = jn.get("weld") or {}
+        if w.get("seam") is not None:
+            m.notes.append(f"маршрут weld: лист {w['sheet']:g}, шов по образующей на {w['seam']:g}° — "
+                           "перемычка ряда 1, мимо штифтов (TECH-01, Д-76)")
     return m
 
 

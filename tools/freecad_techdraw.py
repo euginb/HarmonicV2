@@ -177,8 +177,16 @@ def _section(shape, z):
     return sec
 
 
-def _value(c, sec, cyl, bb):
+def _value(c, sec, cyl, bb, rad=()):
     k, v = c["kind"], c["value"]
+    if k in ("n_pins", "d_pin", "pin_z"):        # CP-63: радиальные отверстия штифтов
+        if not rad:
+            return "нет радиальных отверстий"
+        if k == "n_pins":
+            return len(rad)
+        if k == "d_pin":
+            return 2 * min((r for _, _, r in rad), key=lambda r: abs(2 * r - v))
+        return sum(z for _, z, _ in rad) / len(rad)
     if k == "length":
         return bb.ZLength
     if k == "d_cyl":
@@ -211,10 +219,33 @@ def _value(c, sec, cyl, bb):
     return f"вид проверки {k} не поддержан"
 
 
+def _radial(shape, tol=3.0):
+    """Радиальные отверстия (CP-63): цилиндрические грани с осью ⟂ z -> [(угол, z, r)];
+    половины одной грани (шов цилиндра) сливаются по углу центра масс в пределах tol°."""
+    fs = []
+    for f in shape.Faces:
+        s = f.Surface
+        if _tn(s) != "Cylinder" or abs(s.Axis.z) > 1e-6:
+            continue
+        c = f.CenterOfMass
+        fs.append((math.degrees(math.atan2(c.y, c.x)) % 360, c.z, s.Radius))
+    grp = []
+    for f in sorted(fs):
+        if grp and f[0] - grp[-1][-1][0] < tol and abs(f[2] - grp[-1][-1][2]) < 1e-6:
+            grp[-1].append(f)
+        else:
+            grp.append([f])
+    if len(grp) > 1 and grp[0][0][0] + 360 - grp[-1][-1][0] < tol:   # переход через 0°
+        grp[0] += grp.pop()
+    return [(g[0][0], sum(x[1] for x in g) / len(g), g[0][2]) for g in grp]
+
+
 def measure(shape, chk):
     """{sym: значение по 3D | строка-причина} для эталонов chk."""
     bb = shape.BoundBox
-    cyl = sorted({round(f.Surface.Radius, 6) for f in shape.Faces if _tn(f.Surface) == "Cylinder"})
+    cyl = sorted({round(f.Surface.Radius, 6) for f in shape.Faces if _tn(f.Surface) == "Cylinder"
+                  and abs(f.Surface.Axis.z) > 0.999})
+    rad = _radial(shape)
     secs, out = {}, {}
     for c in chk:
         z = c.get("z")
@@ -224,7 +255,7 @@ def measure(shape, chk):
             except Exception as e:
                 secs[z] = f"сечение z = {z:g}: {type(e).__name__}: {e}"
         try:
-            out[c["sym"]] = _value(c, secs.get(z), cyl, bb)
+            out[c["sym"]] = _value(c, secs.get(z), cyl, bb, rad)
         except Exception as e:
             out[c["sym"]] = f"{type(e).__name__}: {e}"
     return out

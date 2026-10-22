@@ -96,7 +96,7 @@
 | [specs/catalog_hiwin_hg_pairs.json](specs/catalog_hiwin_hg_pairs.json) | code-first (БД) | `egm/catalog.py`, Д-10, INS-20 | rev 1 |
 | [reports/checks.md](reports/checks.md)                                 | отчёт | `main.py` | каждый прогон |
 | [reports/catalog_report.md](reports/catalog_report.md)                 | отчёт | `egm/catalog.py` | каждый прогон |
-| [specs/stock.yaml](stock.yaml)                                         | данные (заказчик) | поставщики | заполняется |
+| [specs/stock.yaml](specs/stock.yaml)                                   | данные (заказчик) | поставщики | заполняется |
 | [specs/materials.yaml](specs/materials.yaml)                             | данные (справочник)   | TECH-01, TECH-02, ГОСТ на марки                            | заполняется   |
 
 

@@ -24,7 +24,8 @@ from datetime import datetime
 from pathlib import Path
 
 from egm import config, products, ptk, ptk_design
-from egm.cad import assy, freecad, ptk_cover, ptk_ecc, ptk_ring, ptk_sep, ptk_spacer, step, svg
+from egm.cad import (assy, freecad, ptk_cover, ptk_ecc, ptk_hub, ptk_ring, ptk_sep, ptk_spacer,
+                     step, svg)
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = config.load_app()                     # общий конфиг приложения (Д-64)
@@ -40,7 +41,8 @@ STEP_MODE = _STEP.get("mode", "spline")         # контур впадин по
 FC_ON = _FC.get("enabled", False)               # альтернативный экспорт — FCStd (Д-64)
 FC_CMD = _FC.get("command") or freecad.DEFAULT_COMMAND
 GENERATORS = {"ptk_ring": ptk_ring.build, "ptk_sep": ptk_sep.build, "ptk_ecc": ptk_ecc.build,
-              "ptk_spacer": ptk_spacer.build, "ptk_cover": ptk_cover.build}
+              "ptk_spacer": ptk_spacer.build, "ptk_cover": ptk_cover.build,
+              "ptk_hub": ptk_hub.build}
 
 
 def _rel(p):
@@ -173,7 +175,9 @@ def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=Non
         raise KeyError(f"{arg}: нет детали (ряд {k}) или она не сгенерирована калькулятором")
     out = CAD_OUT / cfg["id"]
     out.mkdir(parents=True, exist_ok=True)
+    lay = {q["id"]: q for q in (cfg.get("layout") or {}).get("cad_parts", [])}
     for part in parts:
+        part = lay.get(part["id"], part)          # CP-63: join/cup — из layout.cad_parts
         prod = products.item(prods, part.get("base", part["id"]))
         gen = prod.get("cad")
         if gen not in GENERATORS:
