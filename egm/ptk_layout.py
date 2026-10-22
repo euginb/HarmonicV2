@@ -12,7 +12,7 @@ from egm import materials as MAT
 from egm import ptk_join
 
 SUP = {"tau_allow": 25.0, "hub_wall": 2.0, "seat_wall": 2.0, "ring_w": 2.0,
-       "lip": 1.0, "cup_t": 2.0, "ax_gap": 0.5, "nut_h": 4.0, "out_ext": 2.0}
+       "lip": 1.0, "cup_t": 2.0, "ax_gap": 0.5, "nut_h": 4.0, "out_ext": 2.0, "pin_wall": 1.0}
 HEAD = ("| Проработка | Конструктив | Детали | .09 d×D×B | τ ступицы / [τ], МПа | .10 d×D×B | "
         ".11 n × h, мм | Крышки tA / tB, мм | Дно .02 z / t, мм; ступица | Длина, мм | Заготовка .02: марка, формы |")
 RULE = "|---" * 11 + "|"
@@ -105,22 +105,25 @@ def blanks(r_in, r_out, stock, mats=None, forms=MAT.FORMS):
             "sheet_len": round(math.pi * (r_in + r_out), 1), "bar": bar}
 
 
-def axial(width, row_gap, b09, b10, r_out, cfg, o, covers):
+def axial(width, row_gap, b09, b10, r_out, cfg, o, covers, belt=0.0):
     """Осевая компоновка (Д-57); z = 0 — торец пакета со стороны входа, W — длина пакета.
 
     .07A [−tA, 0]: гнездо .10, tA = B.10 + lip. Гайка пакета эксцентриков — за последним рядом,
     поэтому дно стакана изнутри на z_b = max(W, W − row_gap + nut_h) + ax_gap. .07B [W, W + tB]:
     карман под дно Ø 2(r_out + ax_gap) глубиной z_b + cup_t + ax_gap − W, за ним гнездо .09
     и буртик: tB = карман + B.09 + lip. Ступица d.09, длина ax_gap + B.09 + lip + out_ext;
-    отверстие ступицы D.10 сквозь дно — второй .10 на конце входного вала."""
+    отверстие ступицы D.10 сквозь дно — второй .10 на конце входного вала.
+    belt — осевая длина соединения .02–.12 (CP-63, Д-76): пояс L (collar) | L + бурт cup_t (insert);
+    дно — max(cup_t, belt): карман .07B, tB и длина изделия — с поясом."""
     warn = []
     B09, B10 = (b09 or {}).get("B", 0.0), (b10 or {}).get("B", 0.0)
     D10 = (b10 or {}).get("D", 0.0)
+    bot = max(o["cup_t"], belt)
     z_b = max(width, width - row_gap + o["nut_h"]) + o["ax_gap"]
-    pocket = z_b + o["cup_t"] + o["ax_gap"] - width
+    pocket = z_b + bot + o["ax_gap"] - width
     hub_l = o["ax_gap"] + B09 + o["lip"] + o["out_ext"]
-    if B10 > o["cup_t"] + hub_l + 1e-9:
-        warn.append(f".10 в ступице: B = {B10:g} > длины отверстия {o['cup_t'] + hub_l:g} мм")
+    if B10 > bot + hub_l + 1e-9:
+        warn.append(f".10 в ступице: B = {B10:g} > длины отверстия {bot + hub_l:g} мм")
     cov = None
     if covers:
         r_pk = r_out + o["ax_gap"]
@@ -131,7 +134,7 @@ def axial(width, row_gap, b09, b10, r_out, cfg, o, covers):
         cov = {"tA": round(B10 + o["lip"], 2), "tB": round(pocket + B09 + o["lip"], 2),
                "D": cfg["d_out"], "seat_A": D10, "seat_B": (b09 or {}).get("D"),
                "pocket": [round(2 * r_pk, 2), round(pocket, 2)]}
-    cup = {"z_in": round(z_b, 2), "t": o["cup_t"], "hub_d": (b09 or {}).get("d"),
+    cup = {"z_in": round(z_b, 2), "t": round(bot, 2), "hub_d": (b09 or {}).get("d"),
            "hub_bore": D10, "hub_l": round(hub_l, 2)}
     length = (cov["tA"] + cov["tB"] if cov else 0.0) + width + o["out_ext"]
     return {"covers": cov, "cup": cup, "length": round(length, 2)}, warn
@@ -169,24 +172,58 @@ def md_tool(name, r):
             for t in r.get("tooling", [])]
 
 
+def join_cad(cfg, rec):
+    """Геометрия соединения .02–.12 для egm.cad (CP-63, Д-76) -> dict | None (нет соединения):
+    схема, z стыка = cup.z_in, пояс L, бурт .12B f, штифты на z стыка + L/2 по осям окон
+    последнего ряда (cage + j·360/n), гнездо hole12, ступица; weld — лист и угол шва."""
+    p = (rec.get("join") or {}).get("pick")
+    if not p:
+        return None
+    q, g, c = p["pins"], p["geom"], rec["cup"]
+    sep, a = cfg.get("sep") or {}, float(cfg.get("a_w", 0.0))
+    r_in = float(sep.get("r_in", cfg.get("R_sum", 0.0) - 1.1 * a))
+    r_out = float(sep.get("r_out", cfg.get("R_sum", 0.0) + 1.1 * a))
+    win = sep.get("rows") or [{"cage": 0.0, "z0": 0.0}]
+    last = max(win, key=lambda w: w["z0"])
+    ins = p["scheme"] == "insert"
+    n = int(sep.get("n") or cfg.get("n") or 0)
+    weld = ins and p.get("tube") is None and p.get("sheet")
+    return {"scheme": p["scheme"], "z": c["z_in"], "L": q["L"],
+            "f": round(c["t"] - q["L"], 2) if ins else 0.0,
+            "r_in": r_in, "r_out": r_out, "r_j": g["r_j"], "D": g["D"], "d": g["d"],
+            "pin_d": q["d"], "pin_n": q["n"], "pin_l": q.get("l"), "hole12": q["hole12"],
+            "pin_z": round(c["z_in"] + q["L"] / 2, 3),
+            "pin_a": [round((last["cage"] + j * 360.0 / q["n"]) % 360, 4) for j in range(q["n"])],
+            "hub_d": c["hub_d"], "hub_bore": c["hub_bore"], "hub_l": c["hub_l"],
+            "weld": {"sheet": p["sheet"],
+                     "seam": round((win[0]["cage"] + 180.0 / n) % 360, 4) if n else None}
+            if weld else None}
+
+
 def cad_parts(cfg, name, rec):
     """Детали конструктива для egm.cad (CP-45, Д-73): .02A стакан | .02B обечайка с буртом |
-    .02C обечайка без бурта, .07A/.07B, .11; ступица .12A/.12B — CP-63.
+    .02C обечайка без бурта, .07A/.07B, .11; ступица .12A/.12B; соединение — join (CP-63, Д-76).
 
     ID — <ID>.<NN><вар>-<проработка>, base — без суффикса (Д-48); покупные .09/.10 — в rec."""
     cid = cfg["id"]
     rows = [ph.get("row", k + 1) for k, ph in enumerate(cfg["phasing"])]
     sfx, out, v02 = (f"-{name}" if name else ""), [], rec["parts"].get("02")
     l02 = (rec.get("var") or {}).get("02") or V_DEF["02"].get(v02, "")
+    jc = join_cad(cfg, rec)
     if l02:
         base = f"{cid}.02{l02}"
         out.append({"id": base + sfx, "base": base, "rows": rows,
-                    **({"cup": rec["cup"]} if v02 == "cup" else {})})
+                    **({"cup": rec["cup"]} if v02 == "cup" else {}),
+                    **({"join": jc} if jc else {})})
     if rec.get("covers"):
         out += [{"id": f"{cid}.07{s}{sfx}", "base": f"{cid}.07{s}", "rows": rows, "side": s}
                 for s in "AB"]
     if rec.get("r11"):
         out.append({"id": f"{cid}.11{sfx}", "base": f"{cid}.11", "rows": rows})
+    l12 = (rec.get("var") or {}).get("12")
+    if jc and l12:                                                   # CP-63: ступица .12A | .12B
+        base = f"{cid}.12{l12}"
+        out.append({"id": base + sfx, "base": base, "rows": rows, "join": jc})
     return out
 
 
@@ -242,7 +279,7 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
     sep = cfg.get("sep") or {}
     r_in = float(sep.get("r_in", cfg["R_sum"] - 1.1 * a))
     r_out = float(sep.get("r_out", cfg["R_sum"] + 1.1 * a))
-    mats02, jn, r_pk = MAT.part_materials(prods, "PTK", "02"), None, r_out
+    mats02, jn, r_pk, belt = MAT.part_materials(prods, "PTK", "02"), None, r_out, 0.0
     if "12" in pr:                                                             # Д-72, OQ-12
         jopt = {**(d.get("join") or {}),                    # схему задаёт конструктив (Д-73)
                 **({"join": lay["join"]} if lay.get("join") in ptk_join.SCHEMES else {})}
@@ -250,16 +287,25 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
         if jn["pick"] is None:
             (err if stock else warn).append(f"{code}: соединение .02–.12 — " + ptk_join.why(jn))
         else:
-            r_pk = max(r_out, jn["pick"]["geom"]["D"] / 2)
-            if jn["pick"]["pins"]["L"] > o["cup_t"] + 1e-9:
-                warn.append(f".12: пояс соединения {jn['pick']['pins']['L']:g} мм > cup_t "
-                            f"{o['cup_t']:g} — длина изделия без пояса (CP-63)")
-    ax, aw = axial(width, row_gap, b09, b10, r_pk, cfg, o, "07" in pr)
+            p, q = jn["pick"], jn["pick"]["pins"]
+            r_pk = max(r_out, p["geom"]["D"] / 2)
+            belt = q["L"] + (o["cup_t"] if p["scheme"] == "insert" else 0.0)    # CP-63, Д-76
+            wall = p["geom"]["r_j"] - q["hole12"] - (b10 or {}).get("D", 0.0) / 2
+            if wall < o["pin_wall"] - 1e-9:
+                warn.append(f".12: стенка под гнездом штифта {wall:.2f} < pin_wall {o['pin_wall']:g} мм "
+                            "(TECH-01, Д-76)")
+            n_w = int(cfg.get("n") or 0)
+            if p["scheme"] == "insert" and n_w and n_w % q["n"]:
+                warn.append(f".02C: штифтов {q['n']} не делитель числа окон {n_w} — отверстия "
+                            "не по делению окон (Д-72)")
+    ax, aw = axial(width, row_gap, b09, b10, r_pk, cfg, o, "07" in pr, belt)
     warn += aw
     bl = blanks(r_in, r_out, stock, mats02,
                 FORMS_BY_02.get(pr.get("02"), MAT.FORMS))
     if bl is not None and jn and jn["pick"]:
         bl.update(material=jn["pick"]["material"], tube=jn["pick"]["tube"])
+        if jn["pick"].get("sheet"):                                  # CP-63: .02C из листа (weld)
+            bl["sheet"] = jn["pick"]["sheet"]
     if bl is not None and not (bl["tube"] or bl["sheet"] or bl["bar"]):
         warn.append(".02: нет заготовки" + (f" из {', '.join(bl['tried'])}" if bl["tried"] else "")
                     + f" в stock.yaml (труба Ø ≥ {bl['tube_need'][0]:g} с отв. ≤ "
@@ -456,4 +502,10 @@ def self_test():
     rp, _, _ = layout(cfg, {"layout": "L3"}, ecc, 10.0, 1.0, prods, bears, stock,
                       {"P3": {"d": 3.0, "l": [8, 10], "std": "ГОСТ 24296-93"}})
     assert rp["join"]["pick"]["pins"]["des"] == "Штифт 3×8 ГОСТ 24296-93", rp["join"]
+    assert rc["cup"]["t"] == 11.0 and rc["length"] == 64.0, (rc["cup"], rc["length"])  # CP-63
+    assert [q["id"].split(".")[-1] for q in rc["cad_parts"]] == ["02C", "07A", "07B", "11", "12B"], \
+        rc["cad_parts"]
+    jc = rc["cad_parts"][-1]["join"]
+    assert (jc["scheme"], jc["f"], jc["pin_z"], len(jc["pin_a"])) == ("insert", 2.0, 41.0, 8), jc
+    assert rc["cad_parts"][0]["join"] == jc and r["cup"]["t"] == 2.0, rc["cad_parts"][0]
     return True

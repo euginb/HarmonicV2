@@ -18,7 +18,7 @@ from egm import materials as MAT
 JOIN = {"join": "auto", "join_order": ["collar", "insert"], "pin_d": [3.0, 4.0, 5.0],
         "pin_n": [4, 6, 8, 10, 12, 16], "edge_k": 1.5, "pin_depth_k": 1.5, "pin_web": 2.0,
         "tau_pin": 80.0, "sig_wall": 150.0, "sig_hub": 150.0, "c_in": 1.0, "c_out": 1.0,
-        "pin_gap": 0.5}
+        "pin_gap": 0.5, "weld": []}   # weld — марки, из листа которых допустима .02C (insert, Д-76)
 SCHEMES = ("collar", "insert")
 
 
@@ -100,6 +100,14 @@ def pins(M, g, o, n_win=None, cat=None):
 
 def _area(t):
     return t["D"] ** 2 - (t["D"] - 2 * t["s"]) ** 2
+
+
+def _blank(p):
+    """Заготовка .02 выбранного соединения: «труба D×s» | «лист t (weld)» (rev 10.4, CP-63)."""
+    t = p.get("tube")
+    if t:
+        return f"труба {t['D']:g}×{t['s']:g}"
+    return f"лист {p['sheet']:g} (weld)" if p.get("sheet") else "нет"
 
 
 def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None, cat=None):

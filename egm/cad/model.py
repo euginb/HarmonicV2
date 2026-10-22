@@ -45,6 +45,15 @@ class Window:
 
 
 @dataclass
+class PinHole:
+    angle: float               # ось радиального отверстия, град (CP-63, Д-76)
+    z: float                   # центр по оси, мм (локальная система детали)
+    d: float
+    r0: float                  # отверстие от радиуса r0 …
+    r1: float                  # … до r1, мм (сквозное — за обе стенки, глухое — гнездо)
+
+
+@dataclass
 class Band:
     r_in: float                # кольцо r_in…r_out вокруг оси (0, 0); r_in = 0 — сплошной цилиндр
     r_out: float
@@ -86,3 +95,4 @@ class PartModel:
     row: int = 0                                 # ряд вида SVG: окна только этого ряда
     view: str = ""                               # "" — вид по оси; unroll — развёртка втулки (Д-47)
     bands: list = field(default_factory=list)    # ступени вращения Band: дно, ступица, гнёзда (CP-45)
+    pins: list = field(default_factory=list)     # радиальные отверстия PinHole: штифты .02–.12 (CP-63)

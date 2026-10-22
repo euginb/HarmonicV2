@@ -46,6 +46,12 @@ def solid(m, mode="spline"):
         body = body.cut(*tools)
         if hasattr(body, "Solids") and len(body.Solids()) == 1:
             body = body.Solids()[0]
+    if m.pins:                         # CP-63: радиальные отверстия штифтов — одна булева операция
+        tools = [cq.Solid.makeCylinder(p.d / 2, p.r1 - p.r0, V(p.r0, 0, p.z), V(1, 0, 0))
+                 .rotate(V(0, 0, 0), V(0, 0, 1), p.angle) for p in m.pins]
+        body = body.cut(*tools)
+        if hasattr(body, "Solids") and len(body.Solids()) == 1:
+            body = body.Solids()[0]
     if not body.isValid():
         raise ValueError(f"{m.id}: тело STEP невалидно (режим {mode}); попробуйте --step poly")
     return body
@@ -85,4 +91,10 @@ def self_test():
     ref2 = math.pi * (375.0 + 400.0 - 48.0)
     v2 = solid(m2, "spline").Volume()
     assert abs(v2 - ref2) < 0.01 * ref2, ("ступени Band (CP-45)", v2, ref2)
+    from egm.cad.model import PinHole
+    m3 = PartModel("T3", 10.0, 30.0, Contour(pts),
+                   pins=[PinHole(a, 5.0, 2.0, 9.0, 16.0) for a in (0.0, 90.0, 180.0, 270.0)])
+    ref3 = math.pi * (225.0 - 100.0) * 10.0 - 4 * math.pi * 1.0 * 5.0
+    v3 = solid(m3, "spline").Volume()
+    assert abs(v3 - ref3) < 0.005 * ref3, ("радиальные отверстия PinHole (CP-63)", v3, ref3)
     return True

@@ -34,10 +34,13 @@ KINDS = {"d_out": "наружный Ø: контур сечения",
          "holes_xy": "наибольшее смещение центров отверстий, мм",
          "d_cyl": "Ø ближайшей цилиндрической грани",
          "length": "габарит по оси z",
-         "windows": "число окон в сечении ряда"}
+         "windows": "число окон в сечении ряда",
+         "n_pins": "число радиальных отверстий (оси ⟂ z)",
+         "d_pin": "Ø радиальных отверстий",
+         "pin_z": "z осей радиальных отверстий, мм"}
 ON_VIEW = ("d_out", "d_hole", "d_cyl")    # есть кромка-окружность на виде по оси
 COSMETIC = ("d_root", "d_tip", "d_bc")    # кромки нет — косметическая окружность
-COUNT = ("n_holes", "windows")
+COUNT = ("n_holes", "windows", "n_pins")
 NOGEO = ("center", "holes_xy")            # проверки без строки легенды
 
 
@@ -74,7 +77,8 @@ def extent(m):
 def free_z(m):
     """z сечения основного тела без окон и ступеней — середина наибольшего свободного
     промежутка в [0, thick]; нет такого — thick/2."""
-    busy = sorted([(w.z0, w.z0 + w.h) for w in m.windows] + [(b.z0, b.z0 + b.h) for b in m.bands])
+    busy = sorted([(w.z0, w.z0 + w.h) for w in m.windows] + [(b.z0, b.z0 + b.h) for b in m.bands]
+                  + [(p.z - p.d / 2, p.z + p.d / 2) for p in m.pins])
     gaps, cur = [], 0.0
     for a, b in busy:
         if a > cur:
@@ -126,6 +130,12 @@ def checks(m, nn):
                 out.append({"sym": f"Ø отв {d:g}", "kind": "d_hole", "value": d, "z": zs})
         out.append({"sym": "отв xy", "kind": "holes_xy", "value": 0.0, "z": zs,
                     "ref": [[_r(h.x), _r(h.y)] for h in m.holes]})
+    if m.pins:                                    # CP-63: радиальные отверстия штифтов (Д-76)
+        out.append({"sym": "n шт", "kind": "n_pins", "value": len(m.pins), "z": None})
+        for d in sorted({_r(p.d) for p in m.pins}):
+            out.append({"sym": f"Ø шт {d:g}", "kind": "d_pin", "value": d, "z": None})
+        out.append({"sym": "z шт", "kind": "pin_z", "z": None,
+                    "value": _r(sum(p.z for p in m.pins) / len(m.pins))})
     _, z0, z1 = extent(m)
     sym = THICK.get(nn, "B") if abs((z1 - z0) - m.thick) < 1e-9 else "L"
     out.append({"sym": sym, "kind": "length", "value": _r(z1 - z0), "z": None})
