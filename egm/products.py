@@ -1,4 +1,4 @@
-"""Реестр изделий и номенклатура деталей (Д-24, SPEC-03)."""
+"""Реестр изделий и номенклатура деталей (Д-80, SPEC-03)."""
 import re
 
 PART_RE = re.compile(r"^(?P<cfg>(?P<prod>[A-Z]+)-[^.]+)\.(?P<nn>\d{2})(?P<var>[A-Z]?)$")
@@ -35,14 +35,14 @@ def check(products, configs):
 
 
 def check_app(app, prods):
-    """Д-64: разделы продуктов в configs/application.yaml (products:) — есть в реестре
+    """Д-79: разделы продуктов в configs/application.yaml (products:) — есть в реестре
     products.yaml; enabled — при непустой номенклатуре."""
     fails = []
     for code, sec in (app.get("products") or {}).items():
         if not isinstance(sec, dict):
-            fails.append(f"application.yaml: products.{code}: раздел не словарь (Д-64)")
+            fails.append(f"application.yaml: products.{code}: раздел не словарь (Д-79)")
         elif code not in prods:
-            fails.append(f"application.yaml: products.{code} отсутствует в products.yaml (Д-64)")
+            fails.append(f"application.yaml: products.{code} отсутствует в products.yaml (Д-79)")
         elif sec.get("enabled") and not (prods[code].get("parts") or {}):
             fails.append(f"application.yaml: products.{code}: enabled, но номенклатура "
                          "в products.yaml пуста")

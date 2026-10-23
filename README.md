@@ -13,13 +13,13 @@
 | Папка | Содержимое | Кто пишет |
 |---|---|---|
 | `specs/` | спецификации (spec-first и code-first); ручные конфиги `*.yaml`, code-first данные и БД — `*.json` | заказчик; code-first — перенос из `out/specs/` |
-| `reports/` | отчёты прогона: сводка проверок, разбор каталогов | перенос из `out/reports/` (Д-14) |
-| `instructions/` | инструкции: к code-first спецификациям, режимы работы с ИИ, подготовка контекста; реестр — `instructions/README.md` (Д-17, Д-25) | правятся напрямую |
+| `reports/` | отчёты прогона: сводка проверок, разбор каталогов | перенос из `out/reports/` (Д-79) |
+| `instructions/` | инструкции: к code-first спецификациям, режимы работы с ИИ, подготовка контекста; реестр — `instructions/README.md` (Д-79, Д-78) | правятся напрямую |
 | `templates/` | шаблоны code-first спецификаций | код |
 | `egm/` | пакет расчётов на Python | код |
 | `docs/` | каталоги производителей, справочные материалы | заказчик |
 | `archive/` | архив решений | журнал |
-| `tools/` | служебные утилиты: `fix_diff.py` (Д-13), `upd_apply.py` (Д-59), `context_bundle.py`, `make_audit_bundle.py` (INS-90) | — |
+| `tools/` | служебные утилиты: `fix_diff.py` (Д-78), `upd_apply.py` (Д-79), `context_bundle.py`, `make_audit_bundle.py` (INS-90) | — |
 | `out/` | выход прогона, в git не хранится | `main.py` |
 | `HarmonicV2-workflow.md` | референсная копия порядка работы Super Agent; актуальная — в AI Drive (`instructions/README.md` §1) | заказчик |
 
@@ -28,12 +28,12 @@
 1. **Code-first**: числа живут в коде и `specs/` (ручные конфиги `*.yaml`,
    код-первая выдача `*.json`); `python main.py` пишет
    спецификации в `out/specs/`, отчёты в `out/reports/`; они переносятся в
-   `specs/` и `reports/` вручную или ключом `--publish` (Д-14). Руками не правятся.
+   `specs/` и `reports/` вручную или ключом `--publish` (Д-79). Руками не правятся.
 2. **Spec-first**: технология, методики, договорённости — правятся напрямую.
    Если число из spec-first попадает в расчёт, оно переносится в код/конфиг,
    а документ ссылается на источник, не дублируя значение.
 3. Данные производителей — только из ручных конфигов `specs/*.yaml`, без хардкода в коде.
-4. Входные параметры расчётов — `specs/*.yaml` (Д-18, Д-60), их смысл — комментариями
+4. Входные параметры расчётов — `specs/*.yaml` (Д-79), их смысл — комментариями
    в самих файлах и в `instructions/`.
 5. Решения — `Д-##` в DECISIONS.md, план кода — `CP-##` + `TODO(CP-##)` в коде.
 
@@ -47,7 +47,7 @@
 
 | Признак в задаче: ключи, слова, файлы | Что там | Раздел |
 |---|---|---|
-| `INS-##`, «инструкция», новый файл в `instructions/` | реестр всех инструкций: назначение, когда читать, решения; правило поддержания реестра (Д-25) | §1 |
+| `INS-##`, «инструкция», новый файл в `instructions/` | реестр всех инструкций: назначение, когда читать, решения; правило поддержания реестра (Д-78) | §1 |
 | `HarmonicV2-workflow.md`, «зеркало», «синхронизация», AI Drive | статус референсной копии workflow (актуальная — в AI Drive) | §1 |
 | «Super Agent», «AI Chat», «режим», «нет доступа к GitHub», base sha | режимы A / B / C: доступ к файлам, источник контекста, проверки, канал выдачи патча | §2 |
 | начало сессии, «что читать», «пол» | обязательный стартовый набор файлов | §2.4 |
@@ -61,14 +61,14 @@
 
 1. ИИ не пишет в репозиторий: изменения — только unified diff; заказчик
    проверяет, применяет, коммитит и пушит; закрывающий прогон `main.py` — у
-   заказчика (Д-01). Мелкие правки таблиц и новые файлы могут выдаваться
+   заказчика (Д-79). Мелкие правки таблиц и новые файлы могут выдаваться
    файлом `upd.md` через `tools/upd_apply.py` (instructions/README.md §2.5,
-   Д-59).
+   Д-79).
 2. Каждый файл: `diff --git a/<путь> b/<путь>`; новый — `new file mode 100644`,
    `--- /dev/null`, один hunk `@@ -0,0 +1,N @@`, все строки с `+`.
 3. Правки существующих файлов — только от текущего коммита; первая строка
    патча `# base: <sha>, CP-##`; контекст дословный, минимум не нормируется —
-   `tools/fix_diff.py` добирает его до 3 строк по рабочему дереву (Д-13).
+   `tools/fix_diff.py` добирает его до 3 строк по рабочему дереву (Д-78).
 4. UTF-8 без BOM, LF, перевод строки в конце; `--recount` не используется.
 5. Перед наложением: `python tools/fix_diff.py p.diff` → `git apply --check`.
 6. Коммит — с префиксом ревизии (`[rev-NN] …`); пункт `CP-##` закрывается
@@ -82,9 +82,9 @@
 | [archive/DECISIONS_ARCHIVE.md](archive/DECISIONS_ARCHIVE.md)           | журнал | — | ведётся |
 | [specs/CODE_PLAN.md](specs/CODE_PLAN.md)                               | план | доработка кода, `TODO(CP-##)` | ведётся |
 | [specs/CANCELLED.md](specs/CANCELLED.md)                               | журнал | — | ведётся |
-| [specs/SPEC-01_NAMING.md](specs/SPEC-01_NAMING.md)                     | spec-first | Д-02 | черновик |
-| [specs/SPEC-02_PRECISION_EMBEDS.md](specs/SPEC-02_PRECISION_EMBEDS.md) | spec-first | Д-03, Д-04 | черновик |
-| [specs/SPEC-03_PRODUCTS.md](specs/SPEC-03_PRODUCTS.md)                 | spec-first | Д-24 | черновик |
+| [specs/SPEC-01_NAMING.md](specs/SPEC-01_NAMING.md)                     | spec-first | Д-80 | черновик |
+| [specs/SPEC-02_PRECISION_EMBEDS.md](specs/SPEC-02_PRECISION_EMBEDS.md) | spec-first | Д-80, Д-81 | черновик |
+| [specs/SPEC-03_PRODUCTS.md](specs/SPEC-03_PRODUCTS.md)                 | spec-first | Д-80 | черновик |
 | [specs/SPEC-04_ARCHITECTURE.md](specs/SPEC-04_ARCHITECTURE.md)         | spec-first | Д-39 | черновик |
 | [specs/products.yaml](specs/products.yaml)                             | данные (номенклатура) | SPEC-03 | rev 7 |
 | [specs/CATALOGS.md](specs/CATALOGS.md)                                 | реестр | `docs/` | черновик |
@@ -93,7 +93,7 @@
 | [specs/SPEC-10_PTK_CALC.md](specs/SPEC-10_PTK_CALC.md)                 | code-first | `egm/ptk.py`, `templates/SPEC-10_PTK_CALC.md.tmpl`, INS-10 | rev 1 |
 | [specs/ptk_configs.json](specs/ptk_configs.json)                       | code-first (данные) | `egm/ptk.py` | rev 1 |
 | [specs/catalog_hiwin_hg.json](specs/catalog_hiwin_hg.json)             | code-first (БД) | `egm/catalog.py` ← CAT-01, INS-20 | rev 1 |
-| [specs/catalog_hiwin_hg_pairs.json](specs/catalog_hiwin_hg_pairs.json) | code-first (БД) | `egm/catalog.py`, Д-10, INS-20 | rev 1 |
+| [specs/catalog_hiwin_hg_pairs.json](specs/catalog_hiwin_hg_pairs.json) | code-first (БД) | `egm/catalog.py`, Д-80, INS-20 | rev 1 |
 | [reports/checks.md](reports/checks.md)                                 | отчёт | `main.py` | каждый прогон |
 | [reports/catalog_report.md](reports/catalog_report.md)                 | отчёт | `egm/catalog.py` | каждый прогон |
 | [specs/stock.yaml](specs/stock.yaml)                                   | данные (заказчик) | поставщики | заполняется |
@@ -124,12 +124,12 @@
 
 Инструкции (`INS-##`) в этот реестр не входят: их реестр, назначение и
 правило поддержания — [instructions/README.md](instructions/README.md) §1
-(Д-25); признаки для перехода — «Когда открывать instructions/README.md».
+(Д-78); признаки для перехода — «Когда открывать instructions/README.md».
 
 ## Запуск
 
 `python main.py [calc|design|all]` → `out/specs/`, `out/reports/`; код выхода 0 = все
-проверки пройдены. Шаги (Д-60): `calc` — шаг 1 (SPEC-10, `ptk_configs.json`);
+проверки пройдены. Шаги (Д-79): `calc` — шаг 1 (SPEC-10, `ptk_configs.json`);
 `design` — шаг 2 (SPEC-11) по опубликованному результату шага 1; `all` (по умолчанию) — всё.
 `python main.py --publish` — то же и копирование: `out/reports/` → `reports/`
 всегда, `out/specs/` → `specs/` только при коде выхода 0.

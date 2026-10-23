@@ -10,10 +10,10 @@
 --spec specs/cad_set.yaml — комплект чертежей по спецификации (Д-61): записи items[] —
 исполнения целиком (id, design, assy, фильтры rows/parts); ID из командной строки —
 низкоуровневый путь. Данные — specs/ptk_configs.json, specs/products.yaml.
-Механизм и форматы 3D-экспорта — configs/application.yaml → cad: (Д-64): STEP —
+Механизм и форматы 3D-экспорта — configs/application.yaml → cad: (Д-79): STEP —
 основной, FCStd (FreeCAD) — альтернативный; без FreeCAD/CadQuery — «пропущен».
 Пути в выводе — от корня репозитория; весь вывод консоли дублируется в
-reports/cad_report.md (Д-14, переписывается каждым запуском; в конце лога — куда
+reports/cad_report.md (Д-79, переписывается каждым запуском; в конце лога — куда
 сохранён) с легендой каждой позиции: что это за чертёж и что это за деталь.
 Коды выхода: 0 — ok; 1 — ID не найден / нет генератора / ошибка геометрии; 2 — аргументы.
 """
@@ -28,17 +28,17 @@ from egm.cad import (assy, freecad, ptk_cover, ptk_ecc, ptk_hub, ptk_ring, ptk_s
                      step, svg)
 
 ROOT = Path(__file__).resolve().parents[2]
-APP = config.load_app()                     # общий конфиг приложения (Д-64)
+APP = config.load_app()                     # общий конфиг приложения (Д-79)
 _CAD = APP.get("cad") or {}
 _EXP = _CAD.get("export") or {}
 _STEP = _EXP.get("step") or {}
 _FC = _EXP.get("freecad") or {}
-CAD_OUT = ROOT / (_CAD.get("out_dir") or "out/cad")          # каталог чертежей (Д-64)
-CAD_REPORT = _CAD.get("report") or "reports/cad_report.md"   # отчёт прогона (Д-14)
+CAD_OUT = ROOT / (_CAD.get("out_dir") or "out/cad")          # каталог чертежей (Д-79)
+CAD_REPORT = _CAD.get("report") or "reports/cad_report.md"   # отчёт прогона (Д-79)
 SVG_ON = (_CAD.get("svg") or {}).get("enabled", True)
 STEP_ON = _STEP.get("enabled", True)            # основной экспорт — STEP (Д-32)
 STEP_MODE = _STEP.get("mode", "spline")         # контур впадин по умолчанию (INS-30 §6)
-FC_ON = _FC.get("enabled", False)               # альтернативный экспорт — FCStd (Д-64)
+FC_ON = _FC.get("enabled", False)               # альтернативный экспорт — FCStd (Д-79)
 FC_CMD = _FC.get("command") or freecad.DEFAULT_COMMAND
 GENERATORS = {"ptk_ring": ptk_ring.build, "ptk_sep": ptk_sep.build, "ptk_ecc": ptk_ecc.build,
               "ptk_spacer": ptk_spacer.build, "ptk_cover": ptk_cover.build,
@@ -51,7 +51,7 @@ def _rel(p):
 
 
 class _Report:
-    """Дубликат вывода консоли в reports/cad_report.md (Д-14): say — консоль и отчёт,
+    """Дубликат вывода консоли в reports/cad_report.md (Д-79): say — консоль и отчёт,
     only — только отчёт (легенда позиции). Без path — только консоль."""
 
     def __init__(self, path=None):
@@ -83,7 +83,7 @@ _CONSOLE = _Report()      # по умолчанию — только консо�
 
 
 def _open_report(argv):
-    """Отчёт прогона reports/cad_report.md (Д-14): переписывается каждым запуском,
+    """Отчёт прогона reports/cad_report.md (Д-79): переписывается каждым запуском,
     в конце лога печатается, куда он сохранён."""
     rep = _Report(ROOT / CAD_REPORT)
     rep.only("# Отчёт построения чертежей (code-first, НЕ ПРАВИТЬ РУКАМИ)\n")
@@ -127,7 +127,7 @@ def _row(cfg, phase, row):
 
 
 def _export_fc(model, fcstd_path, step_mode, pid, rep, step_file=None):
-    """Альтернативный экспорт .FCStd (Д-64): включается в configs/application.yaml
+    """Альтернативный экспорт .FCStd (Д-79): включается в configs/application.yaml
     (cad.export.freecad.enabled). Геометрия та же, что у STEP (Д-30, Д-32): FreeCAD
     импортирует STEP и сохраняет документ (egm/cad/freecad.py). Без FreeCAD/CadQuery/
     STEP — «freecad: пропущен», прогон не падает; ошибка конвертации — ValueError."""
@@ -311,7 +311,7 @@ def run_spec(spec, configs, prods, designs, rep=_CONSOLE):
     целиком; строятся все детали с генераторами (products.yaml → cad), assy — сборка.
     Возвращает число записей, окончивших ошибкой."""
     data = config.load(spec)
-    step_mode = data.get("step") or STEP_MODE   # приоритет: файл комплекта → Д-64
+    step_mode = data.get("step") or STEP_MODE   # приоритет: файл комплекта → Д-79
     bad = 0
     for i, item in enumerate(data.get("items", []), 1):
         arg = item.get("id")
@@ -353,7 +353,7 @@ def main(argv):
     grp.add_argument("--row", type=int, help="номер ряда 1…rows")
     ap.add_argument("--step", choices=("spline", "poly", "off"), default=None,
                     help="контур впадин в STEP: B-сплайн | ломаная | без STEP "
-                         "(по умолчанию — step: комплекта или cad.export.step.mode, Д-64)")
+                         "(по умолчанию — step: комплекта или cad.export.step.mode, Д-79)")
     ap.add_argument("--assy", action="store_true",
                     help="сборка исполнения в один STEP: дерево, слои, метаданные (Д-49)")
     ap.add_argument("--design", help="проработка шага 2 из specs/ptk_designs.json (Д-48)")
@@ -376,7 +376,7 @@ def main(argv):
         for arg in a.ids:
             try:
                 des = ptk_design.pick(designs, arg, a.design)
-                mode = a.step or STEP_MODE      # --step → иначе application.yaml (Д-64)
+                mode = a.step or STEP_MODE      # --step → иначе application.yaml (Д-79)
                 if a.assy:
                     build_assy(arg, configs, prods, mode, des, rep)
                 else:

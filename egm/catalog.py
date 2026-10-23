@@ -1,4 +1,4 @@
-"""Парсер каталога HIWIN HG (CAT-01) -> БД JSON, пары рельс+каретка (Д-10), проверки.
+"""Парсер каталога HIWIN HG (CAT-01) -> БД JSON, пары рельс+каретка (Д-80), проверки.
 
 Все числа берутся из docs/HG-Series-Catalog_opt.md. В коде — только правила
 разбора таблиц и формула раскладки отверстий рельса L = (n-1)*P + 2*E (Eq. 2.1).
@@ -13,7 +13,7 @@ RAIL_COLS = ("WR", "HR", "D", "h", "d", "P", "E", "rail_bolt")
 KEYS = {"Масса блока": "mass_block_kg", "Масса рельса": "mass_rail_kg_m",
         "Масса": "mass_rail_kg_m", "Mxl": "M", "M (Ø)": "M", "Болт для рельса": "rail_bolt"}
 DASH = {"–", "—", "-", ""}
-PN_FMT = "EGC-HG-{type}{size}{load}{mount}-{cls}-{pre}{bottom}"  # Д-10
+PN_FMT = "EGC-HG-{type}{size}{load}{mount}-{cls}-{pre}{bottom}"  # Д-80
 
 
 def _key(h):
@@ -187,7 +187,7 @@ def build_pairs(db):
                                        bottom="-T" if mount == "T" else "")
                     pairs[pn] = {"block": model, "rail": rail, "class": cls,
                                  "preload": pre, "order_block": f"{model}{pre}{cls}"}
-    return {"format": "EGC-HG-<тип><размер><нагр><крепл>-<класс>-<натяг>[-T] (Д-10)",
+    return {"format": "EGC-HG-<тип><размер><нагр><крепл>-<класс>-<натяг>[-T] (Д-80)",
             "pairs": pairs}
 
 
@@ -280,7 +280,7 @@ def report_md(db, pairs, rep):
          f"Источник: `docs/{db['source']}`, каталог {db['catalog']}. "
          f"Генерирует `egm/catalog.py` (CP-02).", "",
          f"Кареток: {st['blocks']}, рельсов: {st['rails']}, типоразмеров: {st['sizes']}, "
-         f"пар (Д-10): {st['pairs']}.",
+         f"пар (Д-80): {st['pairs']}.",
          f"Классы точности: {', '.join(db['classes'])}; натяг: {', '.join(db['preloads'])}.",
          f"Позиций vendor_prices без цены: {st['no_price']}.", "",
          "## Каретки", "", "| Модель | H | W | L | C, кН | C0, кН | Масса, кг |",
