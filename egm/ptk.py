@@ -8,7 +8,7 @@ zg = i + 1, zsh = i). 4 ряда 0/90/180/270° (Д-08). Отверстия ве
 Порядок расчёта (Д-38): u, D_ш, a_ω → R_Σ — наименьший без подреза вершины зуба, с
 перемычкой сепаратора и D_г ≥ Dgen_min → профиль по (6) Янгулова → D_В, α max →
 отверстия, D. Обозначения — Д-37. Параметры — specs/ptk_input.yaml (INS-10);
-значения по умолчанию в dataclass — только для self_test() (Д-18).
+значения по умолчанию в dataclass — только для self_test() (Д-79).
 """
 import hashlib
 import json
@@ -234,7 +234,7 @@ def ring(d_root, holes, fast, lim, wall):
     return res, err
 
 
-# Д-22: маркировка. GEOM_REV повышается при смене формул геометрии — меняются все ID.
+# Д-80: маркировка. GEOM_REV повышается при смене формул геометрии — меняются все ID.
 GEOM_REV = 6                       # Д-42: тип генератора bearing | eccentric в хэше
 # Д-48: параметры эксцентрика (rho, brg_mass_k, shaft_key_*, key_angle, bal_*) — не в хэше;
 # эксцентрик в SPEC-10 предварительный по limits, окончательный — шаг 2 (egm/ptk_design.py)
@@ -309,7 +309,7 @@ def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing"):
 
 
 def config_id(u, rol, lim, holes, fast, brg=None, gen="bearing"):
-    """ID исполнения PTK-<u>-<тело>-<отверстия>-<хэш> (Д-22) и снимок геометрии."""
+    """ID исполнения PTK-<u>-<тело>-<отверстия>-<хэш> (Д-80) и снимок геометрии."""
     g = geom_params(u, rol, lim, holes, fast, brg, gen)
     raw = json.dumps(g, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
     h = hashlib.sha1(raw.encode("ascii")).hexdigest()[:6].upper()
@@ -317,7 +317,7 @@ def config_id(u, rol, lim, holes, fast, brg=None, gen="bearing"):
 
 
 def ring_parts(cid, ph):
-    """Детали .01<вариант> — венцы (Д-19, Д-22)."""
+    """Детали .01<вариант> — венцы (Д-19, Д-80)."""
     out = {}
     for row in ph["rows"]:
         v = row["variant"]

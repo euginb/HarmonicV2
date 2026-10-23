@@ -1,7 +1,7 @@
 # INS-91 — Подготовка контекста Super Agent'ом: CTX-T и CTX-R
 
 Тип: инструкция по процессу  
-Статус: действует (Д-75, rev 10.3)  
+Статус: действует (Д-78, rev 10.3)  
 Источник: порядок работы с ИИ — `instructions/README.md` §2; заменяет ручную
 сборку бандла для моделей без GitHub — INS-90 остаётся запасным путём
 
@@ -140,7 +140,7 @@ T-режима (по фразе на шаг).
 
 ## 6. Инструменты: импорт-граф
 
-`tools/import_graph.py` (Д-75) — граф импортов, только stdlib (ast):
+`tools/import_graph.py` (Д-78) — граф импортов, только stdlib (ast):
 
 ```text
 python tools/import_graph.py [--mermaid] [--roots egm tools main.py] [--out FILE]

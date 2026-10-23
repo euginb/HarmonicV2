@@ -1,16 +1,16 @@
 """Точка входа: python main.py [calc|design|all] [--publish]. Код выхода 0 — все проверки.
 
-Шаги (Д-60): calc — шаг 1 «Расчёт» (SPEC-10, ptk_configs.json из ptk_input.yaml +
+Шаги (Д-79): calc — шаг 1 «Расчёт» (SPEC-10, ptk_configs.json из ptk_input.yaml +
 vendor_prices.yaml); design — шаг 2 «Проработка» (SPEC-11, ptk_designs.json из
 ptk_design_input.yaml по ОПУБЛИКОВАННОМУ specs/ptk_configs.json — связка выход шага 1 →
 вход шага 2); all (по умолчанию) — весь прогон, как прежде: шаг 1 → шаг 2 по его
 результату → проверки products → каталог.
 
-Конфигурация — configs/application.yaml (Д-64): пути, ссылки на пучок конфигов
+Конфигурация — configs/application.yaml (Д-79): пути, ссылки на пучок конфигов
 (configs:), разделы продуктов (products.PTK — входы шагов 1 и 2), механизм чертежей (cad:).
 
-out/specs/   — code-first спецификации и БД -> переносятся в specs/   (Д-14)
-out/reports/ — отчёты прогона               -> переносятся в reports/ (Д-14)
+out/specs/   — code-first спецификации и БД -> переносятся в specs/   (Д-79)
+out/reports/ — отчёты прогона               -> переносятся в reports/ (Д-79)
 --publish    — скопировать самому: reports — всегда, specs — только при коде 0.
 """
 import json
@@ -24,9 +24,9 @@ from egm.cad import (assy as cad_assy, freecad as cad_freecad, ptk_ring, ptk_sep
                      step as cad_step, techdraw as cad_techdraw)
 
 ROOT = Path(__file__).resolve().parent
-APP = config.load_app()                     # общий конфиг приложения (Д-64)
+APP = config.load_app()                     # общий конфиг приложения (Д-79)
 PATHS = APP.get("paths") or {}
-SPECS = ROOT / PATHS.get("specs", "specs")      # каталоги — application.yaml (Д-64)
+SPECS = ROOT / PATHS.get("specs", "specs")      # каталоги — application.yaml (Д-79)
 REPORTS = ROOT / PATHS.get("reports", "reports")
 TPL = ROOT / PATHS.get("templates", "templates")
 OUT = ROOT / PATHS.get("out", "out")
@@ -34,7 +34,7 @@ DEST = {"specs": SPECS, "reports": REPORTS}
 
 
 def write(kind, name, text):
-    """kind: 'specs' | 'reports' (Д-14)."""
+    """kind: 'specs' | 'reports' (Д-79)."""
     d = OUT / kind
     d.mkdir(parents=True, exist_ok=True)
     (d / name).write_text(text, encoding="utf-8", newline="\n")
@@ -75,7 +75,7 @@ def publish(ok):
 
 
 def run_ptk(prices):
-    """SPEC-10: калькулятор ПТК по входу шага 1 (application.yaml → products.PTK, Д-64)."""
+    """SPEC-10: калькулятор ПТК по входу шага 1 (application.yaml → products.PTK, Д-79)."""
     try:
         lim, mounts, fast, mode = ptk.load_config(
             config.load(config.cfg_file(APP, "products.PTK.configs.input")))
@@ -124,12 +124,12 @@ def run_ptk(prices):
     dup = sorted({i for i in ids if ids.count(i) > 1})
     if dup:
         bad.append(f"ptk: одинаковые ID {dup} — одно тело под разными ключами "
-                   "vendor_prices.yaml → rollers (Д-22)")
+                   "vendor_prices.yaml → rollers (Д-80)")
     return bad
 
 
 def run_catalog(prices):
-    """CP-02: CAT-01 -> catalog_hiwin_hg.json, пары (Д-10), отчёт проверок."""
+    """CP-02: CAT-01 -> catalog_hiwin_hg.json, пары (Д-80), отчёт проверок."""
     md = config.cfg_file(APP, "configs.catalog_md")
     db = catalog.parse_md(md.read_text(encoding="utf-8"), source=md.name)
     pairs = catalog.build_pairs(db)
@@ -145,7 +145,7 @@ def run_design(cfg_rows, require=False):
 
     cfg_rows — исполнения шага 1 (ptk_configs.json): полный прогон — свежие из
     out/specs/, режим design — опубликованные specs/ (связь выход шага 1 → вход
-    шага 2, Д-60)."""
+    шага 2, Д-79)."""
     if not config.cfg_file(APP, "products.PTK.configs.design_input").exists():
         if require:
             return ["products.PTK.configs.design_input: файл не найден — "
@@ -154,7 +154,7 @@ def run_design(cfg_rows, require=False):
     if cfg_rows is None:
         if require:
             return ["specs/ptk_configs.json: не найден — сначала шаг 1: "
-                    "python main.py calc --publish (Д-60)"]
+                    "python main.py calc --publish (Д-79)"]
         return []
     try:
         lim = ptk.load_config(
@@ -169,7 +169,7 @@ def run_design(cfg_rows, require=False):
         res = ptk_design.run(config.load(
             config.cfg_file(APP, "products.PTK.configs.design_input")), cfg_rows, lim, extra)
     except (KeyError, ValueError, TypeError) as e:
-        return [f"входные конфиги шага 2 (Д-64): {e!r}"]
+        return [f"входные конфиги шага 2 (Д-79): {e!r}"]
     write("specs", "ptk_designs.json", json.dumps(res, ensure_ascii=False, indent=2) + "\n")
     tpl = (TPL / "SPEC-11_PTK_DESIGN.md.tmpl").read_text(encoding="utf-8")
     text, missing = fill(tpl, **ptk_design.md(res))
@@ -214,7 +214,7 @@ def main(argv):
         try:
             prods = config.load(config.cfg_file(APP, "configs.products"))
             prices = config.load(config.cfg_file(APP, "configs.vendor_prices"))
-            fails += products.check_app(APP, prods)   # Д-64: разделы продуктов есть в реестре
+            fails += products.check_app(APP, prods)   # Д-79: разделы продуктов есть в реестре
             fails += run_ptk(prices)
             cfg_path = OUT / "specs" / "ptk_configs.json"
             rows = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else None
@@ -227,7 +227,7 @@ def main(argv):
                 fails += run_catalog(prices)
         except (KeyError, ValueError, TypeError) as e:
             fails.append(f"входные конфигурации: {e!r}")
-    elif mode == "design":              # шаг 2 — по ОПУБЛИКОВАННОМУ шагу 1 (Д-60)
+    elif mode == "design":              # шаг 2 — по ОПУБЛИКОВАННОМУ шагу 1 (Д-79)
         cfg_path = SPECS / "ptk_configs.json"
         rows = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else None
         fails += run_design(rows, require=True)

@@ -1,5 +1,5 @@
 # Покупные позиции — заполняет заказчик. Цена в currency; unit: pcs | m.
-# Формат — YAML (Д-60). Тела и подшипники — instructions/INS-10_PTK_CALC.md,
+# Формат — YAML (Д-79). Тела и подшипники — instructions/INS-10_PTK_CALC.md,
 # направляющие и цены — instructions/INS-20_CATALOG.md.
 
 currency: RUB

@@ -1,4 +1,4 @@
-"""Чтение конфигураций: configs/application.yaml (общий, Д-64) и specs/*.yaml (Д-60).
+"""Чтение конфигураций: configs/application.yaml (общий, Д-79) и specs/*.yaml (Д-79).
 
 Общий конфиг configs/application.yaml — пути, ссылки на пучок текущих конфигов,
 разделы продуктов, механизм чертежей; читается load_app(), ссылки на файлы
@@ -17,16 +17,16 @@ except ImportError:                     # внятная ошибка вмест
 
 ROOT = Path(__file__).resolve().parents[1]
 SPECS = ROOT / "specs"
-APP_FILE = ROOT / "configs" / "application.yaml"   # общий конфиг приложения (Д-64)
+APP_FILE = ROOT / "configs" / "application.yaml"   # общий конфиг приложения (Д-79)
 
 
 def load_app():
-    """configs/application.yaml -> dict (Д-64). Файла нет — {} (работают значения
+    """configs/application.yaml -> dict (Д-79). Файла нет — {} (работают значения
     по умолчанию в коде). Сами конфиги в него НЕ вкладываются — ссылки (configs:),
     пути резолвит cfg_file."""
     if yaml is None:
         raise ValueError("PyYAML не установлен: pip install pyyaml "
-                         "(конфиги configs/application.yaml и specs/*.yaml, Д-60/Д-64)")
+                         "(конфиги configs/application.yaml и specs/*.yaml, Д-79/Д-79)")
     if not APP_FILE.exists():
         return {}
     return yaml.safe_load(APP_FILE.read_text(encoding="utf-8"))
@@ -34,34 +34,34 @@ def load_app():
 
 def app_section(app, key):
     """Раздел application.yaml по точечному пути: 'products.PTK' -> dict.
-    Узла нет — KeyError с внятным текстом (Д-64)."""
+    Узла нет — KeyError с внятным текстом (Д-79)."""
     node = app
     walked = []
     for part in key.split("."):
         walked.append(part)
         if not isinstance(node, dict) or part not in node:
-            raise KeyError(f"configs/application.yaml: нет узла {'.'.join(walked)} (Д-64)")
+            raise KeyError(f"configs/application.yaml: нет узла {'.'.join(walked)} (Д-79)")
         node = node[part]
     return node
 
 
 def cfg_file(app, key):
-    """Ссылка на конфиг из application.yaml (точечный путь, Д-64) -> Path от корня
+    """Ссылка на конфиг из application.yaml (точечный путь, Д-79) -> Path от корня
     репозитория: 'configs.products' -> <корень>/specs/products.yaml."""
     rel = app_section(app, key)
     if not isinstance(rel, str) or not rel:
-        raise ValueError(f"configs/application.yaml: {key}: путь не строка: {rel!r} (Д-64)")
+        raise ValueError(f"configs/application.yaml: {key}: путь не строка: {rel!r} (Д-79)")
     return ROOT / rel
 
 
 def load(name, base=None):
-    """YAML-файл -> dict (Д-60). base — папка с файлом (по умолчанию specs/ корня
+    """YAML-файл -> dict (Д-79). base — папка с файлом (по умолчанию specs/ корня
     репозитория); имя — с .yaml или без. Путь, существующий от текущей папки
     (например specs/cad_set.yaml из --spec), берётся как есть; абсолютный путь —
-    тоже (ссылки application.yaml резолвит cfg_file, Д-64)."""
+    тоже (ссылки application.yaml резолвит cfg_file, Д-79)."""
     if yaml is None:
         raise ValueError("PyYAML не установлен: pip install pyyaml "
-                         "(ручные конфиги specs/*.yaml, Д-60)")
+                         "(ручные конфиги specs/*.yaml, Д-79)")
     p = Path(name)
     if p.suffix != ".yaml":
         p = p.with_suffix(".yaml")
@@ -71,11 +71,11 @@ def load(name, base=None):
 
 
 def self_test():
-    assert yaml is not None, "нужен PyYAML: pip install pyyaml (Д-60)"
+    assert yaml is not None, "нужен PyYAML: pip install pyyaml (Д-79)"
     # комментарии не ломают разбор; типы — как в JSON: 1.0 -> float, null -> None
     data = yaml.safe_load("# пояснение\nключ: 1.0\nсписок: [1, 2]\nвложение:\n  параметр: null\n")
     assert data == {"ключ": 1.0, "список": [1, 2], "вложение": {"параметр": None}}, data
-    # Д-64: точечный путь и ссылка на конфиг (без файлов на диске)
+    # Д-79: точечный путь и ссылка на конфиг (без файлов на диске)
     app = {"configs": {"products": "specs/products.yaml"},
            "products": {"PTK": {"enabled": True,
                                 "configs": {"input": "specs/ptk_input.yaml"}}}}

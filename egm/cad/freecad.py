@@ -1,4 +1,4 @@
-"""Экспорт 3D-модели во FreeCAD (.FCStd) — альтернативный формат (Д-64, rev 9.4).
+"""Экспорт 3D-модели во FreeCAD (.FCStd) — альтернативный формат (Д-79, rev 9.4).
 
 Геометрия та же, что у STEP (egm/cad/step.py, Д-30, Д-32): FreeCAD сам её не
 строит. Деталь/сборка экспортируются в STEP (CadQuery), головной FreeCAD
@@ -23,7 +23,7 @@ DEFAULT_COMMAND = "FreeCADCmd"
 # переменные окружения EGM_STEP / EGM_FCSTD (argv у FreeCADCmd зависит от версии).
 # Структура — Import.insert (дерево изделия); без него — одна Part::Feature.
 _SCRIPT = """\
-# EGM: STEP -> FreeCAD (.FCStd), головной режим (Д-64). Запускается FreeCADCmd:
+# EGM: STEP -> FreeCAD (.FCStd), головной режим (Д-79). Запускается FreeCADCmd:
 # вход и выход — переменные окружения EGM_STEP / EGM_FCSTD (argv зависит от версии).
 import os
 import sys
@@ -71,18 +71,18 @@ def _write_script(out_dir):
 
 def _resolve(command=None):
     """Исполняемый файл FreeCAD: command из application.yaml (по умолчанию
-    FreeCADCmd) -> путь через PATH; не найден — FileNotFoundError (Д-64)."""
+    FreeCADCmd) -> путь через PATH; не найден — FileNotFoundError (Д-79)."""
     cmd = (command or DEFAULT_COMMAND).strip().strip('"')
     found = shutil.which(cmd)
     if found is None:
         raise FileNotFoundError(f"FreeCAD не найден: {cmd!r} — установите FreeCAD или "
                                 "укажите команду в configs/application.yaml → "
-                                "cad.export.freecad.command (Д-64)")
+                                "cad.export.freecad.command (Д-79)")
     return found
 
 
 def export(step_file, fcstd_path, command=None):
-    """STEP -> .FCStd: головной FreeCAD (command, Д-64) импортирует STEP скриптом-
+    """STEP -> .FCStd: головной FreeCAD (command, Д-79) импортирует STEP скриптом-
     конвертером и сохраняет документ. Возвращает время конвертации, с.
     Команда не найдена — FileNotFoundError; ошибка конвертации — ValueError."""
     cmd = _resolve(command)
