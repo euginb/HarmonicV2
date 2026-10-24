@@ -338,8 +338,10 @@ def run_spec(spec, configs, prods, designs, rep=_CONSOLE):
     Возвращает число записей, окончивших ошибкой."""
     data = config.load(spec)
     step_mode = data.get("step")
-    step_mode = STEP_MODE if step_mode in (None, False) else step_mode
-    # bare off в YAML — False (PyYAML 1.1), не режим; приоритет: файл комплекта → Д-79
+    if step_mode is False:
+        step_mode = "off"           # bare off в YAML — False (PyYAML 1.1) — это режим off
+    elif not step_mode:
+        step_mode = STEP_MODE       # не задан — по умолчанию (приоритет: комплект → Д-79)
 
     vp = config.load(config.cfg_file(APP, "configs.vendor_prices"))
     bears, pins = vp.get("bearings", {}), vp.get("pins", {})
