@@ -1,5 +1,5 @@
 {
- "format": "EGC-HG-<тип><размер><нагр><крепл>-<класс>-<натяг>[-T] (Д-10)",
+ "format": "EGC-HG-<тип><размер><нагр><крепл>-<класс>-<натяг>[-T] (Д-80)",
  "pairs": {
   "EGC-HG-H15CA-C-Z0": {"block": "HGH15CA", "rail": "HGR15R", "class": "C", "preload": "Z0", "order_block": "HGH15CAZ0C"},
   "EGC-HG-H15CA-C-Z0-T": {"block": "HGH15CA", "rail": "HGR15T", "class": "C", "preload": "Z0", "order_block": "HGH15CAZ0C"},
