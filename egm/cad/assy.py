@@ -410,10 +410,10 @@ def _shape(cq, cfg, pid, nn, mode):
     return cq.Solid.makeCylinder(g["limits"]["shaft_d_min"] / 2, _shaft(cfg)[1])
 
 
-def export(cfg, prods, path, mode="spline"):
+def export(cfg, prods, path, mode="spline", tag=None):
     """Пишет STEP сборки -> (время, с; число узлов с атрибутами в STEP).
 
-    Дерево (Д-50): изделие (полный ID) → «Ряд k (φ)» → венец, эксцентрик, подшипник и группа
+    Дерево (Д-50, Д-91): изделие (тег имени файла — ID с суффиксом проработки/конструктива) → «Ряд k (φ)» → венец, эксцентрик, подшипник и группа
     «Тела ряда k»; сепаратор и вал — у корня. Имена — алиасы label(), атрибуты — finish()."""
     import cadquery as cq
     from OCP.IFSelect import IFSelect_ReturnStatus
@@ -460,7 +460,7 @@ def export(cfg, prods, path, mode="spline"):
         return sub
 
     root = st.NewShape()
-    name(root, cfg["id"])
+    name(root, tag or cfg["id"])          # Д-91 (CP-76): изделие — тег имени файла
     for r in p["rows"]:
         sub = group(root, row_label(r))
         cnt = {}
