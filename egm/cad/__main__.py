@@ -294,7 +294,7 @@ def build_assy(arg, configs, prods, step_mode="spline", des=None, rep=_CONSOLE):
         rep.say(f"кеш: {_rel(path)} уже на диске (сгенерирован {ts}) — пропущен (Д-84)")
         return
     try:
-        dt, meta = assy.export(cfg, prods, path, step_mode)
+        dt, meta = assy.export(cfg, prods, path, step_mode, tag=tag)
     except Exception:
         import traceback
         traceback.print_exc()
