@@ -8,7 +8,7 @@
 --phase φ / --row k — ряд редуктора: строится только венец этого ряда, на чертеже —
 направление его эксцентрика.
 --spec specs/cad_set.yaml — комплект чертежей по спецификации (Д-61): записи items[] —
-исполнения целиком (id, design, assy, фильтры rows/parts); ID из командной строки —
+исполнения целиком (id, design, layout, assy, фильтры rows/parts); ID из командной строки —
 низкоуровневый путь. Данные — specs/ptk_configs.json, specs/products.yaml.
 Механизм и форматы 3D-экспорта — configs/application.yaml → cad: (Д-79): STEP —
 основной, FCStd (FreeCAD) — альтернативный; без FreeCAD/CadQuery — «пропущен».
@@ -23,7 +23,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from egm import config, products, ptk, ptk_design
+from egm import config, products, ptk, ptk_design, ptk_layout
 from egm.cad import (assy, freecad, ptk_cover, ptk_ecc, ptk_hub, ptk_ring, ptk_sep, ptk_spacer,
                      step, svg)
 
@@ -306,12 +306,47 @@ def _pick_design(designs, arg, name):
     ptk_design.find(designs, base, name)        # не найдена — штатная ошибка Д-48
 
 
+def _layout_des(cfg, des, code, prods, bears, pins, stock, rep):
+    """CP-74: конструктив code из items[] cad_set.yaml — резолв на лету (ptk_layout.layout,
+    Д-73) и запись-обёртка для build/build_assy: имя — код конструктива (файлы и сборка
+    <ID>-<код>), .03/.11 — из проработки des или предварительные шага 1. None — ошибки."""
+    d = {"layout": code,
+         "supports": ((des or {}).get("input") or {}).get("supports") or {}}
+    shaft_d = des["shaft"]["d"] if des else float(cfg["geom"]["limits"].get("shaft_d_min") or 0.0)
+    ecc = des["ecc"] if des else cfg["ecc"]
+    lay, errs, warns = ptk_layout.layout(cfg, d, ecc, shaft_d, cfg["geom"]["limits"]["row_gap"],
+                                         prods=prods, bears=bears, stock=stock, pins=pins)
+    tag = f"{cfg['id']} [{code}]: "
+    for w in warns:
+        rep.say("предупреждение: " + tag + w)
+    if lay is None or errs:
+        for e in errs:
+            rep.say(f"ошибка: {tag}{e}")
+        return None
+    p03 = [{"base": p["id"], "id": p["id"], **p}
+           for p in cfg["parts"] if p["id"].split(".", 1)[1][:2] == "03"]
+    return {"name": code, "id": cfg["id"], "layout": lay, "ecc": ecc, "ok": True,
+            "errors": [], "warnings": warns, "input": d, "mass": (des or {}).get("mass"),
+            "shaft": {"d": shaft_d, "bore": (des or {}).get("shaft", {}).get("bore", 0.0)},
+            "link": (des or {}).get("link") or "предварительный (шаг 1)",
+            "parts": des["parts"] if des else p03}
+
+
 def run_spec(spec, configs, prods, designs, rep=_CONSOLE):
     """Комплект чертежей по спецификации (YAML, Д-61): записи items[] — исполнения
     целиком; строятся все детали с генераторами (products.yaml → cad), assy — сборка.
     Возвращает число записей, окончивших ошибкой."""
     data = config.load(spec)
-    step_mode = data.get("step") or STEP_MODE   # приоритет: файл комплекта → Д-79
+    step_mode = data.get("step")
+    if step_mode is False:
+        step_mode = "off"           # bare off в YAML — False (PyYAML 1.1) — это режим off
+    elif not step_mode:
+        step_mode = STEP_MODE       # не задан — по умолчанию (приоритет: комплект → Д-79)
+
+    vp = config.load(config.cfg_file(APP, "configs.vendor_prices"))
+    bears, pins = vp.get("bearings", {}), vp.get("pins", {})
+    stock_f = config.cfg_file(APP, "configs.stock")
+    stock = config.load(stock_f) if stock_f.exists() else None
     bad = 0
     for i, item in enumerate(data.get("items", []), 1):
         arg = item.get("id")
@@ -331,14 +366,28 @@ def run_spec(spec, configs, prods, designs, rep=_CONSOLE):
                 des = ptk_design.pick(designs, target)   # имя из хвоста ID детали или None
             only = None if item.get("parts", "all") == "all" \
                 else {str(p).zfill(2)[:2] for p in item["parts"]}
-            rows = item.get("rows", "all")
-            if rows == "all":
-                build(target, configs, prods, None, None, step_mode, des, only, rep)
+            codes = item.get("layout")          # CP-74: конструктив(ы) — свой комплект на каждый
+            if codes:
+                if "." in arg:
+                    raise ValueError(f"{arg}: layout задаётся для исполнения, не для детали")
+                for code in codes if isinstance(codes, list) else [codes]:
+                    des_l = _layout_des(ptk.find(configs, full), des, str(code),
+                                        prods, bears, pins, stock, rep)
+                    if des_l is None:
+                        bad += 1
+                        continue
+                    build(full, configs, prods, None, None, step_mode, des_l, only, rep)
+                    if item.get("assy"):
+                        build_assy(full, configs, prods, step_mode, des_l, rep)
             else:
-                for k in rows:
-                    build(target, configs, prods, None, k, step_mode, des, only, rep)
-            if item.get("assy"):
-                build_assy(target, configs, prods, step_mode, des, rep)
+                rows = item.get("rows", "all")
+                if rows == "all":
+                    build(target, configs, prods, None, None, step_mode, des, only, rep)
+                else:
+                    for k in rows:
+                        build(target, configs, prods, None, k, step_mode, des, only, rep)
+                if item.get("assy"):
+                    build_assy(target, configs, prods, step_mode, des, rep)
         except (KeyError, ValueError) as e:
             rep.say(f"ошибка: {e}")
             bad += 1
