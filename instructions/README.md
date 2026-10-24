@@ -42,6 +42,11 @@ AI Drive (её ведёт агент, включая журналы синхро
 diff, заказчик проверяет (`tools/fix_diff.py` → `git apply --check`),
 применяет, коммитит и пушит (правила — главный `README.md`). Для правок строк таблиц и новых файлов вместо (или вместе с) diff — файл `upd.md` через `tools/upd_apply.py` (п. 2.5): `git apply` не нужен.
 
+Исключение — **прямой режим (Д-82)**: при переданном пользователем токене
+GitHub запись в репозиторий делает исполнитель — клон, коммит и push (автор —
+euginb, noreply); прогон `main.py` и отметка OK — по-прежнему за заказчиком
+(Д-01). Режим и блок репозитория в CTX — INS-91 §8.
+
 | | A. Super Agent | B. AI Chat + GitHub | C. AI Chat без GitHub |
 |---|---|---|---|
 | Где | Genspark Super Agent (песочница + AI Drive) | AI Chat Genspark или другая модель с веб-доступом | любая модель без доступа к GitHub |
@@ -57,7 +62,9 @@ diff, заказчик проверяет (`tools/fix_diff.py` → `git apply --
 Задача открывается фразой: «Работаем с HarmonicV2: зеркало
 `/HarmonicV2-main.zip`, порядок `/HarmonicV2-workflow.md` в AI Drive, база
 <sha>: <задача> (CP-##)». После каждого push — «синхронизируй зеркало
-HarmonicV2». Детали — `/HarmonicV2-workflow.md` в AI Drive.
+HarmonicV2». Детали — `/HarmonicV2-workflow.md` в AI Drive. При переданном
+пользователем токене GitHub — прямой режим (Д-82): правки — коммитом и push в
+ветку работы, без канала патчей (INS-91 §8).
 
 ### 2.2. Режим B — AI Chat + GitHub
 
