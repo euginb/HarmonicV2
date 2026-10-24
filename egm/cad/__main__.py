@@ -13,8 +13,9 @@
 Механизм и форматы 3D-экспорта — configs/application.yaml → cad: (Д-79): STEP —
 основной, FCStd (FreeCAD) — альтернативный; без FreeCAD/CadQuery — «пропущен».
 Пути в выводе — от корня репозитория; весь вывод консоли дублируется в
-reports/cad_report.md (Д-79, переписывается каждым запуском; в конце лога — куда
-сохранён) с легендой каждой позиции: что это за чертёж и что это за деталь.
+reports/cad_report.md (Д-79, Д-83: записи добавляются, каждый прогон — блок;
+в конце лога — куда сохранён) с легендой каждой позиции: что это за чертёж
+и что это за деталь; чертежи, уже на диске, не перегенерируются (Д-84).
 Коды выхода: 0 — ok; 1 — ID не найден / нет генератора / ошибка геометрии; 2 — аргументы.
 """
 import argparse
@@ -54,12 +55,13 @@ class _Report:
     """Дубликат вывода консоли в reports/cad_report.md (Д-79): say — консоль и отчёт,
     only — только отчёт (легенда позиции). Без path — только консоль."""
 
-    def __init__(self, path=None):
+    def __init__(self, path=None, append=False):
         self.path = path
         self._fh = None
         if path is not None:
             path.parent.mkdir(parents=True, exist_ok=True)
-            self._fh = path.open("w", encoding="utf-8", newline="\n")
+            self._fh = path.open("a" if append else "w", encoding="utf-8",
+                                 newline="\n")
 
     def say(self, text="", flush=False):
         print(text, flush=flush)
@@ -83,13 +85,25 @@ _CONSOLE = _Report()      # по умолчанию — только консо�
 
 
 def _open_report(argv):
-    """Отчёт прогона reports/cad_report.md (Д-79): переписывается каждым запуском,
-    в конце лога печатается, куда он сохранён."""
-    rep = _Report(ROOT / CAD_REPORT)
-    rep.only("# Отчёт построения чертежей (code-first, НЕ ПРАВИТЬ РУКАМИ)\n")
-    rep.only(f"- Запуск: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    """Отчёт прогона reports/cad_report.md (Д-79, Д-83): записи добавляются — файл
+    не переписывается; заголовок пишется один раз, каждый прогон добавляет блок
+    (разделитель, - Запуск: <ts с секундами>, - Команда:); в конце лога печатается,
+    куда он сохранён."""
+    path = ROOT / CAD_REPORT
+    first = not path.exists() or path.stat().st_size == 0
+    rep = _Report(path, append=not first)
+    if first:
+        rep.only("# Отчёт построения чертежей (code-first, НЕ ПРАВИТЬ РУКАМИ)\n")
+    else:
+        rep.only("\n---\n")
+    rep.only(f"- Запуск: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     rep.only(f"- Команда: python -m egm.cad {' '.join(argv)}\n")
     return rep
+
+
+def _stamp(rep):
+    """CP-75 (Д-83): метка времени генерации — в конец блока чертежа отчёта."""
+    rep.say(f"Сгенерирован: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def _legend(rep, cfg, part, gen, des, name, prod):
@@ -184,6 +198,13 @@ def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=Non
             rep.say(f"{part['id']}: генератора нет (products.yaml → cad)")
             continue
         name = part["id"].split(".", 1)[1] + (f"-r{k}" if k else "")
+        want = ([out / f"{name}.svg"] if SVG_ON else []) \
+             + ([out / f"{name}.step"] if step_mode != "off" and STEP_ON else [])
+        if want and all(t_.exists() for t_ in want):   # CP-75 (Д-84): кеш — не перегенерировать
+            ts = datetime.fromtimestamp(max(t_.stat().st_mtime for t_ in want)) \
+                 .strftime("%Y-%m-%d %H:%M:%S")
+            rep.say(f"кеш: {name} уже на диске (сгенерирован {ts}) — пропущен (Д-84)")
+            continue
         _legend(rep, cfg, part, gen, des, name, prod)
         model = GENERATORS[gen](cfg, part, k)
         if SVG_ON:
@@ -196,6 +217,7 @@ def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=Non
             rep.say("step: пропущен " + ("(--step off)" if step_mode == "off"
                                          else "(application.yaml → cad.export.step.enabled)"))
             _export_fc(model, out / f"{name}.FCStd", step_mode, part["id"], rep)
+            _stamp(rep)
             continue
         try:
             import cadquery  # noqa: F401
@@ -203,6 +225,7 @@ def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=Non
             rep.say(f"step: пропущен — cadquery не импортируется в {sys.executable}: "
                     f"{type(e).__name__}: {e}")
             _export_fc(model, out / f"{name}.FCStd", step_mode, part["id"], rep)
+            _stamp(rep)
             continue
         rep.say(f"step: строится ({step_mode}, {len(model.cut.pts)} точек профиля, "
                 f"{len(model.holes)} отв.)…", flush=True)
@@ -215,6 +238,7 @@ def build(arg, configs, prods, phase=None, row=None, step_mode="spline", des=Non
             raise ValueError(f"{part['id']}: ошибка построения STEP (traceback выше)")
         _export_fc(model, out / f"{name}.FCStd", step_mode, part["id"], rep,
                    step_file=out / f"{name}.step")
+        _stamp(rep)
 
 
 def build_assy(arg, configs, prods, step_mode="spline", des=None, rep=_CONSOLE):
@@ -265,6 +289,10 @@ def build_assy(arg, configs, prods, step_mode="spline", des=None, rep=_CONSOLE):
     rep.say(f"step: сборка строится ({len(assy.items(p))} деталей, {n} экземпляров, "
             f"{step_mode})…", flush=True)
     path = out / f"{tag}.step"
+    if path.exists():                     # CP-75 (Д-84): кеш — не перегенерировать
+        ts = datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+        rep.say(f"кеш: {_rel(path)} уже на диске (сгенерирован {ts}) — пропущен (Д-84)")
+        return
     try:
         dt, meta = assy.export(cfg, prods, path, step_mode)
     except Exception:
