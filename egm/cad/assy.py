@@ -23,11 +23,13 @@ LAYERS = {"01": ("01_RING", "венец"), "02": ("02_CAGE", "сепаратор
           "08": ("08_BEARING", "подшипник генератора"), "09": ("09_BEARING_OUT", "подшипник выхода"),
           "10": ("10_BEARING_IN", "подшипники входного вала"),
           "11": ("11_DIST", "дистанционные кольца эксцентриков"), "12": ("12_HUB", "ступица выхода"),
+          "13": ("13_LEAF", "дно-лист"),
           "ref": ("REF", "примитивы: вал")}
 COLORS = {"01": (0.55, 0.57, 0.60), "02": (0.80, 0.60, 0.20), "03": (0.30, 0.50, 0.80),
           "04": (0.85, 0.20, 0.20), "05": (0.45, 0.47, 0.52), "08": (0.20, 0.65, 0.30),
           "07": (0.62, 0.64, 0.68), "09": (0.20, 0.55, 0.25), "10": (0.25, 0.60, 0.35),
-          "11": (0.35, 0.55, 0.85), "12": (0.75, 0.50, 0.20), "ref": (0.70, 0.70, 0.70)}
+          "11": (0.35, 0.55, 0.85), "12": (0.75, 0.50, 0.20), "13": (0.60, 0.45, 0.30),
+          "ref": (0.70, 0.70, 0.70)}
 VIEWS = [{"name": "ISO", "dir": [1, -1, 1], "layers": "все"},
          {"name": "по оси", "dir": [0, 0, 1], "layers": "все"},
          {"name": "сбоку", "dir": [1, 0, 0], "layers": "все"},
@@ -35,7 +37,7 @@ VIEWS = [{"name": "ISO", "dir": [1, -1, 1], "layers": "все"},
 SCHEMA = "AP242DIS"
 ALIAS = {"01": "RING", "02": "CAGE", "03": "ECC", "04": "BODY", "05": "SPACER",
          "07": "COVER", "08": "BEARING", "09": "BRG_OUT", "10": "BRG_IN", "11": "DIST",
-         "12": "HUB", "ref": "SHAFT"}   # Д-52: имена узлов STEP — только латиница
+         "12": "HUB", "13": "LEAF", "ref": "SHAFT"}   # Д-52: имена узлов STEP — только латиница
 _ENT = re.compile(r"#(\d+)\s*=\s*([A-Z0-9_]+)\s*\((.*?)\)\s*;", re.S)
 _TOK = re.compile(r"'EGM(\d+)'")
 
@@ -80,8 +82,10 @@ def _layout_inst(cfg, rows):
         elif nn == "11":
             for r in rows[:-1]:
                 at(q["id"], nn, r["zc"] + cfg["ecc"]["t"] / 2)
-        elif nn == "12" and cup.get("z_in"):          # CP-63: ступица .12A | .12B — от дна
-            at(q["id"], nn, cup["z_in"])
+        elif nn in ("12", "13") and cup.get("z_in"):  # CP-63: .12A | .12B от дна; CP-80: .13 за буртом,
+            j = q.get("join") or {}                   # .12 (фланец) за дном-листом
+            dz = (j.get("h_b", 0.0) + (j.get("t_s", 0.0) if nn == "12" else 0.0)) if j.get("hub") else 0.0
+            at(q["id"], nn, round(cup["z_in"] + dz, 3))
     b09, b10 = lay.get("b09"), lay.get("b10")
     if b10 and cov:
         at(f"{cid}.10", "10", -b10["B"])
@@ -193,6 +197,13 @@ def item_meta(cfg, prods, pid, nn):
         m.update(scheme=j.get("scheme"), belt=j.get("L"),
                  pins=f"{j.get('pin_n')}×Ø{j.get('pin_d') or 0:g}",
                  hub=f"Ø{j.get('hub_d') or 0:g}×{j.get('hub_l') or 0:g}")
+    elif nn == "13":                   # CP-80, Д-93
+        j = next((q.get("join") or {} for q in cfg["layout"].get("cad_parts", [])
+                  if q["id"] == pid), {})
+        h = j.get("hub") or {}
+        m.update(t=j.get("t_s"), crit=j.get("crit"), D=j.get("D"),
+                 pins=f"{j.get('pin_n')}×Ø{j.get('pin_d') or 0:g}",
+                 hub_pins=f"{h.get('n')}×Ø{h.get('d') or 0:g}")
     else:
         m.update(d=g["limits"]["shaft_d_min"])
     return m
@@ -327,7 +338,7 @@ def manifest(cfg, prods, p):
 
 _GEN = {"01": ptk_ring.build, "02": ptk_sep.build, "03": ptk_ecc.build,
         "05": ptk_spacer.build, "07": ptk_cover.build, "11": ptk_cover.build,
-        "12": ptk_hub.build}
+        "12": ptk_hub.build, "13": ptk_hub.build_leaf}
 
 
 def part_model(cfg, pid, nn):
@@ -595,6 +606,23 @@ def self_test():
     s4, h4 = part_model(cfg4, "PTK-T.02B-K", "02"), part_model(cfg4, "PTK-T.12A-K", "12")
     assert len(s4.bands) == 2 and len(s4.pins) == 10 and len(h4.pins) == 10, (s4.bands, h4.pins)
     assert label(cfg4, "PTK-T.12A-K", "12") == "HUB (.12A-K)"
+    jn5 = {**jn, "L": 7.5, "dir": "in", "axial": True, "h_b": 4.5, "t_s": 3.0, "crit": "k_fit",
+           "t_s_min": 3.0, "r_j": 28.56, "d": 46.12, "pin_n": 8, "pin_a": [45.0 * k for k in range(8)],
+           "hub": {"d": 3.0, "n": 10, "r_h": 19.5, "r_f": 24.0, "h_f": 4.5, "l": None}}   # CP-80
+    lay5 = {**lay2, "parts": {**lay2["parts"], "12": "flange", "13": "leaf"},
+            "cup": {**lay["cup"], "t": 12.0},
+            "cad_parts": [{"id": "PTK-T.02B-K", "base": "PTK-T.02B", "rows": [1, 2, 3, 4], "join": jn5},
+                          {"id": "PTK-T.12A-K", "base": "PTK-T.12A", "rows": [1, 2, 3, 4], "join": jn5},
+                          {"id": "PTK-T.13-K", "base": "PTK-T.13", "rows": [1, 2, 3, 4], "join": jn5}]}
+    cfg5 = {**cfg, "layout": lay5,
+            "parts": [x for x in parts if ".02" not in x["id"]] + lay5["cad_parts"]}
+    z5 = {}
+    for x in plan(cfg5)["root"]:
+        z5.setdefault(x["id"], []).append(x["z"])
+    assert z5["PTK-T.13-K"] == [41.0] and z5["PTK-T.12A-K"] == [44.0], z5
+    h5, l5 = part_model(cfg5, "PTK-T.12A-K", "12"), part_model(cfg5, "PTK-T.13-K", "13")
+    assert len(h5.axial) == 10 and len(l5.axial) == 18 and l5.thick == 3.0, (h5.axial, l5.axial)
+    assert label(cfg5, "PTK-T.13-K", "13") == "LEAF (.13-K)"
     assert ptk_cover.self_test()
     for s in ("Эксцентрик (.03D)", "it's \\ ok", "φ = 90°"):
         assert step_unstr(step_str(s)[1:-1]) == s, ("кодирование строки STEP", s)

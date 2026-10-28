@@ -43,7 +43,7 @@ FC_ON = _FC.get("enabled", False)               # альтернативный �
 FC_CMD = _FC.get("command") or freecad.DEFAULT_COMMAND
 GENERATORS = {"ptk_ring": ptk_ring.build, "ptk_sep": ptk_sep.build, "ptk_ecc": ptk_ecc.build,
               "ptk_spacer": ptk_spacer.build, "ptk_cover": ptk_cover.build,
-              "ptk_hub": ptk_hub.build}
+              "ptk_hub": ptk_hub.build, "ptk_leaf": ptk_hub.build_leaf}
 
 
 def _rel(p):
