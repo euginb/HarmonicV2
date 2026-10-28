@@ -25,7 +25,11 @@ JOIN = {"join": "auto", "join_order": ["collar", "insert"], "pin_d": [3.0, 4.0, 
         "pin_n": [4, 6, 8, 10, 12, 16], "edge_k": 1.5, "pin_depth_k": 1.5, "pin_web": 2.0,
         "tau_pin": 80.0, "sig_wall": 150.0, "sig_hub": 150.0, "c_in": 1.0, "c_out": 1.0,
         "pin_gap": 0.5, "weld": []}   # weld — марки, из листа которых допустима .02C (insert, Д-76)
+# CP-79, Д-93: collar — t_s_min = max(k_fit·d, t_tech); [τ] диска на срез; корпус r_lim/r_free (из ptk_layout);
+# значения k_fit, t_tech, tau_disk — предварительные, обосновать (OQ-27)
+JOIN.update(k_fit=1.0, t_tech=2.0, tau_disk=80.0, r_lim=None, r_free=None)
 SCHEMES = ("collar", "insert")
+DIRS = ("out", "in")          # направление бурта collar: наружу | внутрь (Д-93)
 
 
 def tube_ok(t, Dn, Dv, st=None):
@@ -116,6 +120,101 @@ def _blank(p):
     return f"лист {p['sheet']:g} (weld)" if p.get("sheet") else "нет"
 
 
+def collar_geom(dr, r_in, r_out, d, o):
+    """collar (Д-93): бурт наружу r_in…r_in+2e | внутрь r_in−2e…r_out, e = edge_k·d; штифты на r_j = r_in ± e.
+    -> {r_j, t — ширина бурта, D, d — габарит кольца бурта с припусками c_in/c_out, r0, r1}."""
+    e = o["edge_k"] * d
+    if dr == "out":
+        r0, r1, rj = r_in - o["c_in"], r_in + 2 * e + o["c_out"], r_in + e
+    else:
+        r0, r1, rj = r_in - 2 * e - o["c_in"], r_out + o["c_out"], r_in - e
+    return {"r_j": rj, "t": r1 - r0, "D": 2 * r1, "d": 2 * r0, "r0": r0, "r1": r1}
+
+
+def _up(x):
+    return math.ceil(x * 10 - 1e-9) / 10
+
+
+def collar_check(M, g, d, n, o):
+    """Осевые сквозные штифты через бурт h_b и дно-лист t_s -> (напряжения, нарушения).
+    h_b = max(pin_depth_k·d, F/(n·d·[σсм])); t_s = max(смятие F/(n·d·[σсм]), срез диска
+    M/(2π·r_j²·[τ]), k_fit·d, t_tech) — критерий выводится (Д-93); ступица — CP-80."""
+    F = M * 1e3 / g["r_j"]
+    e = o["edge_k"] * d
+    h_b = _up(max(o["pin_depth_k"] * d, F / (n * d * o["sig_wall"])))
+    c = {"смятие": F / (n * d * o["sig_hub"]),
+         "срез диска": M * 1e3 / (2 * math.pi * g["r_j"] ** 2 * o["tau_disk"]),
+         "k_fit": o["k_fit"] * d, "t_tech": o["t_tech"]}
+    crit = max(c, key=c.get)
+    t_s = _up(c[crit])
+    s = {"F": F, "tau": F / (n * math.pi * d * d / 4), "sig_wall": F / (n * d * h_b),
+         "sig_hub": F / (n * d * t_s), "tau_edge": F / (n * 2 * max(e - d / 2, 1e-6) * h_b),
+         "h_b": h_b, "t_s": t_s, "L": h_b + t_s, "pitch": 2 * math.pi * g["r_j"] / n,
+         "t_s_min": max(o["k_fit"] * d, o["t_tech"])}
+    bad = [k for k, lim in (("tau", o["tau_pin"]), ("sig_wall", o["sig_wall"]),
+                            ("sig_hub", o["sig_hub"]), ("tau_edge", 0.6 * o["sig_wall"]))
+           if s[k] > lim + 1e-9]
+    if s["pitch"] < d + o["pin_web"] - 1e-9:
+        bad.append("pitch")
+    return s, crit, bad
+
+
+def collar_pins(M, dr, r_in, r_out, o, cat=None):
+    """Наименьший Ø, затем наименьшее n; длина штифта ≥ h_b + t_s (сквозной) -> (dict | None, geom)."""
+    ds = sorted(o["pin_d"])
+    if cat:
+        ds = [d for d in ds if float(d) in cat]
+    g = collar_geom(dr, r_in, r_out, ds[0] if ds else 3.0, o)
+    for d in ds:
+        g = collar_geom(dr, r_in, r_out, d, o)
+        for n in sorted(o["pin_n"]):
+            s, crit, bad = collar_check(M, g, d, n, o)
+            if bad:
+                continue
+            l, des = pin_len(d, s["L"], cat)
+            if cat and l is None:
+                break
+            q = {"d": d, "n": n, **{k: round(v, 1) for k, v in s.items()}}
+            q.update(crit=crit, t=round(g["t"], 2), need=round(s["L"], 2), l=l, des=des,
+                     key=f"{cat[float(d)]['key']}x{l:g}" if l else "", hole12=q["t_s"])
+            return q, g
+    return None, g
+
+
+def _collar(M, r_in, r_out, stock, by, tried, ta, o, cat):
+    """Варианты collar по направлениям бурта: штифты, труба по бурту, фильтр корпуса (Д-93)."""
+    out = []
+    for dr in DIRS:
+        q, g = collar_pins(M, dr, r_in, r_out, o, cat)
+        need = [round(g["D"] + 2 * ta, 2), round(g["d"] - 2 * ta, 2)]
+        fit = {}
+        for m in tried:
+            ts = [t for t in (by.get(m) or {}).get("tubes", []) if tube_ok(t, *need, stock)]
+            if ts:
+                fit[m] = min(ts, key=_area)
+        house, margin = "", None
+        if dr == "out" and o.get("r_lim") is not None:
+            margin = o["r_lim"] - g["r1"]
+            if margin < -1e-9:
+                house = f"корпус: r бурта {g['r1']:.2f} > {o['r_lim']:.2f} (карман .07B до болтов)"
+        if dr == "in" and o.get("r_free") is not None:
+            margin = g["r0"] - o["r_free"]
+            if margin < -1e-9:
+                house = f"корпус: r отв. бурта {g['r0']:.2f} < {o['r_free']:.2f} (.10/.11 + seat_wall)"
+        out.append({"scheme": "collar", "dir": dr, "geom": {k: round(v, 2) for k, v in g.items()},
+                    "pins": q, "need": need, "fit": fit, "house": house,
+                    "margin": round(margin, 2) if margin is not None else None})
+    return out
+
+
+def _vtext(v, jn):
+    p = "" if v["pins"] else "штифты не проходят"
+    t = "" if v["fit"] else (f"нет трубы Ø ≥ {v['need'][0]:g} с отв. ≤ {v['need'][1]:g}"
+                             + (f" из {', '.join(map(str, jn['tried']))}" if any(jn["tried"]) else ""))
+    r = "; ".join(x for x in (t, p, v.get("house", "")) if x) or "нет марки"
+    return r + (f" [{'наружу' if v['dir'] == 'out' else 'внутрь'}]" if v.get("dir") else "")
+
+
 def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None, cat=None):
     """Схема по доступности заготовок -> {pick | None, variants, tried, lim}.
     cat — каталог штифтов (pin_cat); нет — из opt["pin_cat"] (Д-74)."""
@@ -128,6 +227,9 @@ def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None, cat=None):
     ta = float((stock or {}).get("tube_allow", 0.5))
     var = []
     for s in order:
+        if s == "collar":                                        # CP-79, Д-93
+            var += _collar(M, r_in, r_out, stock, by, tried, ta, o, cat)
+            continue
         g = geometry(s, r_in, r_out, o)
         need = [round(g["D"] + 2 * ta, 2), round(g["d"] - 2 * ta, 2)]
         fit = {}
@@ -137,22 +239,35 @@ def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None, cat=None):
                 fit[m] = min(ts, key=_area)
         var.append({"scheme": s, "geom": {k: round(v, 2) for k, v in g.items()},
                     "pins": pins(M, g, o, n_win, cat), "need": need, "fit": fit})
-    pick = next(({"scheme": v["scheme"], "material": m, "tube": v["fit"][m], "pins": v["pins"],
-                  "geom": v["geom"]} for m in tried for v in var if v["pins"] and m in v["fit"]),
-                None)
+    jn = {"variants": var, "tried": tried}
+    pick = None
+    for m in tried:
+        for s in order:
+            c = [v for v in var if v["scheme"] == s and v["pins"] and m in v["fit"] and not v.get("house")]
+            if not c:
+                continue
+            # Д-93: меньший съём — сечение трубы; при равенстве — наружу
+            v = min(c, key=lambda v: (_area(v["fit"][m]), DIRS.index(v["dir"]) if v.get("dir") else 0))
+            pick = {"scheme": v["scheme"], "material": m, "tube": v["fit"][m], "pins": v["pins"],
+                    "geom": v["geom"]}
+            if v.get("dir"):
+                oth = [_vtext(x, jn) for x in var if x.get("dir") and x is not v]
+                pick.update(dir=v["dir"], margin=v["margin"],
+                            other="; ".join(oth) if oth else "")
+            break
+        if pick:
+            break
     return {"pick": pick, "variants": var, "tried": tried,
-            "lim": {"sig_wall": o["sig_wall"], "tau_pin": o["tau_pin"], "sig_hub": o["sig_hub"]}}
+            "lim": {"sig_wall": o["sig_wall"], "tau_pin": o["tau_pin"], "sig_hub": o["sig_hub"],
+                    "r_lim": o.get("r_lim"), "r_free": o.get("r_free"), "k_fit": o["k_fit"],
+                    "t_tech": o["t_tech"], "tau_disk": o["tau_disk"]}}
 
 
 def why(jn):
     """Причины отказа по схемам."""
     out = []
     for v in jn["variants"]:
-        p = "" if v["pins"] else "штифты не проходят"
-        t = "" if v["fit"] else (f"нет трубы Ø ≥ {v['need'][0]:g} с отв. ≤ {v['need'][1]:g}"
-                                 + (f" из {', '.join(map(str, jn['tried']))}"
-                                    if any(jn["tried"]) else ""))
-        out.append(f"{v['scheme']}: " + ("; ".join(x for x in (p, t) if x) or "нет марки"))
+        out.append(f"{v['scheme']}: " + _vtext(v, jn))
     return " | ".join(out) + " (Д-72)"
 
 
@@ -173,6 +288,17 @@ JOIN_HEAD = ("| Проработка | Схема | Заготовка .02 | Ш�
 JOIN_RULE = "|---" * 11 + "|"
 
 
+def _sch(p):
+    """Ячейка «Схема» SPEC-11: collar — направление, h_b, t_s с критерием, запас корпуса, отказ другого."""
+    if not p.get("dir"):
+        return p["scheme"]
+    q = p["pins"]
+    mg = f"; запас корпуса {p['margin']:g} мм" if p.get("margin") is not None else ""
+    return (f"collar {'наружу' if p['dir'] == 'out' else 'внутрь'}; бурт h_b {q['h_b']:g}, "
+            f"дно-лист t_s {q['t_s']:g} ({q['crit']}; t_s_min {q['t_s_min']:g}){mg}"
+            + (f"; отказ: {p['other']}" if p.get("other") else "") + " (Д-93)")
+
+
 def join_row(name, jn):
     """Строка таблицы «Соединение .02–.12» SPEC-11 (Д-74); отказ — причины по схемам."""
     p = jn["pick"]
@@ -182,7 +308,7 @@ def join_row(name, jn):
     m = f"{p['material']} " if p["material"] else ""
     nd = f"{q['n']} × Ø{q['d']:g}" + (f" × {q['l']:g}" if q.get("l") else "")
     des = f"{q['des']} ({q['key']})" if q.get("des") else "нет vendor_prices.yaml → pins"
-    return (f"| {name} | {p['scheme']} | {m}труба {t['D']:g}×{t['s']:g} | {nd} | {des} | "
+    return (f"| {name} | {_sch(p)} | {m}труба {t['D']:g}×{t['s']:g} | {nd} | {des} | "
             f"{q.get('hole12', q['L']):g} | {q['tau']:g} / {lim['tau_pin']:g} | "
             f"{q['sig_wall']:g} / {lim['sig_wall']:g} | {q['sig_hub']:g} / {lim.get('sig_hub', 0):g} | "
             f"{q['tau_edge']:g} / {0.6 * lim['sig_wall']:g} | {q['L']:g} |")
@@ -197,7 +323,7 @@ def self_test():
     assert not tube_ok({"D": 73.0, "s": 5.0}, 70.88, 63.12, st)
     assert tube_ok({"D": 73.0, "s": 5.0}, 70.88, 63.12)
     p = choose(100.0, r_in, r_out, st, ["40Х"])["pick"]
-    assert (p["scheme"], p["tube"]["s"], p["pins"]["d"], p["pins"]["n"]) == ("collar", 7.0, 3.0, 6), p
+    assert p["scheme"] == "insert", p          # CP-79: под бурт Д-93 труб 73×5/7 мало
     j2 = choose(100.0, r_in, r_out, st, ["40Х"], {"join": "insert"})
     p2 = j2["pick"]
     assert (p2["scheme"], p2["tube"]["s"], p2["pins"]["n"]) == ("insert", 5.0, 8), p2
@@ -218,4 +344,16 @@ def self_test():
     assert choose(100.0, r_in, r_out, st1, ["40Х"], {"pin_d": [5.0]}, cat=cat)["pick"] is None
     assert "Штифт 3×8" in join_row("K", jc) and join_row("K", jc).count("|") == 12, join_row("K", jc)
     assert join_row("K", j3).count("|") == 12, join_row("K", j3)
+    # CP-79, Д-93: collar — направление бурта, осевые штифты, t_s с критерием, фильтр корпуса
+    stc = {**st, "materials": {"40Х": {"tubes": [{"D": 73.0, "s": 18.0}, {"D": 89.0, "s": 16.0}]}}}
+    jk = choose(100.0, r_in, r_out, stc, ["40Х"], {"join": "collar"})
+    k = jk["pick"]
+    assert (k["dir"], k["tube"]["D"], k["pins"]["d"], k["pins"]["n"]) == ("in", 73.0, 3.0, 8), k
+    assert (k["pins"]["h_b"], k["pins"]["t_s"], k["pins"]["crit"], k["pins"]["L"]) == \
+        (4.5, 3.0, "k_fit", 7.5), k["pins"]
+    ko = choose(100.0, r_in, r_out, stc, ["40Х"], {"join": "collar", "r_free": 30.0})["pick"]
+    assert ko["dir"] == "out" and ko["tube"]["D"] == 89.0 and "корпус" in ko["other"], ko
+    kn = choose(100.0, r_in, r_out, stc, ["40Х"], {"join": "collar", "r_free": 30.0, "r_lim": 36.9})
+    assert kn["pick"] is None and "корпус" in why(kn), why(kn)
+    assert "внутрь" in join_row("K", jk) and join_row("K", jk).count("|") == 12, join_row("K", jk)
     return True

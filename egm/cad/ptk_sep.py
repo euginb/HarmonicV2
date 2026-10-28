@@ -6,7 +6,7 @@
 """
 import math
 
-from egm.cad.model import Band, Circle, Contour, Dim, PartModel, PinHole, Window
+from egm.cad.model import AxialHole, Band, Circle, Contour, Dim, PartModel, PinHole, Window
 
 
 def build(cfg, part, row=None):
@@ -62,9 +62,16 @@ def build(cfg, part, row=None):
         if end > W + 1e-9:
             m.bands.append(Band(s["r_in"], s["r_out"], W, end - W))
         r0, r1 = (s["r_in"], s["r_out"]) if ins else (jn["d"] / 2, jn["D"] / 2)
+        ax = bool(jn.get("axial"))           # CP-79, Д-93: бурт h_b, осевые сквозные штифты на r_j
         if not ins:
-            m.bands.append(Band(r0, r1, z, L))
-        m.pins = [PinHole(a, jn["pin_z"], jn["pin_d"], r0 - 1.0, r1 + 1.0) for a in jn["pin_a"]]
+            m.bands.append(Band(r0, r1, z, jn["h_b"] if ax else L))
+        if ax:
+            m.axial = [AxialHole(a, jn["r_j"], jn["pin_d"], z - 1.0, jn["h_b"] + 2.0) for a in jn["pin_a"]]
+            m.notes.append(f"CP-79: бурт {'наружу' if jn['dir'] == 'out' else 'внутрь'} z {z:g}…"
+                           f"{z + jn['h_b']:g}, дно-лист t_s {jn['t_s']:g} к торцу; штифты {jn['pin_n']}×"
+                           f"Ø{jn['pin_d']:g} осевые сквозные на r {jn['r_j']:g}, через 360/n (Д-93)")
+        else:
+            m.pins = [PinHole(a, jn["pin_z"], jn["pin_d"], r0 - 1.0, r1 + 1.0) for a in jn["pin_a"]]
         pl = f"×{jn['pin_l']:g}" if jn.get("pin_l") else ""
         m.notes.append((f"обечайка .02C без бурта: стенка до z {end:g} под дно-вставку .12B" if ins else
                         f"бурт .02B Ø{2 * r0:g}/Ø{2 * r1:g} на z {z:g}…{z + L:g}: поясок .12A — в отверстии")
@@ -100,4 +107,9 @@ def self_test():
     leg = {a: b for a, b, _ in m.legend}
     assert abs(leg["π·Dm"] - 210.49) < 0.01 and leg["hс"] == 0.88, leg
     assert "π·Dm = 210.49" in out and "ряд 4: z0" in out, "подписи развёртки"
+    jn = {"scheme": "collar", "z": 36.5, "L": 7.5, "h_b": 4.5, "t_s": 3.0, "axial": True,
+          "dir": "in", "r_j": 28.56, "D": 69.88, "d": 46.12, "pin_d": 3.0, "pin_n": 6,
+          "pin_l": 8.0, "pin_z": 40.25, "pin_a": [60.0 * k for k in range(6)]}
+    m2 = build(cfg, {"id": "PTK-T.02B", "rows": [1, 2, 3, 4], "join": jn}, 1)
+    assert not m2.pins and len(m2.axial) == 6 and m2.bands[-1].h == 4.5, (m2.pins, m2.bands)
     return True

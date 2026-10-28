@@ -52,6 +52,13 @@ def solid(m, mode="spline"):
         body = body.cut(*tools)
         if hasattr(body, "Solids") and len(body.Solids()) == 1:
             body = body.Solids()[0]
+    if getattr(m, "axial", None):      # CP-79: осевые сквозные отверстия штифтов — одна булева операция
+        tools = [cq.Solid.makeCylinder(h.d / 2, h.h, V(h.r * math.cos(math.radians(h.angle)),
+                                                        h.r * math.sin(math.radians(h.angle)), h.z0), nz)
+                 for h in m.axial]
+        body = body.cut(*tools)
+        if hasattr(body, "Solids") and len(body.Solids()) == 1:
+            body = body.Solids()[0]
     if not body.isValid():
         raise ValueError(f"{m.id}: тело STEP невалидно (режим {mode}); попробуйте --step poly")
     return body
