@@ -84,7 +84,9 @@ def _layout_inst(cfg, rows):
                 at(q["id"], nn, r["zc"] + cfg["ecc"]["t"] / 2)
         elif nn in ("12", "13") and cup.get("z_in"):  # CP-63: .12A | .12B от дна; CP-80: .13 за буртом,
             j = q.get("join") or {}                   # .12 (фланец) за дном-листом
-            dz = (j.get("h_b", 0.0) + (j.get("t_s", 0.0) if nn == "12" else 0.0)) if j.get("hub") else 0.0
+            jh = j.get("hub") or {}                   # Д-94: утопленный фланец .12 — в бурте под листом
+            dz = (j.get("h_b", 0.0) + ((-jh.get("h_f", 0.0) if jh.get("flush") else j.get("t_s", 0.0))
+                                       if nn == "12" else 0.0)) if jh else 0.0
             at(q["id"], nn, round(cup["z_in"] + dz, 3))
     b09, b10 = lay.get("b09"), lay.get("b10")
     if b10 and cov:

@@ -302,7 +302,8 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
             p, q = jn["pick"], jn["pick"]["pins"]
             r_pk = max(r_out, p["geom"]["D"] / 2)
             belt = (q["L"] + (o["cup_t"] if p["scheme"] == "insert" else 0.0)    # CP-63, Д-76
-                    + (q.get("hub") or {}).get("h_f", 0.0))                      # CP-80: + фланец .12
+                    + (0.0 if (q.get("hub") or {}).get("flush")                 # Д-94: фланец в бурте
+                       else (q.get("hub") or {}).get("h_f", 0.0)))                # CP-80: + фланец .12
             wall = (p["geom"]["r_j"] - q["hole12"] - (b10 or {}).get("D", 0.0) / 2
                     if not p.get("dir") else o["pin_wall"])          # CP-79: collar — осевые, гнёзд нет
             if wall < o["pin_wall"] - 1e-9:
