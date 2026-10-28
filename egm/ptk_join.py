@@ -28,7 +28,8 @@ JOIN = {"join": "auto", "join_order": ["collar", "insert"], "pin_d": [3.0, 4.0, 
 # CP-79, Д-93: collar — t_s_min = max(k_fit·d, t_tech); [τ] диска на срез; корпус r_lim/r_free (из ptk_layout);
 # значения k_fit, t_tech, tau_disk — предварительные, обосновать (OQ-27)
 # hub_d — d.09 (ступица, CP-80): нет — штифты ступица–лист не считаются (как CP-79)
-JOIN.update(k_fit=1.0, t_tech=2.0, tau_disk=80.0, r_lim=None, r_free=None, hub_d=None)
+JOIN.update(k_fit=1.0, t_tech=2.0, tau_disk=80.0, r_lim=None, r_free=None, hub_d=None,
+            fl_gap=0.5)   # OQ-28, Д-94: радиальный зазор утопленного фланца .12 в отверстии бурта
 SCHEMES = ("collar", "insert")
 DIRS = ("out", "in")          # направление бурта collar: наружу | внутрь (Д-93)
 
@@ -136,14 +137,19 @@ def _up(x):
     return math.ceil(x * 10 - 1e-9) / 10
 
 
-def collar_check(M, g, d, n, o, ex=None):
+def _flush(v):
+    """Вариант collar с фланцем .12, утопленным в отверстие бурта (OQ-28, Д-94)."""
+    return bool(((v.get("pins") or {}).get("hub") or {}).get("flush"))
+
+
+def collar_check(M, g, d, n, o, ex=None, hb_min=0.0):
     """Осевые сквозные штифты через бурт h_b и дно-лист t_s -> (напряжения, нарушения).
     h_b = max(pin_depth_k·d, F/(n·d·[σсм])); t_s = max(смятие F/(n·d·[σсм]), срез диска
     M/(2π·r²·[τ]), k_fit·d, t_tech) — критерий выводится (Д-93); ex — критерии ступицы (CP-80):
     смятие по штифтам ступицы и срез диска на r_h (заменяет срез на r_j)."""
     F = M * 1e3 / g["r_j"]
     e = o["edge_k"] * d
-    h_b = _up(max(o["pin_depth_k"] * d, F / (n * d * o["sig_wall"])))
+    h_b = _up(max(o["pin_depth_k"] * d, F / (n * d * o["sig_wall"]), hb_min))   # hb_min — h_f утопл. фланца (Д-94)
     c = {"смятие": F / (n * d * o["sig_hub"]),
          "срез диска": M * 1e3 / (2 * math.pi * g["r_j"] ** 2 * o["tau_disk"]),
          "k_fit": o["k_fit"] * d, "t_tech": o["t_tech"]}
@@ -182,10 +188,13 @@ def hub_pins(M, hub_d, g, d, o, cat=None):
         if rf > lim_f + 1e-9:
             note = f"ступица: фланец r {rf:.2f} закрывает штифты бурта (≤ {lim_f:.2f})"
             continue
+        lim_fl = g["r0"] - o.get("fl_gap", 0.5)       # OQ-28, Д-94: фланец в отверстии бурта, под листом
+        flush = rf <= lim_fl + 1e-9                    # TODO(CP-82): сверка по 3D (Д-65)
+        why_fl = "" if flush else f"фланец r {rf:.2f} > отв. бурта − fl_gap {lim_fl:.2f}"
         F = M * 1e3 / rh
         for nh in sorted(o["pin_n"]):
             h_f = _up(max(o["pin_depth_k"] * dh, F / (nh * dh * o["sig_wall"])))
-            s = {"d": dh, "n": nh, "r_h": rh, "r_f": rf, "F": F, "h_f": h_f,
+            s = {"d": dh, "n": nh, "r_h": rh, "r_f": rf, "F": F, "h_f": h_f, "flush": flush, "fl_why": why_fl,
                  "tau": F / (nh * math.pi * dh * dh / 4), "sig_fl": F / (nh * dh * h_f),
                  "tau_edge": F / (nh * 2 * max(e - dh / 2, 1e-6) * h_f), "pitch": 2 * math.pi * rh / nh}
             if (s["tau"] > o["tau_pin"] + 1e-9 or s["sig_fl"] > o["sig_wall"] + 1e-9
@@ -193,6 +202,8 @@ def hub_pins(M, hub_d, g, d, o, cat=None):
                 continue
             ex = {"смятие ступицы": F / (nh * dh * o["sig_hub"]),
                   "срез диска": M * 1e3 / (2 * math.pi * rh ** 2 * o["tau_disk"])}
+            if flush:                                  # Д-94: ступица сквозь лист — кромка у отв. d.09
+                ex["кромка листа"] = F / (nh * 2 * max(e - dh / 2, 1e-6) * 0.6 * o["sig_wall"])
             return s, ex, ""
         note = note or "ступица: штифты не проходят"
     return None, None, note
@@ -228,6 +239,8 @@ def collar_pins(M, dr, r_in, r_out, o, cat=None):
                 if h is None:
                     break                              # от n не зависит — следующий Ø бурта
                 s, crit, bad = collar_check(M, g, d, n, o, ex)
+                if h.get("flush") and h["h_f"] > s["h_b"] + 1e-9:   # Д-94: фланец в бурте — h_b ≥ h_f
+                    s, crit, bad = collar_check(M, g, d, n, o, ex, h["h_f"])
                 hub = hub_fin(h, s["t_s"], cat)
                 if hub is None:
                     note = f"ступица: нет стандартной длины штифта Ø{h['d']:g} ≥ {h['h_f'] + s['t_s']:g}"
@@ -310,7 +323,8 @@ def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None, cat=None):
             if not c:
                 continue
             # Д-93: меньший съём — сечение трубы; при равенстве — наружу
-            v = min(c, key=lambda v: (_area(v["fit"][m]), DIRS.index(v["dir"]) if v.get("dir") else 0))
+            v = min(c, key=lambda v: (_area(v["fit"][m]), not _flush(v),          # Д-94: фланец в бурте
+                                      DIRS.index(v["dir"]) if v.get("dir") else 0))
             pick = {"scheme": v["scheme"], "material": m, "tube": v["fit"][m], "pins": v["pins"],
                     "geom": v["geom"]}
             if v.get("dir"):
@@ -359,7 +373,9 @@ def _sch(p):
     mg = f"; запас корпуса {p['margin']:g} мм" if p.get("margin") is not None else ""
     hb = q.get("hub")                                                # CP-80: ступица–лист
     hs = (f"; ступица {hb['n']}×Ø{hb['d']:g}" + (f"×{hb['l']:g}" if hb.get("l") else "")
-          + f" на r_h {hb['r_h']:g}, фланец Ø{2 * hb['r_f']:g}×{hb['h_f']:g}") if hb else ""
+          + f" на r_h {hb['r_h']:g}, фланец Ø{2 * hb['r_f']:g}×{hb['h_f']:g}"
+          + (" утоплен в бурт (Д-94)" if hb.get("flush")
+             else f" над листом, +h_f к длине ({hb.get('fl_why') or 'Д-94'})")) if hb else ""
     return (f"collar {'наружу' if p['dir'] == 'out' else 'внутрь'}; бурт h_b {q['h_b']:g}, "
             f"дно-лист t_s {q['t_s']:g} ({q['crit']}; t_s_min {q['t_s_min']:g}){hs}{mg}"
             + (f"; отказ: {p['other']}" if p.get("other") else "") + " (Д-93)")
@@ -432,4 +448,12 @@ def self_test():
     assert k40["dir"] == "out" and k40["pins"]["hub"]["n"] == 8 and "ступица" in k40["other"], k40
     rk = join_row("K", {**jk, "pick": kh})
     assert "ступица 10×Ø3" in rk and rk.count("|") == 12, rk
+    # OQ-28, Д-94: фланец в плоскости бурта при r_f ≤ r0 − fl_gap, иначе — над листом (+h_f к длине)
+    assert not h["flush"] and "над листом" in rk, (h, rk)
+    h40 = k40["pins"]["hub"]
+    assert h40["flush"] and k40["pins"]["h_b"] >= h40["h_f"], k40["pins"]
+    k26 = choose(100.0, r_in, r_out, stc, ["40Х"], {"join": "collar", "hub_d": 26.0})["pick"]
+    h26 = k26["pins"]["hub"]
+    assert (k26["dir"], h26["n"], h26["r_h"], h26["r_f"], h26["flush"]) == ("in", 12, 17.5, 22.0, True), h26
+    assert k26["pins"]["t_s"] == 3.0 and "утоплен" in join_row("K", {**jk, "pick": k26}), k26["pins"]
     return True

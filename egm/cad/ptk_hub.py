@@ -78,7 +78,9 @@ def _flange(part, j):
     if rb <= 0:
         raise ValueError(f"{part['id']}: нет .10 — отверстие ступицы не задано (CP-63)")
     m = PartModel(part["id"], h["h_f"], 2 * h["r_f"], _circle(rb))
-    m.bands.append(Band(rb, j["hub_d"] / 2, h["h_f"], j["hub_l"]))
+    fl = bool(h.get("flush"))                  # OQ-28, Д-94: фланец в отверстии бурта, ступица сквозь лист .13
+    hl = round(j["hub_l"] + (j["t_s"] if fl else 0.0), 3)
+    m.bands.append(Band(rb, j["hub_d"] / 2, h["h_f"], hl))
     m.axial = [AxialHole(a, h["r_h"], h["d"], -1.0, h["h_f"] + 2.0) for a in _ang(h["n"])]
     m.axes = [Circle(h["r_h"])]
     m.dims = [Dim(round(2 * h["r_f"], 3), "Dф"), Dim(j["hub_d"], "d.09"), Dim(round(2 * rb, 3), "dотв")]
@@ -87,11 +89,14 @@ def _flange(part, j):
                f"{j['hub_l']:g} под .09; отверстие Ø{2 * rb:g} под .10 сквозное (Д-93)",
                f"штифты {h['n']} × Ø{h['d']:g}{pl} осевые сквозные (фланец + лист) на r {h['r_h']:g}, "
                "через 360/n; посадка H7 (OQ-27)"]
-    m.legend = [("L", round(h["h_f"] + j["hub_l"], 3), "длина .12: фланец h_f + ступица"),
+    if fl:
+        m.notes.append(f"фланец утоплен в отверстие бурта .02B (r_f ≤ r0 − fl_gap), прижат к дну-листу "
+                       f"изнутри; ступица проходит сквозь лист .13 (+t_s {j['t_s']:g}) — Д-94")
+    m.legend = [("L", round(h["h_f"] + hl, 3), "длина .12: фланец h_f + ступица"),
                 ("Dф", round(2 * h["r_f"], 3), "фланец r_h + edge_k·d_h; не закрывает штифты бурта"),
                 ("h_f", h["h_f"], "толщина фланца: max(pin_depth_k·d_h, смятие)"),
                 ("d.09", j["hub_d"], "ступица: посадка .09"),
-                ("ступица", j["hub_l"], "длина ступицы, мм"),
+                ("ступица", hl, "длина ступицы, мм" + (" (+t_s — сквозь лист, Д-94)" if fl else "")),
                 ("dотв", round(2 * rb, 3), "сквозное под .10 — опору конца входного вала"),
                 ("штифты", f"{h['n']}×Ø{h['d']:g}{pl}", "ГОСТ 24296-93, H7, ступица–лист (Д-93)"),
                 ("r_h", h["r_h"], "окружность штифтов: d.09/2 + edge_k·d_h")]
@@ -105,7 +110,8 @@ def build_leaf(cfg, part, row=None):
     h = j.get("hub")
     if not (j.get("axial") and h):
         raise ValueError(f"{part['id']}: дно-лист .13 — только collar с осевыми штифтами и ступицей (CP-80)")
-    rb, t = (j.get("hub_bore") or 0.0) / 2, j["t_s"]
+    fl = bool(h.get("flush"))                  # Д-94: сквозь лист проходит ступица .12 — отверстие d.09
+    rb, t = ((j.get("hub_d") or 0.0) if fl else (j.get("hub_bore") or 0.0)) / 2, j["t_s"]
     if rb <= 0:
         raise ValueError(f"{part['id']}: нет .10 — отверстие дна-листа не задано (CP-80)")
     m = PartModel(part["id"], t, j["D"], _circle(rb))
@@ -116,12 +122,13 @@ def build_leaf(cfg, part, row=None):
     crit = f"; критерий — {j['crit']}" if j.get("crit") else ""
     tmin = f"{j['t_s_min']:g}" if j.get("t_s_min") is not None else "—"
     m.notes = [f"дно-лист Ø{j['D']:g} × {t:g} — точение из прутка 40Х (Д-93); к торцу бурта .02B, "
-               f"со стороны выхода — фланец .12",
+               + ("фланец .12 — в отверстии бурта под листом, ступица d.09 сквозь лист (Д-94)" if fl
+                  else "со стороны выхода — фланец .12"),
                f"отверстия: {j['pin_n']} × Ø{j['pin_d']:g} на r {j['r_j']:g} (бурт), {h['n']} × Ø{h['d']:g} "
                f"на r {h['r_h']:g} (ступица); сквозные H7, через 360/n"]
     m.legend = [("t_s", t, f"толщина листа{crit}; t_s_min {tmin} (Д-93, OQ-27)"),
                 ("D", j["D"], "Ø листа = Ø бурта .02B"),
-                ("dотв", round(2 * rb, 3), "под .10"),
+                ("dотв", round(2 * rb, 3), "под ступицу d.09 (Д-94)" if fl else "под .10"),
                 ("шт. бурта", f"{j['pin_n']}×Ø{j['pin_d']:g} r {j['r_j']:g}", "осевые сквозные (CP-79)"),
                 ("шт. ступицы", f"{h['n']}×Ø{h['d']:g} r {h['r_h']:g}", "осевые сквозные (CP-80)")]
     return m
@@ -161,4 +168,12 @@ def self_test():
     assert techdraw.extent(s) == (69.88, 0.0, 3.0), techdraw.extent(s)
     for m in (f, s):
         assert "Легенда" in svg.render(m), m.id
+    jf = {**jx, "hub_d": 26.0, "hub": {"d": 3.0, "n": 12, "r_h": 17.5, "r_f": 22.0, "h_f": 4.5, "l": 8.0,
+                                      "flush": True}}                                   # OQ-28, Д-94
+    f2 = build({}, {"id": "PTK-T.12A-K", "rows": [1], "join": jf})
+    s2 = build_leaf({}, {"id": "PTK-T.13-K", "rows": [1], "join": jf})
+    assert f2.d_out == 44.0 and [(x.z0, x.h) for x in f2.bands] == [(4.5, 13.5)], f2.bands
+    assert techdraw.extent(f2) == (44.0, 0.0, 18.0), techdraw.extent(f2)
+    assert s2.thick == 3.0 and len(s2.axial) == 20, s2
+    assert "Легенда" in svg.render(f2) and "Легенда" in svg.render(s2)
     return True
