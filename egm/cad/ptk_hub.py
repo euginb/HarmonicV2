@@ -7,10 +7,13 @@
 (l − t + pin_gap, Д-74), на z = Lп/2, углы — оси окон последнего ряда .02 (Д-76).
 Отверстие Ø D.10 сквозное — второй .10 на конце входного вала (как у стакана L1).
 Локальная z = 0 — внутренний торец (в сборке — cup.z_in, ptk_layout.axial).
+CP-80 (Д-93): collar с осевыми штифтами — .12A — фланец Dф × h_f + ступица d.09, к дну-листу .13
+осевыми сквозными штифтами на r_h; дно-лист .13 — build_leaf: диск Ø D бурта × t_s, отверстия
+штифтов бурта (r_j) и ступицы (r_h). Прежние .12A (поясок) и .12B — без изменений.
 """
 import math
 
-from egm.cad.model import Band, Circle, Contour, Dim, PartModel, PinHole
+from egm.cad.model import AxialHole, Band, Circle, Contour, Dim, PartModel, PinHole
 
 N_PTS = 360
 
@@ -24,6 +27,8 @@ def build(cfg, part, row=None):
     j = part.get("join")
     if not j:
         raise ValueError(f"{part['id']}: нет соединения .02–.12 — строится только с --design (CP-63)")
+    if j.get("axial") and j.get("hub"):          # CP-80, Д-93: ступица с фланцем к дну-листу .13
+        return _flange(part, j)
     ins = j["scheme"] == "insert"
     r0, rb, L = (j["r_in"] if ins else j["r_j"]), (j["hub_bore"] or 0.0) / 2, j["L"]
     if rb <= 0:
@@ -63,6 +68,65 @@ def build(cfg, part, row=None):
     return m
 
 
+def _ang(n):
+    return [round(k * 360.0 / n, 4) for k in range(n)]
+
+
+def _flange(part, j):
+    """.12A по Д-93 (CP-80): фланец Dф × h_f, осевые сквозные штифты на r_h; ступица d.09; отв. под .10."""
+    h, rb = j["hub"], (j["hub_bore"] or 0.0) / 2
+    if rb <= 0:
+        raise ValueError(f"{part['id']}: нет .10 — отверстие ступицы не задано (CP-63)")
+    m = PartModel(part["id"], h["h_f"], 2 * h["r_f"], _circle(rb))
+    m.bands.append(Band(rb, j["hub_d"] / 2, h["h_f"], j["hub_l"]))
+    m.axial = [AxialHole(a, h["r_h"], h["d"], -1.0, h["h_f"] + 2.0) for a in _ang(h["n"])]
+    m.axes = [Circle(h["r_h"])]
+    m.dims = [Dim(round(2 * h["r_f"], 3), "Dф"), Dim(j["hub_d"], "d.09"), Dim(round(2 * rb, 3), "dотв")]
+    pl = f"×{h['l']:g}" if h.get("l") else ""
+    m.notes = [f"фланец Ø{2 * h['r_f']:g} × {h['h_f']:g} к дну-листу .13; ступица Ø{j['hub_d']:g} × "
+               f"{j['hub_l']:g} под .09; отверстие Ø{2 * rb:g} под .10 сквозное (Д-93)",
+               f"штифты {h['n']} × Ø{h['d']:g}{pl} осевые сквозные (фланец + лист) на r {h['r_h']:g}, "
+               "через 360/n; посадка H7 (OQ-27)"]
+    m.legend = [("L", round(h["h_f"] + j["hub_l"], 3), "длина .12: фланец h_f + ступица"),
+                ("Dф", round(2 * h["r_f"], 3), "фланец r_h + edge_k·d_h; не закрывает штифты бурта"),
+                ("h_f", h["h_f"], "толщина фланца: max(pin_depth_k·d_h, смятие)"),
+                ("d.09", j["hub_d"], "ступица: посадка .09"),
+                ("ступица", j["hub_l"], "длина ступицы, мм"),
+                ("dотв", round(2 * rb, 3), "сквозное под .10 — опору конца входного вала"),
+                ("штифты", f"{h['n']}×Ø{h['d']:g}{pl}", "ГОСТ 24296-93, H7, ступица–лист (Д-93)"),
+                ("r_h", h["r_h"], "окружность штифтов: d.09/2 + edge_k·d_h")]
+    return m
+
+
+def build_leaf(cfg, part, row=None):
+    """Дно-лист .13 (CP-80, Д-93): диск Ø D бурта × t_s из прутка 40Х; осевые сквозные отверстия —
+    штифты бурта .02B на r_j и штифты ступицы .12 на r_h; отверстие Ø D.10 в центре."""
+    j = part.get("join") or {}
+    h = j.get("hub")
+    if not (j.get("axial") and h):
+        raise ValueError(f"{part['id']}: дно-лист .13 — только collar с осевыми штифтами и ступицей (CP-80)")
+    rb, t = (j.get("hub_bore") or 0.0) / 2, j["t_s"]
+    if rb <= 0:
+        raise ValueError(f"{part['id']}: нет .10 — отверстие дна-листа не задано (CP-80)")
+    m = PartModel(part["id"], t, j["D"], _circle(rb))
+    m.axial = ([AxialHole(a, j["r_j"], j["pin_d"], -1.0, t + 2.0) for a in j["pin_a"]]
+               + [AxialHole(a, h["r_h"], h["d"], -1.0, t + 2.0) for a in _ang(h["n"])])
+    m.axes = [Circle(j["r_j"]), Circle(h["r_h"])]
+    m.dims = [Dim(j["D"], "D"), Dim(round(2 * rb, 3), "dотв")]
+    crit = f"; критерий — {j['crit']}" if j.get("crit") else ""
+    tmin = f"{j['t_s_min']:g}" if j.get("t_s_min") is not None else "—"
+    m.notes = [f"дно-лист Ø{j['D']:g} × {t:g} — точение из прутка 40Х (Д-93); к торцу бурта .02B, "
+               f"со стороны выхода — фланец .12",
+               f"отверстия: {j['pin_n']} × Ø{j['pin_d']:g} на r {j['r_j']:g} (бурт), {h['n']} × Ø{h['d']:g} "
+               f"на r {h['r_h']:g} (ступица); сквозные H7, через 360/n"]
+    m.legend = [("t_s", t, f"толщина листа{crit}; t_s_min {tmin} (Д-93, OQ-27)"),
+                ("D", j["D"], "Ø листа = Ø бурта .02B"),
+                ("dотв", round(2 * rb, 3), "под .10"),
+                ("шт. бурта", f"{j['pin_n']}×Ø{j['pin_d']:g} r {j['r_j']:g}", "осевые сквозные (CP-79)"),
+                ("шт. ступицы", f"{h['n']}×Ø{h['d']:g} r {h['r_h']:g}", "осевые сквозные (CP-80)")]
+    return m
+
+
 def self_test():
     """.12A: поясок + ступица, 10 гнёзд на Lп/2; .12B: вставка + бурт + ступица; эталоны TechDraw; SVG."""
     from egm.cad import svg, techdraw
@@ -83,5 +147,18 @@ def self_test():
     assert b.d_out == 66.12 and [(x.z0, x.h) for x in b.bands] == [(9.0, 2.0), (11.0, 10.5)], b.bands
     assert techdraw.extent(b) == (67.88, 0.0, 21.5), techdraw.extent(b)
     for m in (a, b):
+        assert "Легенда" in svg.render(m), m.id
+    jx = {**j, "L": 7.5, "dir": "in", "axial": True, "h_b": 4.5, "t_s": 3.0, "crit": "k_fit",
+          "t_s_min": 3.0, "r_j": 28.56, "D": 69.88, "d": 46.12, "pin_n": 8,
+          "pin_a": [45.0 * k for k in range(8)],
+          "hub": {"d": 3.0, "n": 10, "r_h": 19.5, "r_f": 24.0, "h_f": 4.5, "l": 8.0}}      # CP-80
+    f = build({}, {"id": "PTK-T.12A-K", "rows": [1], "join": jx})
+    assert f.d_out == 48.0 and f.thick == 4.5 and len(f.axial) == 10 and not f.pins, f
+    assert [(x.z0, x.h) for x in f.bands] == [(4.5, 10.5)], f.bands
+    assert techdraw.extent(f) == (48.0, 0.0, 15.0), techdraw.extent(f)
+    s = build_leaf({}, {"id": "PTK-T.13-K", "rows": [1], "join": jx})
+    assert s.d_out == 69.88 and s.thick == 3.0 and len(s.axial) == 18 and not s.bands, s
+    assert techdraw.extent(s) == (69.88, 0.0, 3.0), techdraw.extent(s)
+    for m in (f, s):
         assert "Легенда" in svg.render(m), m.id
     return True

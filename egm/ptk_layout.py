@@ -64,7 +64,7 @@ def _fit(forms, Dn, Dv, need, st=None):
 # труба или лист (маршрут weld).
 FORMS_BY_02 = {"cup": ("bars",), "collar": ("tubes",), "plain": ("tubes", "sheets")}
 # Буквы исполнений по ключу варианта (Д-73) — если в products.yaml → parts.<NN>.variants нет таблицы.
-V_DEF = {"02": {"cup": "A", "collar": "B", "plain": "C"}, "12": {"spigot": "A", "insert": "B"}}
+V_DEF = {"02": {"cup": "A", "collar": "B", "plain": "C"}, "12": {"flange": "A", "spigot": "A", "insert": "B"}}
 
 
 def variant_letter(prods, nn, key):
@@ -200,6 +200,7 @@ def join_cad(cfg, rec):
             if weld else None}
     if p.get("dir"):                         # CP-79, Д-93: collar — бурт h_b + дно-лист t_s, осевые сквозные
         res.update(dir=p["dir"], axial=True, h_b=q["h_b"], t_s=q["t_s"],
+                   crit=q["crit"], t_s_min=q["t_s_min"], hub=q.get("hub"),   # CP-80: ступица–лист
                    pin_a=[round(j * 360.0 / q["n"], 4) for j in range(q["n"])])
     return res
 
@@ -228,6 +229,8 @@ def cad_parts(cfg, name, rec):
     if jc and l12:                                                   # CP-63: ступица .12A | .12B
         base = f"{cid}.12{l12}"
         out.append({"id": base + sfx, "base": base, "rows": rows, "join": jc})
+    if jc and jc.get("hub") and rec["parts"].get("13"):              # CP-80, Д-93: дно-лист .13
+        out.append({"id": f"{cid}.13{sfx}", "base": f"{cid}.13", "rows": rows, "join": jc})
     return out
 
 
@@ -291,13 +294,15 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
         jopt.setdefault("r_lim", float(cfg["d_bc"]) / 2 - bolt_clear(cfg["id"]) / 2
                         - o["seat_wall"] - o["ax_gap"])
         jopt.setdefault("r_free", max(D10 / 2, (r11 or {}).get("d_out", 0.0) / 2) + o["seat_wall"])
+        jopt.setdefault("hub_d", (b09 or {}).get("d"))               # CP-80: штифты ступица–лист на r_h
         jn = ptk_join.choose(M, r_in, r_out, stock, mats02, jopt, cfg.get("n"))
         if jn["pick"] is None:
             (err if stock else warn).append(f"{code}: соединение .02–.12 — " + ptk_join.why(jn))
         else:
             p, q = jn["pick"], jn["pick"]["pins"]
             r_pk = max(r_out, p["geom"]["D"] / 2)
-            belt = q["L"] + (o["cup_t"] if p["scheme"] == "insert" else 0.0)    # CP-63, Д-76
+            belt = (q["L"] + (o["cup_t"] if p["scheme"] == "insert" else 0.0)    # CP-63, Д-76
+                    + (q.get("hub") or {}).get("h_f", 0.0))                      # CP-80: + фланец .12
             wall = (p["geom"]["r_j"] - q["hole12"] - (b10 or {}).get("D", 0.0) / 2
                     if not p.get("dir") else o["pin_wall"])          # CP-79: collar — осевые, гнёзд нет
             if wall < o["pin_wall"] - 1e-9:

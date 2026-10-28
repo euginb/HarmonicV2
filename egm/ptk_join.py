@@ -27,7 +27,8 @@ JOIN = {"join": "auto", "join_order": ["collar", "insert"], "pin_d": [3.0, 4.0, 
         "pin_gap": 0.5, "weld": []}   # weld — марки, из листа которых допустима .02C (insert, Д-76)
 # CP-79, Д-93: collar — t_s_min = max(k_fit·d, t_tech); [τ] диска на срез; корпус r_lim/r_free (из ptk_layout);
 # значения k_fit, t_tech, tau_disk — предварительные, обосновать (OQ-27)
-JOIN.update(k_fit=1.0, t_tech=2.0, tau_disk=80.0, r_lim=None, r_free=None)
+# hub_d — d.09 (ступица, CP-80): нет — штифты ступица–лист не считаются (как CP-79)
+JOIN.update(k_fit=1.0, t_tech=2.0, tau_disk=80.0, r_lim=None, r_free=None, hub_d=None)
 SCHEMES = ("collar", "insert")
 DIRS = ("out", "in")          # направление бурта collar: наружу | внутрь (Д-93)
 
@@ -135,16 +136,18 @@ def _up(x):
     return math.ceil(x * 10 - 1e-9) / 10
 
 
-def collar_check(M, g, d, n, o):
+def collar_check(M, g, d, n, o, ex=None):
     """Осевые сквозные штифты через бурт h_b и дно-лист t_s -> (напряжения, нарушения).
     h_b = max(pin_depth_k·d, F/(n·d·[σсм])); t_s = max(смятие F/(n·d·[σсм]), срез диска
-    M/(2π·r_j²·[τ]), k_fit·d, t_tech) — критерий выводится (Д-93); ступица — CP-80."""
+    M/(2π·r²·[τ]), k_fit·d, t_tech) — критерий выводится (Д-93); ex — критерии ступицы (CP-80):
+    смятие по штифтам ступицы и срез диска на r_h (заменяет срез на r_j)."""
     F = M * 1e3 / g["r_j"]
     e = o["edge_k"] * d
     h_b = _up(max(o["pin_depth_k"] * d, F / (n * d * o["sig_wall"])))
     c = {"смятие": F / (n * d * o["sig_hub"]),
          "срез диска": M * 1e3 / (2 * math.pi * g["r_j"] ** 2 * o["tau_disk"]),
          "k_fit": o["k_fit"] * d, "t_tech": o["t_tech"]}
+    c.update(ex or {})
     crit = max(c, key=c.get)
     t_s = _up(c[crit])
     s = {"F": F, "tau": F / (n * math.pi * d * d / 4), "sig_wall": F / (n * d * h_b),
@@ -159,33 +162,93 @@ def collar_check(M, g, d, n, o):
     return s, crit, bad
 
 
-def collar_pins(M, dr, r_in, r_out, o, cat=None):
-    """Наименьший Ø, затем наименьшее n; длина штифта ≥ h_b + t_s (сквозной) -> (dict | None, geom)."""
+def _pin_ds(o, cat):
     ds = sorted(o["pin_d"])
-    if cat:
-        ds = [d for d in ds if float(d) in cat]
+    return [d for d in ds if float(d) in cat] if cat else ds
+
+
+def hub_pins(M, hub_d, g, d, o, cat=None):
+    """Штифты ступица–лист (CP-80, Д-93): r_h = d.09/2 + edge_k·d_h, фланец r_f = r_h + edge_k·d_h;
+    отверстия ступицы — внутри отверстия бурта (r_h + d_h/2 ≤ r0), фланец не закрывает штифты бурта
+    (r_f ≤ r_j − d/2 − c_out); h_f = max(pin_depth_k·d_h, смятие) -> (штифты | None, критерии t_s, причина)."""
+    note = ""
+    lim_f = g["r_j"] - d / 2 - o["c_out"]
+    for dh in _pin_ds(o, cat):
+        e = o["edge_k"] * dh
+        rh, rf = hub_d / 2 + e, hub_d / 2 + 2 * e
+        if rh + dh / 2 > g["r0"] + 1e-9:
+            note = f"ступица: штифты до r {rh + dh / 2:.2f} > отв. бурта {g['r0']:.2f}"
+            continue
+        if rf > lim_f + 1e-9:
+            note = f"ступица: фланец r {rf:.2f} закрывает штифты бурта (≤ {lim_f:.2f})"
+            continue
+        F = M * 1e3 / rh
+        for nh in sorted(o["pin_n"]):
+            h_f = _up(max(o["pin_depth_k"] * dh, F / (nh * dh * o["sig_wall"])))
+            s = {"d": dh, "n": nh, "r_h": rh, "r_f": rf, "F": F, "h_f": h_f,
+                 "tau": F / (nh * math.pi * dh * dh / 4), "sig_fl": F / (nh * dh * h_f),
+                 "tau_edge": F / (nh * 2 * max(e - dh / 2, 1e-6) * h_f), "pitch": 2 * math.pi * rh / nh}
+            if (s["tau"] > o["tau_pin"] + 1e-9 or s["sig_fl"] > o["sig_wall"] + 1e-9
+                    or s["tau_edge"] > 0.6 * o["sig_wall"] + 1e-9 or s["pitch"] < dh + o["pin_web"] - 1e-9):
+                continue
+            ex = {"смятие ступицы": F / (nh * dh * o["sig_hub"]),
+                  "срез диска": M * 1e3 / (2 * math.pi * rh ** 2 * o["tau_disk"])}
+            return s, ex, ""
+        note = note or "ступица: штифты не проходят"
+    return None, None, note
+
+
+def hub_fin(h, ts, cat=None):
+    """Длина штифта ступицы ≥ h_f + t_s (сквозной), смятие в листе -> dict | None (нет длины)."""
+    L = h["h_f"] + ts
+    l, des = pin_len(h["d"], L, cat)
+    if cat and l is None:
+        return None
+    out = {k: (round(v, 2) if isinstance(v, float) else v) for k, v in h.items()}
+    out.update(L=round(L, 2), sig_leaf=round(h["F"] / (h["n"] * h["d"] * ts), 1), l=l, des=des,
+               key=f"{cat[float(h['d'])]['key']}x{l:g}" if l else "")
+    return out
+
+
+def collar_pins(M, dr, r_in, r_out, o, cat=None):
+    """Наименьший Ø, затем наименьшее n; длина штифта ≥ h_b + t_s (сквозной); при o["hub_d"] —
+    штифты ступица–лист, t_s — max по обеим окружностям (CP-80) -> (dict | None, geom, причина)."""
+    ds = _pin_ds(o, cat)
     g = collar_geom(dr, r_in, r_out, ds[0] if ds else 3.0, o)
+    note = ""
     for d in ds:
         g = collar_geom(dr, r_in, r_out, d, o)
         for n in sorted(o["pin_n"]):
             s, crit, bad = collar_check(M, g, d, n, o)
             if bad:
                 continue
+            hub = None
+            if o.get("hub_d"):
+                h, ex, note = hub_pins(M, float(o["hub_d"]), g, d, o, cat)
+                if h is None:
+                    break                              # от n не зависит — следующий Ø бурта
+                s, crit, bad = collar_check(M, g, d, n, o, ex)
+                hub = hub_fin(h, s["t_s"], cat)
+                if hub is None:
+                    note = f"ступица: нет стандартной длины штифта Ø{h['d']:g} ≥ {h['h_f'] + s['t_s']:g}"
+                    continue
             l, des = pin_len(d, s["L"], cat)
             if cat and l is None:
                 break
             q = {"d": d, "n": n, **{k: round(v, 1) for k, v in s.items()}}
             q.update(crit=crit, t=round(g["t"], 2), need=round(s["L"], 2), l=l, des=des,
                      key=f"{cat[float(d)]['key']}x{l:g}" if l else "", hole12=q["t_s"])
-            return q, g
-    return None, g
+            if hub:
+                q["hub"] = hub
+            return q, g, ""
+    return None, g, note
 
 
 def _collar(M, r_in, r_out, stock, by, tried, ta, o, cat):
     """Варианты collar по направлениям бурта: штифты, труба по бурту, фильтр корпуса (Д-93)."""
     out = []
     for dr in DIRS:
-        q, g = collar_pins(M, dr, r_in, r_out, o, cat)
+        q, g, note = collar_pins(M, dr, r_in, r_out, o, cat)
         need = [round(g["D"] + 2 * ta, 2), round(g["d"] - 2 * ta, 2)]
         fit = {}
         for m in tried:
@@ -202,13 +265,13 @@ def _collar(M, r_in, r_out, stock, by, tried, ta, o, cat):
             if margin < -1e-9:
                 house = f"корпус: r отв. бурта {g['r0']:.2f} < {o['r_free']:.2f} (.10/.11 + seat_wall)"
         out.append({"scheme": "collar", "dir": dr, "geom": {k: round(v, 2) for k, v in g.items()},
-                    "pins": q, "need": need, "fit": fit, "house": house,
+                    "pins": q, "need": need, "fit": fit, "house": house, "note": note,
                     "margin": round(margin, 2) if margin is not None else None})
     return out
 
 
 def _vtext(v, jn):
-    p = "" if v["pins"] else "штифты не проходят"
+    p = "" if v["pins"] else (v.get("note") or "штифты не проходят")
     t = "" if v["fit"] else (f"нет трубы Ø ≥ {v['need'][0]:g} с отв. ≤ {v['need'][1]:g}"
                              + (f" из {', '.join(map(str, jn['tried']))}" if any(jn["tried"]) else ""))
     r = "; ".join(x for x in (t, p, v.get("house", "")) if x) or "нет марки"
@@ -294,8 +357,11 @@ def _sch(p):
         return p["scheme"]
     q = p["pins"]
     mg = f"; запас корпуса {p['margin']:g} мм" if p.get("margin") is not None else ""
+    hb = q.get("hub")                                                # CP-80: ступица–лист
+    hs = (f"; ступица {hb['n']}×Ø{hb['d']:g}" + (f"×{hb['l']:g}" if hb.get("l") else "")
+          + f" на r_h {hb['r_h']:g}, фланец Ø{2 * hb['r_f']:g}×{hb['h_f']:g}") if hb else ""
     return (f"collar {'наружу' if p['dir'] == 'out' else 'внутрь'}; бурт h_b {q['h_b']:g}, "
-            f"дно-лист t_s {q['t_s']:g} ({q['crit']}; t_s_min {q['t_s_min']:g}){mg}"
+            f"дно-лист t_s {q['t_s']:g} ({q['crit']}; t_s_min {q['t_s_min']:g}){hs}{mg}"
             + (f"; отказ: {p['other']}" if p.get("other") else "") + " (Д-93)")
 
 
@@ -356,4 +422,14 @@ def self_test():
     kn = choose(100.0, r_in, r_out, stc, ["40Х"], {"join": "collar", "r_free": 30.0, "r_lim": 36.9})
     assert kn["pick"] is None and "корпус" in why(kn), why(kn)
     assert "внутрь" in join_row("K", jk) and join_row("K", jk).count("|") == 12, join_row("K", jk)
+    # CP-80, Д-93: штифты ступица–лист на r_h, t_s — max по обеим окружностям
+    kh = choose(100.0, r_in, r_out, stc, ["40Х"], {"join": "collar", "hub_d": 30.0})["pick"]
+    h = kh["pins"]["hub"]
+    assert (kh["dir"], kh["pins"]["n"], h["d"], h["n"], h["r_h"], h["r_f"], h["h_f"]) == \
+        ("in", 8, 3.0, 10, 19.5, 24.0, 4.5), (kh["pins"], h)
+    assert (kh["pins"]["t_s"], kh["pins"]["crit"], h["L"]) == (3.0, "k_fit", 7.5), kh["pins"]
+    k40 = choose(100.0, r_in, r_out, stc, ["40Х"], {"join": "collar", "hub_d": 40.0})["pick"]
+    assert k40["dir"] == "out" and k40["pins"]["hub"]["n"] == 8 and "ступица" in k40["other"], k40
+    rk = join_row("K", {**jk, "pick": kh})
+    assert "ступица 10×Ø3" in rk and rk.count("|") == 12, rk
     return True
