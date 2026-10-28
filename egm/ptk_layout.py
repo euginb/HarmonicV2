@@ -188,7 +188,7 @@ def join_cad(cfg, rec):
     ins = p["scheme"] == "insert"
     n = int(sep.get("n") or cfg.get("n") or 0)
     weld = ins and p.get("tube") is None and p.get("sheet")
-    return {"scheme": p["scheme"], "z": c["z_in"], "L": q["L"],
+    res = {"scheme": p["scheme"], "z": c["z_in"], "L": q["L"],
             "f": round(c["t"] - q["L"], 2) if ins else 0.0,
             "r_in": r_in, "r_out": r_out, "r_j": g["r_j"], "D": g["D"], "d": g["d"],
             "pin_d": q["d"], "pin_n": q["n"], "pin_l": q.get("l"), "hole12": q["hole12"],
@@ -198,6 +198,10 @@ def join_cad(cfg, rec):
             "weld": {"sheet": p["sheet"],
                      "seam": round((win[0]["cage"] + 180.0 / n) % 360, 4) if n else None}
             if weld else None}
+    if p.get("dir"):                         # CP-79, Д-93: collar — бурт h_b + дно-лист t_s, осевые сквозные
+        res.update(dir=p["dir"], axial=True, h_b=q["h_b"], t_s=q["t_s"],
+                   pin_a=[round(j * 360.0 / q["n"], 4) for j in range(q["n"])])
+    return res
 
 
 def cad_parts(cfg, name, rec):
@@ -283,6 +287,10 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
     if "12" in pr:                                                             # Д-72, OQ-12
         jopt = {**(d.get("join") or {}),                    # схему задаёт конструктив (Д-73)
                 **({"join": lay["join"]} if lay.get("join") in ptk_join.SCHEMES else {})}
+        # CP-79, Д-93: ограничения корпуса для направления бурта collar — в результат (jn.lim)
+        jopt.setdefault("r_lim", float(cfg["d_bc"]) / 2 - bolt_clear(cfg["id"]) / 2
+                        - o["seat_wall"] - o["ax_gap"])
+        jopt.setdefault("r_free", max(D10 / 2, (r11 or {}).get("d_out", 0.0) / 2) + o["seat_wall"])
         jn = ptk_join.choose(M, r_in, r_out, stock, mats02, jopt, cfg.get("n"))
         if jn["pick"] is None:
             (err if stock else warn).append(f"{code}: соединение .02–.12 — " + ptk_join.why(jn))
@@ -290,7 +298,8 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
             p, q = jn["pick"], jn["pick"]["pins"]
             r_pk = max(r_out, p["geom"]["D"] / 2)
             belt = q["L"] + (o["cup_t"] if p["scheme"] == "insert" else 0.0)    # CP-63, Д-76
-            wall = p["geom"]["r_j"] - q["hole12"] - (b10 or {}).get("D", 0.0) / 2
+            wall = (p["geom"]["r_j"] - q["hole12"] - (b10 or {}).get("D", 0.0) / 2
+                    if not p.get("dir") else o["pin_wall"])          # CP-79: collar — осевые, гнёзд нет
             if wall < o["pin_wall"] - 1e-9:
                 warn.append(f".12: стенка под гнездом штифта {wall:.2f} < pin_wall {o['pin_wall']:g} мм "
                             "(TECH-01, Д-76)")

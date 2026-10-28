@@ -54,6 +54,15 @@ class PinHole:
 
 
 @dataclass
+class AxialHole:
+    angle: float               # угол центра отверстия, град (CP-79, Д-93)
+    r: float                   # радиус окружности центров, мм
+    d: float
+    z0: float                  # начало по оси, мм (локальная система детали)
+    h: float                   # длина отверстия, мм (сквозное — с выходом за торцы)
+
+
+@dataclass
 class Band:
     r_in: float                # кольцо r_in…r_out вокруг оси (0, 0); r_in = 0 — сплошной цилиндр
     r_out: float
@@ -96,3 +105,4 @@ class PartModel:
     view: str = ""                               # "" — вид по оси; unroll — развёртка втулки (Д-47)
     bands: list = field(default_factory=list)    # ступени вращения Band: дно, ступица, гнёзда (CP-45)
     pins: list = field(default_factory=list)     # радиальные отверстия PinHole: штифты .02–.12 (CP-63)
+    axial: list = field(default_factory=list)    # осевые отверстия AxialHole: штифты collar (CP-79)
