@@ -28,6 +28,8 @@ def build(cfg, part, row=None):
     if not j:
         raise ValueError(f"{part['id']}: нет соединения .02–.12 — строится только с --design (CP-63)")
     if j.get("axial") and j.get("hub"):          # CP-80, Д-93: ступица с фланцем к дну-листу .13
+        if j["hub"].get("mode") == "direct":     # CP-83: без фланца, лист — к торцу ступицы
+            return _direct(part, j)
         return _flange(part, j)
     ins = j["scheme"] == "insert"
     r0, rb, L = (j["r_in"] if ins else j["r_j"]), (j["hub_bore"] or 0.0) / 2, j["L"]
@@ -70,6 +72,32 @@ def build(cfg, part, row=None):
 
 def _ang(n):
     return [round(k * 360.0 / n, 4) for k in range(n)]
+
+
+def _direct(part, j):
+    """.12 без фланца (CP-83): ступица d.09 × hub_l торцом к дну-листу .13; штифты из листа в глухие
+    гнёзда обода на r_h через 360/n; отверстие под .10 сквозное."""
+    h, rb = j["hub"], (j["hub_bore"] or 0.0) / 2
+    if rb <= 0:
+        raise ValueError(f"{part['id']}: нет .10 — отверстие ступицы не задано (CP-63)")
+    nest = h.get("nest") or h["depth"]
+    m = PartModel(part["id"], j["hub_l"], j["hub_d"], _circle(rb))
+    m.axial = [AxialHole(a, h["r_h"], h["d"], -1.0, nest + 1.0) for a in _ang(h["n"])]   # глухие, z 0…nest
+    m.axes = [Circle(h["r_h"])]
+    m.dims = [Dim(j["hub_d"], "d.09"), Dim(round(2 * rb, 3), "dотв")]
+    pl = f"×{h['l']:g}" if h.get("l") else ""
+    m.notes = [f"ступица Ø{j['hub_d']:g} × {j['hub_l']:g} под .09, торцом к дну-листу .13 — без фланца "
+               f"(CP-83); отверстие Ø{2 * rb:g} под .10 сквозное",
+               f"гнёзда {h['n']} × Ø{h['d']:g} глубиной {nest:g} на r {h['r_h']:g} через 360/n — штифты {pl[1:] or ''} "
+               "через лист .13; посадка H7; извлечение из глухого гнезда — OQ-29"]
+    m.legend = [("L", j["hub_l"], "длина .12 = длина ступицы (ax_gap + B.09 + lip + out_ext)"),
+                ("d.09", j["hub_d"], "ступица: посадка .09; выбран с ободом под штифты (CP-83)"),
+                ("обод", round(j["hub_d"] / 2 - rb, 2), "(d.09 − D.10)/2 ≥ 2·edge_k·d_h"),
+                ("dотв", round(2 * rb, 3), "сквозное под .10 — опору конца входного вала"),
+                ("штифты", f"{h['n']}×Ø{h['d']:g}{pl}", "ГОСТ 24296-93, H7, лист–ступица (CP-83)"),
+                ("гнездо", nest, "глубина: l − t_s + pin_gap; + pin_wall ≤ L"),
+                ("r_h", h["r_h"], "окружность штифтов: d.09/2 − edge_k·d_h")]
+    return m
 
 
 def _flange(part, j):
@@ -123,7 +151,8 @@ def build_leaf(cfg, part, row=None):
     tmin = f"{j['t_s_min']:g}" if j.get("t_s_min") is not None else "—"
     m.notes = [f"дно-лист Ø{j['D']:g} × {t:g} — точение из прутка 40Х (Д-93); к торцу бурта .02B, "
                + ("фланец .12 — в отверстии бурта под листом, ступица d.09 сквозь лист (Д-94)" if fl
-                  else "со стороны выхода — фланец .12"),
+                  else "со стороны выхода — ступица .12 торцом, штифты в гнёзда обода (CP-83)"
+                  if h.get("mode") == "direct" else "со стороны выхода — фланец .12"),
                f"отверстия: {j['pin_n']} × Ø{j['pin_d']:g} на r {j['r_j']:g} (бурт), {h['n']} × Ø{h['d']:g} "
                f"на r {h['r_h']:g} (ступица); сквозные H7, через 360/n"]
     m.legend = [("t_s", t, f"толщина листа{crit}; t_s_min {tmin} (Д-93, OQ-27)"),
@@ -176,4 +205,11 @@ def self_test():
     assert techdraw.extent(f2) == (44.0, 0.0, 18.0), techdraw.extent(f2)
     assert s2.thick == 3.0 and len(s2.axial) == 20, s2
     assert "Легенда" in svg.render(f2) and "Легенда" in svg.render(s2)
+    jd = {**jx, "hub_d": 40.0, "hub": {"mode": "direct", "d": 3.0, "n": 12, "r_h": 15.5, "r_f": 20.0,
+                                      "h_f": 0.0, "depth": 4.5, "nest": 5.0, "l": 8.0}}    # CP-83
+    f3 = build({}, {"id": "PTK-T.12A-K", "rows": [1], "join": jd})
+    s3 = build_leaf({}, {"id": "PTK-T.13-K", "rows": [1], "join": jd})
+    assert f3.d_out == 40.0 and f3.thick == 10.5 and len(f3.axial) == 12 and not f3.bands, f3
+    assert techdraw.extent(f3) == (40.0, 0.0, 10.5), techdraw.extent(f3)
+    assert len(s3.axial) == 20 and "Легенда" in svg.render(f3) and "Легенда" in svg.render(s3)
     return True
