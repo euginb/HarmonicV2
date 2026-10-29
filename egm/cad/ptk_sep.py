@@ -57,7 +57,7 @@ def build(cfg, part, row=None):
     jn = part.get("join") or {}
     if jn:                               # CP-63: .02B — бурт (collar), .02C — стенка под .12B (insert)
         W, z, L = s["length"], jn["z"], jn["L"]
-        ins = jn["scheme"] == "insert"
+        ins = jn["scheme"] in ("insert", "ring")   # CP-81: L4 — обечайка .02C без бурта, кольцо .14 внутри
         end = z + L if ins else z
         if end > W + 1e-9:
             m.bands.append(Band(s["r_in"], s["r_out"], W, end - W))
@@ -73,7 +73,8 @@ def build(cfg, part, row=None):
         else:
             m.pins = [PinHole(a, jn["pin_z"], jn["pin_d"], r0 - 1.0, r1 + 1.0) for a in jn["pin_a"]]
         pl = f"×{jn['pin_l']:g}" if jn.get("pin_l") else ""
-        m.notes.append((f"обечайка .02C без бурта: стенка до z {end:g} под дно-вставку .12B" if ins else
+        under = "кольцо-бурт .14 (L4, Д-96)" if jn["scheme"] == "ring" else "дно-вставку .12B"
+        m.notes.append((f"обечайка .02C без бурта: стенка до z {end:g} под {under}" if ins else
                         f"бурт .02B Ø{2 * r0:g}/Ø{2 * r1:g} на z {z:g}…{z + L:g}: поясок .12A — в отверстии")
                        + f"; штифты {jn['pin_n']}×Ø{jn['pin_d']:g}{pl} радиально на z {jn['pin_z']:g}, "
                        "по осям окон последнего ряда (Д-76) — в STEP; на развёртке не показаны")

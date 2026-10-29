@@ -15,7 +15,8 @@ import time
 from pathlib import Path
 
 from egm import products, ptk_profile
-from egm.cad import ptk_cover, ptk_ecc, ptk_hub, ptk_ring, ptk_sep, ptk_spacer, step, techdraw
+from egm.cad import (ptk_collar, ptk_cover, ptk_ecc, ptk_hub, ptk_ring, ptk_sep, ptk_spacer, step,
+                     techdraw)
 
 LAYERS = {"01": ("01_RING", "венец"), "02": ("02_CAGE", "сепаратор"),
           "03": ("03_ECC", "эксцентрик"), "04": ("04_BODIES", "тела качения"),
@@ -24,11 +25,13 @@ LAYERS = {"01": ("01_RING", "венец"), "02": ("02_CAGE", "сепаратор
           "10": ("10_BEARING_IN", "подшипники входного вала"),
           "11": ("11_DIST", "дистанционные кольца эксцентриков"), "12": ("12_HUB", "ступица выхода"),
           "13": ("13_LEAF", "дно-лист"),
+          "14": ("14_COLLAR", "кольцо-бурт"),
           "ref": ("REF", "примитивы: вал")}
 COLORS = {"01": (0.55, 0.57, 0.60), "02": (0.80, 0.60, 0.20), "03": (0.30, 0.50, 0.80),
           "04": (0.85, 0.20, 0.20), "05": (0.45, 0.47, 0.52), "08": (0.20, 0.65, 0.30),
           "07": (0.62, 0.64, 0.68), "09": (0.20, 0.55, 0.25), "10": (0.25, 0.60, 0.35),
           "11": (0.35, 0.55, 0.85), "12": (0.75, 0.50, 0.20), "13": (0.60, 0.45, 0.30),
+          "14": (0.70, 0.55, 0.25),
           "ref": (0.70, 0.70, 0.70)}
 VIEWS = [{"name": "ISO", "dir": [1, -1, 1], "layers": "все"},
          {"name": "по оси", "dir": [0, 0, 1], "layers": "все"},
@@ -37,7 +40,7 @@ VIEWS = [{"name": "ISO", "dir": [1, -1, 1], "layers": "все"},
 SCHEMA = "AP242DIS"
 ALIAS = {"01": "RING", "02": "CAGE", "03": "ECC", "04": "BODY", "05": "SPACER",
          "07": "COVER", "08": "BEARING", "09": "BRG_OUT", "10": "BRG_IN", "11": "DIST",
-         "12": "HUB", "13": "LEAF", "ref": "SHAFT"}   # Д-52: имена узлов STEP — только латиница
+         "12": "HUB", "13": "LEAF", "14": "COLLAR", "ref": "SHAFT"}   # Д-52: имена узлов STEP — только латиница
 _ENT = re.compile(r"#(\d+)\s*=\s*([A-Z0-9_]+)\s*\((.*?)\)\s*;", re.S)
 _TOK = re.compile(r"'EGM(\d+)'")
 
@@ -82,6 +85,8 @@ def _layout_inst(cfg, rows):
         elif nn == "11":
             for r in rows[:-1]:
                 at(q["id"], nn, r["zc"] + cfg["ecc"]["t"] / 2)
+        elif nn == "14" and cup.get("z_in"):          # CP-81: кольцо-бурт .14 — в торце обечайки от z стыка
+            at(q["id"], nn, round(cup["z_in"], 3))
         elif nn in ("12", "13") and cup.get("z_in"):  # CP-63: .12A | .12B от дна; CP-80: .13 за буртом,
             j = q.get("join") or {}                   # .12 (фланец) за дном-листом
             jh = j.get("hub") or {}                   # Д-94: утопленный фланец .12 — в бурте под листом
@@ -340,7 +345,7 @@ def manifest(cfg, prods, p):
 
 _GEN = {"01": ptk_ring.build, "02": ptk_sep.build, "03": ptk_ecc.build,
         "05": ptk_spacer.build, "07": ptk_cover.build, "11": ptk_cover.build,
-        "12": ptk_hub.build, "13": ptk_hub.build_leaf}
+        "12": ptk_hub.build, "13": ptk_hub.build_leaf, "14": ptk_collar.build}
 
 
 def part_model(cfg, pid, nn):

@@ -31,7 +31,7 @@ JOIN = {"join": "auto", "join_order": ["collar", "insert"], "pin_d": [3.0, 4.0, 
 JOIN.update(k_fit=1.0, t_tech=2.0, tau_disk=80.0, r_lim=None, r_free=None, hub_d=None,
             fl_gap=0.5)   # OQ-28, Д-94: радиальный зазор утопленного фланца .12 в отверстии бурта
 JOIN.update(hub_bore=None, hub_l=None, pin_wall=1.0)   # CP-83: обод ступицы D.10…d.09, длина, стенка за гнездом
-SCHEMES = ("collar", "insert")
+SCHEMES = ("collar", "insert", "ring")   # ring — L4: обечайка .02C + кольцо-бурт .14 (CP-81, Д-96); в join_order не входит
 DIRS = ("out", "in")          # направление бурта collar: наружу | внутрь (Д-93)
 
 
@@ -222,6 +222,102 @@ def _direct_pins(M, hub_d, g, d, dh, o):
     return None, why or "штифты в обод ступицы не проходят"
 
 
+def _ang_gap(nr, na):
+    """Наименьший угол, °, между радиальными (cage + i·360/nr) и осевыми (cage + (j + ½)·360/na) штифтами."""
+    best = 360.0
+    for i in range(nr):
+        for j in range(na):
+            x = ((j + 0.5) / na - i / nr) % 1.0
+            best = min(best, 360.0 * min(x, 1.0 - x))
+    return best
+
+
+def _ring_blank(stock, by, mats, r0, r1, ta):
+    """Заготовка кольца .14 (CP-81): труба (tube_ok с допусками ГОСТ), иначе пруток -> dict | None."""
+    Dn, Dv = 2 * r1 + 2 * ta, 2 * r0 - 2 * ta
+    for m in mats:
+        f = by.get(m) or {}
+        ts = [t for t in f.get("tubes", []) if tube_ok(t, Dn, Dv, stock)]
+        if ts:
+            return {"material": m, "tube": min(ts, key=_area), "need": [round(Dn, 2), round(Dv, 2)]}
+        bs = sorted(b for b in f.get("bars", []) if b >= Dn - 1e-9)
+        if bs:
+            return {"material": m, "bar": bs[0], "need": [round(Dn, 2), round(Dv, 2)]}
+    return None
+
+
+def _ring(M, r_in, r_out, stock, by, tried, ta, o, cat, n_win):
+    """L4 (CP-81, Д-93 п. 5, Д-96): обечайка .02C без бурта + кольцо-бурт .14 в её торце.
+    Радиальные штифты обечайка → кольцо — как insert (по делению окон, ось C), гнездо hole12 в кольце;
+    осевые лист .13 → кольцо на r_ja = r_in − e_a, углы между радиальными (cage + (j + ½)·360/n_a);
+    кольцо r0…r_in: w = max(hole12 + pin_wall, 2·e_a), L_r = max(2·edge_k·d_r, h_b);
+    ступица → лист — hub_pins (прямое → Д-94 → CP-80) -> [вариант]."""
+    g = geometry("insert", r_in, r_out, o)
+    need = [round(g["D"] + 2 * ta, 2), round(g["d"] - 2 * ta, 2)]
+    fit = {}
+    for m in tried:
+        ts = [t for t in (by.get(m) or {}).get("tubes", []) if tube_ok(t, *need, stock)]
+        if ts:
+            fit[m] = min(ts, key=_area)
+    v = {"scheme": "ring", "geom": {k: round(x, 2) for k, x in g.items()}, "pins": None, "need": need,
+         "fit": fit, "house": "", "rej": "", "note": "", "margin": None}
+    rad = pins(M, g, o, n_win, cat)
+    if rad is None:
+        v["note"] = "кольцо: радиальные штифты обечайка–кольцо не проходят"
+        return [v]
+    nr, dr, note = rad["n"], rad["d"], ""
+    for d in _pin_ds(o, cat):
+        e = o["edge_k"] * d
+        w = max(rad["hole12"] + o["pin_wall"], 2 * e)
+        r0, rj = r_in - w, r_in - e
+        gr = {"r_j": rj, "r0": r0}
+        h, ex = None, None
+        if o.get("hub_d"):
+            h, ex, hn = hub_pins(M, o["hub_d"], gr, d, o, cat)
+            if h is None:
+                note = hn
+                continue
+        for n in sorted(o["pin_n"]):
+            s, crit, bad = collar_check(M, gr, d, n, o, ex, h["h_f"] if h and h.get("flush") else 0.0)
+            if bad:
+                continue
+            gap = _ang_gap(nr, n)
+            near = rj + d / 2 > r_in - rad["hole12"] - o["pin_wall"] - 1e-9   # в зоне радиальных гнёзд
+            if near and math.radians(gap) * rj < (d + dr) / 2 + o["pin_web"] - 1e-9:
+                note = f"кольцо: осевые {n}×Ø{d:g} и радиальные {nr}×Ø{dr:g} пересекаются ({gap:.1f}°)"
+                continue
+            l, des = pin_len(d, s["h_b"] + s["t_s"], cat)
+            if cat and l is None:
+                note = f"кольцо: нет стандартной длины осевого штифта Ø{d:g} ≥ {s['h_b'] + s['t_s']:g}"
+                continue
+            hub = hub_fin(h, s["t_s"], cat) if h else None
+            if h and hub is None:
+                note = f"ступица: нет стандартной длины штифта Ø{h['d']:g}"
+                continue
+            L_r = _up(max(2 * o["edge_k"] * dr, s["h_b"]))
+            q = {**rad, "L_r": L_r, "h_b": s["h_b"], "t_s": s["t_s"], "crit": crit, "t_s_min": s["t_s_min"],
+                 "L": round(L_r + s["t_s"], 2),
+                 "ax": {"d": d, "n": n, "r_j": round(rj, 2), "l": l, "des": des,
+                        "key": f"{cat[float(d)]['key']}x{l:g}" if l else "", "tau": round(s["tau"], 1),
+                        "sig_ring": round(s["sig_wall"], 1), "sig_leaf": round(s["sig_hub"], 1),
+                        "tau_edge": round(s["tau_edge"], 1), "gap": round(gap, 2)}}
+            if hub:
+                q["hub"] = hub
+            rb = _ring_blank(stock, by, o.get("ring_mats") or tried, r0, r_in, ta)
+            v.update(pins=q, ring={"r0": round(r0, 2), "r1": round(r_in, 2), "L": L_r, "w": round(w, 2)},
+                     ring_blank=rb)
+            if rb is None:
+                v["rej"] = (f"кольцо .14: нет трубы/прутка Ø ≥ {2 * r_in + 2 * ta:.2f} с отв. ≤ "
+                            f"{2 * r0 - 2 * ta:.2f} из {', '.join(map(str, o.get('ring_mats') or tried))}")
+            if o.get("r_free") is not None:
+                v["margin"] = round(r0 - o["r_free"], 2)
+                if v["margin"] < -1e-9:
+                    v["house"] = f"корпус: r отв. кольца {r0:.2f} < {o['r_free']:.2f} (.10/.11 + seat_wall)"
+            return [v]
+    v["note"] = note or "кольцо: осевые штифты лист–кольцо не проходят"
+    return [v]
+
+
 def hub_pins(M, hub_d, g, d, o, cat=None):
     """Штифты ступица–лист (CP-80, Д-93): r_h = d.09/2 + edge_k·d_h, фланец r_f = r_h + edge_k·d_h;
     отверстия ступицы — внутри отверстия бурта (r_h + d_h/2 ≤ r0), фланец не закрывает штифты бурта
@@ -347,7 +443,7 @@ def _vtext(v, jn):
     p = "" if v["pins"] else (v.get("note") or "штифты не проходят")
     t = "" if v["fit"] else (f"нет трубы Ø ≥ {v['need'][0]:g} с отв. ≤ {v['need'][1]:g}"
                              + (f" из {', '.join(map(str, jn['tried']))}" if any(jn["tried"]) else ""))
-    r = "; ".join(x for x in (t, p, v.get("house", "")) if x) or "нет марки"
+    r = "; ".join(x for x in (t, p, v.get("house", ""), v.get("rej", "")) if x) or "нет марки"
     return r + (f" [{'наружу' if v['dir'] == 'out' else 'внутрь'}]" if v.get("dir") else "")
 
 
@@ -363,6 +459,9 @@ def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None, cat=None):
     ta = float((stock or {}).get("tube_allow", 0.5))
     var = []
     for s in order:
+        if s == "ring":                                          # CP-81, Д-96: L4
+            var += _ring(M, r_in, r_out, stock, by, tried, ta, o, cat, n_win)
+            continue
         if s == "collar":                                        # CP-79, Д-93
             var += _collar(M, r_in, r_out, stock, by, tried, ta, o, cat)
             continue
@@ -379,7 +478,8 @@ def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None, cat=None):
     pick = None
     for m in tried:
         for s in order:
-            c = [v for v in var if v["scheme"] == s and v["pins"] and m in v["fit"] and not v.get("house")]
+            c = [v for v in var if v["scheme"] == s and v["pins"] and m in v["fit"] and not v.get("house")
+                 and not v.get("rej")]                            # CP-81: нет заготовки кольца .14
             if not c:
                 continue
             # Д-93: меньший съём — сечение трубы; при равенстве — наружу
@@ -387,6 +487,8 @@ def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None, cat=None):
                                       DIRS.index(v["dir"]) if v.get("dir") else 0))
             pick = {"scheme": v["scheme"], "material": m, "tube": v["fit"][m], "pins": v["pins"],
                     "geom": v["geom"]}
+            if v.get("ring"):                                    # CP-81: кольцо-бурт .14 и его заготовка
+                pick.update(ring=v["ring"], ring_blank=v.get("ring_blank"))
             if v.get("dir"):
                 oth = [_vtext(x, jn) for x in var if x.get("dir") and x is not v]
                 pick.update(dir=v["dir"], margin=v["margin"],
@@ -425,20 +527,44 @@ JOIN_HEAD = ("| Проработка | Схема | Заготовка .02 | Ш�
 JOIN_RULE = "|---" * 11 + "|"
 
 
+def _hub_txt(hb):
+    """Ступица–лист в ячейке «Схема» (CP-80, Д-94, CP-83) — общая для collar и ring."""
+    if not hb:
+        return ""
+    return (f"; ступица {hb['n']}×Ø{hb['d']:g}" + (f"×{hb['l']:g}" if hb.get("l") else "")
+            + (f" на r_h {hb['r_h']:g}, прямо в обод ступицы без фланца, гнёзда {hb.get('nest') or hb['depth']:g} (CP-83)"
+               if hb.get("mode") == "direct" else
+               f" на r_h {hb['r_h']:g}, фланец Ø{2 * hb['r_f']:g}×{hb['h_f']:g}"
+               + (" утоплен в бурт (Д-94)" if hb.get("flush")
+                  else f" над листом, +h_f к длине ({hb.get('fl_why') or 'Д-94'})")
+               + (f"; {hb['dir_why']}" if hb.get("dir_why") else "")))
+
+
+def _sch_ring(p):
+    """Ячейка «Схема» L4 (CP-81, Д-96): кольцо .14, радиальные и осевые штифты, t_s с критерием."""
+    q, rg, b = p["pins"], p["ring"], p.get("ring_blank") or {}
+    a = q["ax"]
+    bl = (f"труба {b['tube']['D']:g}×{b['tube']['s']:g}" if b.get("tube") else
+          f"пруток Ø{b['bar']:g}" if b.get("bar") else "нет заготовки")
+    mg = f"; запас корпуса {p['margin']:g} мм" if p.get("margin") is not None else ""
+    return (f"ring (L4): кольцо .14 Ø{2 * rg['r1']:g}/Ø{2 * rg['r0']:g}×{rg['L']:g} "
+            f"({(b.get('material') or '') + ' ' if b.get('material') else ''}{bl}); "
+            f"радиальные обечайка–кольцо по делению окон, гнездо {q['hole12']:g} сквозь кольцо; "
+            f"осевые лист–кольцо {a['n']}×Ø{a['d']:g}" + (f"×{a['l']:g}" if a.get("l") else "")
+            + f" на r {a['r_j']:g} между радиальными ({a['gap']:g}°), τ {a['tau']:g}, σсм кольца "
+            f"{a['sig_ring']:g}, листа {a['sig_leaf']:g}; дно-лист t_s {q['t_s']:g} ({q['crit']}; "
+            f"t_s_min {q['t_s_min']:g}){_hub_txt(q.get('hub'))}{mg} (Д-96)")
+
+
 def _sch(p):
     """Ячейка «Схема» SPEC-11: collar — направление, h_b, t_s с критерием, запас корпуса, отказ другого."""
+    if p["scheme"] == "ring":                                        # CP-81
+        return _sch_ring(p)
     if not p.get("dir"):
         return p["scheme"]
     q = p["pins"]
     mg = f"; запас корпуса {p['margin']:g} мм" if p.get("margin") is not None else ""
-    hb = q.get("hub")                                                # CP-80: ступица–лист
-    hs = (f"; ступица {hb['n']}×Ø{hb['d']:g}" + (f"×{hb['l']:g}" if hb.get("l") else "")
-          + (f" на r_h {hb['r_h']:g}, прямо в обод ступицы без фланца, гнёзда {hb.get('nest') or hb['depth']:g} (CP-83)"
-             if hb.get("mode") == "direct" else
-             f" на r_h {hb['r_h']:g}, фланец Ø{2 * hb['r_f']:g}×{hb['h_f']:g}"
-             + (" утоплен в бурт (Д-94)" if hb.get("flush")
-                else f" над листом, +h_f к длине ({hb.get('fl_why') or 'Д-94'})")
-             + (f"; {hb['dir_why']}" if hb.get("dir_why") else "")) if hb else "")
+    hs = _hub_txt(q.get("hub"))                                      # CP-80: ступица–лист
     hs += f"; {p['brg']}" if p.get("brg") else ""                   # CP-83: замена .09 ради прямого крепления
     return (f"collar {'наружу' if p['dir'] == 'out' else 'внутрь'}; бурт h_b {q['h_b']:g}, "
             f"дно-лист t_s {q['t_s']:g} ({q['crit']}; t_s_min {q['t_s_min']:g}){hs}{mg}"
@@ -532,4 +658,15 @@ def self_test():
                                                    "hub_l": 10.5})          # обод 5 < 9 — фланец (Д-94)
     hw = jw["pick"]["pins"]["hub"]
     assert mode(jw) == "flush" and "обод ступицы" in hw["dir_why"], hw
+    # CP-81, Д-96: L4 ring — радиальные по окнам (n | 50), осевые между ними (8 — пересечение 4.5°, берётся 10)
+    sr = {**st, "materials": {"40Х": {"tubes": [{"D": 73.0, "s": 5.0}, {"D": 73.0, "s": 18.0}]}}}
+    jr = choose(100.0, r_in, r_out, sr, ["40Х"], {"join": "ring"}, 50)
+    pr_, qa = jr["pick"], jr["pick"]["pins"]["ax"]
+    assert (pr_["scheme"], pr_["tube"]["s"], pr_["pins"]["n"], pr_["pins"]["hole12"]) == ("ring", 5.0, 10, 5.0), pr_
+    assert (qa["d"], qa["n"], qa["r_j"], qa["gap"]) == (3.0, 10, 28.56, 18.0), qa
+    assert (pr_["ring"]["r0"], pr_["ring"]["L"], pr_["pins"]["L"], pr_["pins"]["t_s"]) == (24.06, 9.0, 12.0, 3.0), pr_
+    assert pr_["ring_blank"]["tube"]["s"] == 18.0, pr_["ring_blank"]
+    assert "ring (L4)" in join_row("K", jr) and join_row("K", jr).count("|") == 12, join_row("K", jr)
+    jr0 = choose(100.0, r_in, r_out, st1, ["40Х"], {"join": "ring"}, 50)
+    assert jr0["pick"] is None and "кольцо .14" in jr0["variants"][0]["rej"], jr0["variants"]
     return True
