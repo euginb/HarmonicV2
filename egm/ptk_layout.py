@@ -38,15 +38,23 @@ def pick_brg(bears, d_min):
     return None
 
 
-def hub_brg(bears, M, D10, o, D_max):
-    """.09 на полой ступице: d ≥ D.10 + 2·hub_wall, D ≤ D_max, τ ≤ [τ] -> (подшипник, τ) | (None, None)."""
+def hub_brgs(bears, M, D10, o, D_max):
+    """Все .09 на полой ступице по возрастанию D: d ≥ D.10 + 2·hub_wall, D ≤ D_max, τ ≤ [τ]
+    -> [(подшипник, τ)]; выбор среди них — по креплению дна-листа .13 (CP-83, _one)."""
+    out = []
     for _, d, k in _brgs(bears):
         if d < D10 + 2 * o["hub_wall"] - 1e-9 or bears[k]["D"] > D_max + 1e-9:
             continue
         tau = 16 * M * 1e3 / (math.pi * d ** 3 * (1 - (D10 / d) ** 4))
         if tau <= o["tau_allow"] + 1e-9:
-            return {"id": k, **bears[k]}, tau
-    return None, None
+            out.append(({"id": k, **bears[k]}, tau))
+    return out
+
+
+def hub_brg(bears, M, D10, o, D_max):
+    """.09 на полой ступице: наименьший из hub_brgs -> (подшипник, τ) | (None, None)."""
+    c = hub_brgs(bears, M, D10, o, D_max)
+    return c[0] if c else (None, None)
 
 
 def _fit(forms, Dn, Dv, need, st=None):
@@ -269,7 +277,8 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
         err.append(f".10: нет подшипника с d ≥ {shaft_d:g} мм в vendor_prices.yaml → bearings")
     D10 = b10["D"] if b10 else shaft_d
     D_max = float(cfg["d_bc"]) - bolt_clear(cfg["id"]) - 2 * o["seat_wall"]
-    b09, tau = hub_brg(bears, M, D10, o, D_max)
+    c09 = hub_brgs(bears, M, D10, o, D_max)      # CP-83: кандидаты .09 по D; выбор — ниже, по креплению .13
+    b09, tau = c09[0] if c09 else (None, None)
     if b09 is None:
         err.append(f".09: нет подшипника с d ≥ {D10 + 2 * o['hub_wall']:g}, D ≤ {D_max:.1f} мм "
                    f"(гнездо в .07B внутри крепежа Ø{float(cfg['d_bc']):g}) и τ ступицы ≤ "
@@ -294,8 +303,24 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
         jopt.setdefault("r_lim", float(cfg["d_bc"]) / 2 - bolt_clear(cfg["id"]) / 2
                         - o["seat_wall"] - o["ax_gap"])
         jopt.setdefault("r_free", max(D10 / 2, (r11 or {}).get("d_out", 0.0) / 2) + o["seat_wall"])
-        jopt.setdefault("hub_d", (b09 or {}).get("d"))               # CP-80: штифты ступица–лист на r_h
-        jn = ptk_join.choose(M, r_in, r_out, stock, mats02, jopt, cfg.get("n"))
+        # CP-83: .09 — первый по D, при котором дно-лист .13 крепится к ступице напрямую (обод под штифты);
+        # нет такого — наименьший .09 и фланец (Д-94 → CP-80)
+        b0 = b09
+        for b, t in (c09 or [(b09, tau)]):
+            o2 = dict(jopt)
+            o2.setdefault("hub_d", (b or {}).get("d"))              # CP-80: штифты ступица–лист на r_h
+            o2.setdefault("hub_bore", D10)
+            o2.setdefault("hub_l", o["ax_gap"] + (b or {}).get("B", 0.0) + o["lip"] + o["out_ext"])
+            o2.setdefault("pin_wall", o["pin_wall"])
+            j1 = ptk_join.choose(M, r_in, r_out, stock, mats02, o2, cfg.get("n"))
+            if jn is None:
+                jn = j1
+            if ptk_join.mode(j1) == "direct":
+                jn, b09, tau = j1, b, t
+                if b0 is not None and b is not b0:
+                    jn["pick"]["brg"] = (f".09 {b['id']} вместо {b0['id']} — обод ступицы под штифты "
+                                         f"дна-листа .13 (CP-83)")
+                break
         if jn["pick"] is None:
             (err if stock else warn).append(f"{code}: соединение .02–.12 — " + ptk_join.why(jn))
         else:

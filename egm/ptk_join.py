@@ -30,6 +30,7 @@ JOIN = {"join": "auto", "join_order": ["collar", "insert"], "pin_d": [3.0, 4.0, 
 # hub_d — d.09 (ступица, CP-80): нет — штифты ступица–лист не считаются (как CP-79)
 JOIN.update(k_fit=1.0, t_tech=2.0, tau_disk=80.0, r_lim=None, r_free=None, hub_d=None,
             fl_gap=0.5)   # OQ-28, Д-94: радиальный зазор утопленного фланца .12 в отверстии бурта
+JOIN.update(hub_bore=None, hub_l=None, pin_wall=1.0)   # CP-83: обод ступицы D.10…d.09, длина, стенка за гнездом
 SCHEMES = ("collar", "insert")
 DIRS = ("out", "in")          # направление бурта collar: наружу | внутрь (Д-93)
 
@@ -142,6 +143,19 @@ def _flush(v):
     return bool(((v.get("pins") or {}).get("hub") or {}).get("flush"))
 
 
+HUB_RANK = {"direct": 0, "flush": 1}       # CP-83: прямое → утопленный фланец (Д-94) → над листом (CP-80)
+
+
+def _hub_rank(v):
+    return HUB_RANK.get(((v.get("pins") or {}).get("hub") or {}).get("mode", ""), 2)
+
+
+def mode(jn):
+    """Крепление дна-листа .13 к ступице выбранного варианта: direct | flush | over | ''."""
+    h = ((((jn or {}).get("pick") or {}).get("pins") or {}).get("hub")) or {}
+    return h.get("mode", "")
+
+
 def collar_check(M, g, d, n, o, ex=None, hb_min=0.0):
     """Осевые сквозные штифты через бурт h_b и дно-лист t_s -> (напряжения, нарушения).
     h_b = max(pin_depth_k·d, F/(n·d·[σсм])); t_s = max(смятие F/(n·d·[σсм]), срез диска
@@ -173,12 +187,54 @@ def _pin_ds(o, cat):
     return [d for d in ds if float(d) in cat] if cat else ds
 
 
+def _direct_pins(M, hub_d, g, d, dh, o):
+    """CP-83: дно-лист .13 к ступице .12 напрямую, без фланца — штифты через лист в глухие гнёзда обода.
+    Обод D.10/2…d.09/2, e = edge_k·d_h: r_h = d.09/2 − e, r_h − D.10/2 ≥ e; концы штифтов со стороны
+    обечайки — в отверстии бурта (r_h + d_h/2 ≤ r0); ступица не закрывает штифты бурта
+    (d.09/2 ≤ r_j − d/2 − c_out); гнездо h_p = max(pin_depth_k·d_h, смятие), h_p + pin_gap + pin_wall ≤ hub_l
+    -> ((штифты, критерии t_s, ""), "") | (None, причина)."""
+    e = o["edge_k"] * dh
+    rb, ro = o["hub_bore"] / 2, hub_d / 2
+    rh = ro - e
+    if rh - rb < e - 1e-9:
+        return None, f"обод ступицы {ro - rb:.2f} < 2·edge_k·d_h {2 * e:g} (d.09 {hub_d:g}, D.10 {2 * rb:g})"
+    if rh + dh / 2 > g["r0"] + 1e-9:
+        return None, f"штифты ступицы до r {rh + dh / 2:.2f} > отв. бурта {g['r0']:.2f}"
+    lim = g["r_j"] - d / 2 - o["c_out"]
+    if ro > lim + 1e-9:
+        return None, f"ступица r {ro:.2f} закрывает штифты бурта (≤ {lim:.2f})"
+    F, why = M * 1e3 / rh, ""
+    for nh in sorted(o["pin_n"]):
+        hp = _up(max(o["pin_depth_k"] * dh, F / (nh * dh * o["sig_hub"])))
+        if o.get("hub_l") and hp + o["pin_gap"] + o.get("pin_wall", 1.0) > o["hub_l"] + 1e-9:
+            why = f"гнездо {hp:g} + pin_gap + стенка > длины ступицы {o['hub_l']:g}"
+            continue
+        s = {"mode": "direct", "flush": False, "fl_why": "", "dir_why": "", "d": dh, "n": nh,
+             "r_h": rh, "r_f": ro, "F": F, "h_f": 0.0, "depth": hp,
+             "tau": F / (nh * math.pi * dh * dh / 4), "sig_fl": F / (nh * dh * hp),
+             "tau_edge": F / (nh * 2 * max(e - dh / 2, 1e-6) * hp), "pitch": 2 * math.pi * rh / nh}
+        if (s["tau"] > o["tau_pin"] + 1e-9 or s["tau_edge"] > 0.6 * o["sig_wall"] + 1e-9
+                or s["pitch"] < dh + o["pin_web"] - 1e-9):
+            continue
+        ex = {"смятие ступицы": F / (nh * dh * o["sig_hub"]),
+              "срез диска": M * 1e3 / (2 * math.pi * rh ** 2 * o["tau_disk"])}
+        return (s, ex, ""), ""
+    return None, why or "штифты в обод ступицы не проходят"
+
+
 def hub_pins(M, hub_d, g, d, o, cat=None):
     """Штифты ступица–лист (CP-80, Д-93): r_h = d.09/2 + edge_k·d_h, фланец r_f = r_h + edge_k·d_h;
     отверстия ступицы — внутри отверстия бурта (r_h + d_h/2 ≤ r0), фланец не закрывает штифты бурта
     (r_f ≤ r_j − d/2 − c_out); h_f = max(pin_depth_k·d_h, смятие) -> (штифты | None, критерии t_s, причина)."""
     note = ""
     lim_f = g["r_j"] - d / 2 - o["c_out"]
+    note_d = ""                                        # CP-83: сначала прямое крепление в обод ступицы
+    if o.get("hub_bore"):
+        for dh in _pin_ds(o, cat):
+            r, why = _direct_pins(M, hub_d, g, d, dh, o)
+            if r:
+                return r
+            note_d = note_d or f"прямое: {why}"
     for dh in _pin_ds(o, cat):
         e = o["edge_k"] * dh
         rh, rf = hub_d / 2 + e, hub_d / 2 + 2 * e
@@ -195,6 +251,7 @@ def hub_pins(M, hub_d, g, d, o, cat=None):
         for nh in sorted(o["pin_n"]):
             h_f = _up(max(o["pin_depth_k"] * dh, F / (nh * dh * o["sig_wall"])))
             s = {"d": dh, "n": nh, "r_h": rh, "r_f": rf, "F": F, "h_f": h_f, "flush": flush, "fl_why": why_fl,
+                 "mode": "flush" if flush else "over", "dir_why": note_d,          # CP-83
                  "tau": F / (nh * math.pi * dh * dh / 4), "sig_fl": F / (nh * dh * h_f),
                  "tau_edge": F / (nh * 2 * max(e - dh / 2, 1e-6) * h_f), "pitch": 2 * math.pi * rh / nh}
             if (s["tau"] > o["tau_pin"] + 1e-9 or s["sig_fl"] > o["sig_wall"] + 1e-9
@@ -211,13 +268,16 @@ def hub_pins(M, hub_d, g, d, o, cat=None):
 
 def hub_fin(h, ts, cat=None):
     """Длина штифта ступицы ≥ h_f + t_s (сквозной), смятие в листе -> dict | None (нет длины)."""
-    L = h["h_f"] + ts
+    dr = h.get("mode") == "direct"                      # CP-83: лист + глухое гнездо обода h_p
+    L = (h["depth"] if dr else h["h_f"]) + ts
     l, des = pin_len(h["d"], L, cat)
     if cat and l is None:
         return None
     out = {k: (round(v, 2) if isinstance(v, float) else v) for k, v in h.items()}
     out.update(L=round(L, 2), sig_leaf=round(h["F"] / (h["n"] * h["d"] * ts), 1), l=l, des=des,
                key=f"{cat[float(h['d'])]['key']}x{l:g}" if l else "")
+    if dr:                                              # гнездо по стандартной длине: l − t_s + pin_gap (Д-74)
+        out["nest"] = round((l or L) - ts + JOIN["pin_gap"], 2)
     return out
 
 
@@ -243,7 +303,7 @@ def collar_pins(M, dr, r_in, r_out, o, cat=None):
                     s, crit, bad = collar_check(M, g, d, n, o, ex, h["h_f"])
                 hub = hub_fin(h, s["t_s"], cat)
                 if hub is None:
-                    note = f"ступица: нет стандартной длины штифта Ø{h['d']:g} ≥ {h['h_f'] + s['t_s']:g}"
+                    note = f"ступица: нет стандартной длины штифта Ø{h['d']:g} ≥ {(h.get('depth') or h['h_f']) + s['t_s']:g}"
                     continue
             l, des = pin_len(d, s["L"], cat)
             if cat and l is None:
@@ -323,7 +383,7 @@ def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None, cat=None):
             if not c:
                 continue
             # Д-93: меньший съём — сечение трубы; при равенстве — наружу
-            v = min(c, key=lambda v: (_area(v["fit"][m]), not _flush(v),          # Д-94: фланец в бурте
+            v = min(c, key=lambda v: (_area(v["fit"][m]), _hub_rank(v),           # CP-83: прямое → Д-94 → CP-80
                                       DIRS.index(v["dir"]) if v.get("dir") else 0))
             pick = {"scheme": v["scheme"], "material": m, "tube": v["fit"][m], "pins": v["pins"],
                     "geom": v["geom"]}
@@ -373,9 +433,13 @@ def _sch(p):
     mg = f"; запас корпуса {p['margin']:g} мм" if p.get("margin") is not None else ""
     hb = q.get("hub")                                                # CP-80: ступица–лист
     hs = (f"; ступица {hb['n']}×Ø{hb['d']:g}" + (f"×{hb['l']:g}" if hb.get("l") else "")
-          + f" на r_h {hb['r_h']:g}, фланец Ø{2 * hb['r_f']:g}×{hb['h_f']:g}"
-          + (" утоплен в бурт (Д-94)" if hb.get("flush")
-             else f" над листом, +h_f к длине ({hb.get('fl_why') or 'Д-94'})")) if hb else ""
+          + (f" на r_h {hb['r_h']:g}, прямо в обод ступицы без фланца, гнёзда {hb.get('nest') or hb['depth']:g} (CP-83)"
+             if hb.get("mode") == "direct" else
+             f" на r_h {hb['r_h']:g}, фланец Ø{2 * hb['r_f']:g}×{hb['h_f']:g}"
+             + (" утоплен в бурт (Д-94)" if hb.get("flush")
+                else f" над листом, +h_f к длине ({hb.get('fl_why') or 'Д-94'})")
+             + (f"; {hb['dir_why']}" if hb.get("dir_why") else "")) if hb else "")
+    hs += f"; {p['brg']}" if p.get("brg") else ""                   # CP-83: замена .09 ради прямого крепления
     return (f"collar {'наружу' if p['dir'] == 'out' else 'внутрь'}; бурт h_b {q['h_b']:g}, "
             f"дно-лист t_s {q['t_s']:g} ({q['crit']}; t_s_min {q['t_s_min']:g}){hs}{mg}"
             + (f"; отказ: {p['other']}" if p.get("other") else "") + " (Д-93)")
@@ -456,4 +520,16 @@ def self_test():
     h26 = k26["pins"]["hub"]
     assert (k26["dir"], h26["n"], h26["r_h"], h26["r_f"], h26["flush"]) == ("in", 12, 17.5, 22.0, True), h26
     assert k26["pins"]["t_s"] == 3.0 and "утоплен" in join_row("K", {**jk, "pick": k26}), k26["pins"]
+    # CP-83: .13 к ступице напрямую — d.09 40, D.10 19, hub_l 10.5: обод 10.5 ≥ 9, r_h 15.5, 12×Ø3 (τ 76.1)
+    jd = choose(100.0, r_in, r_out, stc, ["40Х"], {"join": "collar", "hub_d": 40.0, "hub_bore": 19.0,
+                                                   "hub_l": 10.5})
+    kd, hd = jd["pick"], jd["pick"]["pins"]["hub"]
+    assert mode(jd) == "direct" and (kd["dir"], hd["n"], hd["r_h"], hd["h_f"], hd["depth"]) == \
+        ("in", 12, 15.5, 0.0, 4.5), hd
+    assert (kd["pins"]["t_s"], hd["L"], hd["nest"]) == (3.0, 7.5, 5.0), hd
+    assert "прямо в обод" in join_row("K", jd) and join_row("K", jd).count("|") == 12, join_row("K", jd)
+    jw = choose(100.0, r_in, r_out, stc, ["40Х"], {"join": "collar", "hub_d": 40.0, "hub_bore": 30.0,
+                                                   "hub_l": 10.5})          # обод 5 < 9 — фланец (Д-94)
+    hw = jw["pick"]["pins"]["hub"]
+    assert mode(jw) == "flush" and "обод ступицы" in hw["dir_why"], hw
     return True
