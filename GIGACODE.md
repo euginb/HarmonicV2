@@ -136,6 +136,17 @@ python -m egm.cad --spec specs/cad_set.yaml
 
 Полная таблица признаков → разделов инструкции — в `README.md` (раздел «Когда открывать instructions/README.md») и `instructions/README.md` §1.
 
+### Подготовка контекста (CTX-T / CTX-R)
+
+| Инструкция | Назначение |
+|---|---|
+| [`instructions/INS-91_CONTEXT_PREP.md`](instructions/INS-91_CONTEXT_PREP.md) | Супер-агент с AI Drive (зеркало) — CTX-T / CTX-R, p.diff, upd.md |
+| [`instructions/INS-91B_LOCAL.md`](instructions/INS-91B_LOCAL.md) | **Локальный агент (GigaCode):** полный доступ к репозиторию без AI Drive — адаптация INS-91 для работы напрямую из рабочей директории |
+| `tools/context_bundle.py` | Детерминированный сбор контекста по ключам (`--sha <base> CP-## Д-##`) — байт-в-байт детерминирован |
+| `tools/make_audit_bundle.py` | Подготовка AUDIT_BUNDLE.md для review |
+| `instructions/INS-90_AUDIT_BUNDLE.md` | Порядок подготовки контекста заказчиком (резервный путь) |
+
+
 ## Важные технические детали
 
 ### Волновой редуктор ПТК
