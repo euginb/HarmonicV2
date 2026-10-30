@@ -31,6 +31,7 @@ JOIN = {"join": "auto", "join_order": ["collar", "insert"], "pin_d": [3.0, 4.0, 
 JOIN.update(k_fit=1.0, t_tech=2.0, tau_disk=80.0, r_lim=None, r_free=None, hub_d=None,
             fl_gap=0.5)   # OQ-28, Д-94: радиальный зазор утопленного фланца .12 в отверстии бурта
 JOIN.update(hub_bore=None, hub_l=None, pin_wall=1.0)   # CP-83: обод ступицы D.10…d.09, длина, стенка за гнездом
+JOIN.update(leaf_fit="H7/js6")   # CP-84, Д-97: посадка дна-листа .13 в расточку обечайки .02C (L4); предварительно
 SCHEMES = ("collar", "insert", "ring")   # ring — L4: обечайка .02C + кольцо-бурт .14 (CP-81, Д-96); в join_order не входит
 DIRS = ("out", "in")          # направление бурта collar: наружу | внутрь (Д-93)
 
@@ -294,9 +295,13 @@ def _ring(M, r_in, r_out, stock, by, tried, ta, o, cat, n_win):
             if h and hub is None:
                 note = f"ступица: нет стандартной длины штифта Ø{h['d']:g}"
                 continue
-            L_r = _up(max(2 * o["edge_k"] * dr, s["h_b"]))
+            lr = {"2·e_r": 2 * o["edge_k"] * dr, "h_b осевых": s["h_b"],          # CP-84, Д-97: радиальные
+                  "d_r + 2·pin_web": dr + 2 * o["pin_web"]}                          # вне зоны листа: z_r − d_r/2 ≥ t_s + pin_web
+            L_r = _up(max(lr.values()))
             q = {**rad, "L_r": L_r, "h_b": s["h_b"], "t_s": s["t_s"], "crit": crit, "t_s_min": s["t_s_min"],
                  "L": round(L_r + s["t_s"], 2),
+                 "z_r": round(s["t_s"] + L_r / 2, 2), "lr_why": max(lr, key=lr.get),   # z_r — от торца обечайки
+                 "leaf": {"D": round(2 * r_in, 2), "fit": o.get("leaf_fit", "H7/js6")},  # лист в расточке обечайки
                  "ax": {"d": d, "n": n, "r_j": round(rj, 2), "l": l, "des": des,
                         "key": f"{cat[float(d)]['key']}x{l:g}" if l else "", "tau": round(s["tau"], 1),
                         "sig_ring": round(s["sig_wall"], 1), "sig_leaf": round(s["sig_hub"], 1),
@@ -544,6 +549,9 @@ def _sch_ring(p):
     """Ячейка «Схема» L4 (CP-81, Д-96): кольцо .14, радиальные и осевые штифты, t_s с критерием."""
     q, rg, b = p["pins"], p["ring"], p.get("ring_blank") or {}
     a = q["ax"]
+    lf = q.get("leaf") or {}                                          # CP-84, Д-97: лист в расточке обечайки
+    lt = (f"; дно-лист Ø{lf['D']:g} ({lf['fit']}) в расточке обечайки .02C на торце кольца, заподлицо с "
+          f"торцом, обечайка +t_s; радиальные z_r {q['z_r']:g} от торца, L_r по {q['lr_why']}" if lf else "")
     bl = (f"труба {b['tube']['D']:g}×{b['tube']['s']:g}" if b.get("tube") else
           f"пруток Ø{b['bar']:g}" if b.get("bar") else "нет заготовки")
     mg = f"; запас корпуса {p['margin']:g} мм" if p.get("margin") is not None else ""
@@ -553,7 +561,7 @@ def _sch_ring(p):
             f"осевые лист–кольцо {a['n']}×Ø{a['d']:g}" + (f"×{a['l']:g}" if a.get("l") else "")
             + f" на r {a['r_j']:g} между радиальными ({a['gap']:g}°), τ {a['tau']:g}, σсм кольца "
             f"{a['sig_ring']:g}, листа {a['sig_leaf']:g}; дно-лист t_s {q['t_s']:g} ({q['crit']}; "
-            f"t_s_min {q['t_s_min']:g}){_hub_txt(q.get('hub'))}{mg} (Д-96)")
+            f"t_s_min {q['t_s_min']:g}){_hub_txt(q.get('hub'))}{lt}{mg} (Д-96, Д-97)")
 
 
 def _sch(p):
@@ -666,6 +674,8 @@ def self_test():
     assert (qa["d"], qa["n"], qa["r_j"], qa["gap"]) == (3.0, 10, 28.56, 18.0), qa
     assert (pr_["ring"]["r0"], pr_["ring"]["L"], pr_["pins"]["L"], pr_["pins"]["t_s"]) == (24.06, 9.0, 12.0, 3.0), pr_
     assert pr_["ring_blank"]["tube"]["s"] == 18.0, pr_["ring_blank"]
+    assert (pr_["pins"]["z_r"], pr_["pins"]["lr_why"], pr_["pins"]["leaf"]["D"]) == (7.5, "2·e_r", 66.12), pr_["pins"]
+    assert "расточке обечайки" in join_row("K", jr), join_row("K", jr)   # CP-84, Д-97
     assert "ring (L4)" in join_row("K", jr) and join_row("K", jr).count("|") == 12, join_row("K", jr)
     jr0 = choose(100.0, r_in, r_out, st1, ["40Х"], {"join": "ring"}, 50)
     assert jr0["pick"] is None and "кольцо .14" in jr0["variants"][0]["rej"], jr0["variants"]
