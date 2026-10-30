@@ -21,3 +21,5 @@ upd.md
 dist/
 patch/
 out/
+.gigacode/settings.json
+.gigacode/settings.json.orig
