@@ -149,16 +149,21 @@ def build_leaf(cfg, part, row=None):
     m.dims = [Dim(j["D"], "D"), Dim(round(2 * rb, 3), "dотв")]
     crit = f"; критерий — {j['crit']}" if j.get("crit") else ""
     tmin = f"{j['t_s_min']:g}" if j.get("t_s_min") is not None else "—"
-    m.notes = [f"дно-лист Ø{j['D']:g} × {t:g} — точение из прутка 40Х (Д-93); к торцу бурта .02B, "
+    ring = j.get("scheme") == "ring"           # CP-84, Д-97: L4 — лист в расточке обечайки на торце кольца .14
+    seat = ("в расточке обечайки .02C на торце кольца .14, заподлицо с торцом обечайки (Д-97); " if ring
+            else "к торцу бурта .02B, ")
+    m.notes = [f"дно-лист Ø{j['D']:g} × {t:g} — точение из прутка 40Х (Д-93); {seat}"
                + ("фланец .12 — в отверстии бурта под листом, ступица d.09 сквозь лист (Д-94)" if fl
                   else "со стороны выхода — ступица .12 торцом, штифты в гнёзда обода (CP-83)"
                   if h.get("mode") == "direct" else "со стороны выхода — фланец .12"),
                f"отверстия: {j['pin_n']} × Ø{j['pin_d']:g} на r {j['r_j']:g} (бурт), {h['n']} × Ø{h['d']:g} "
                f"на r {h['r_h']:g} (ступица); сквозные H7, через 360/n"]
     m.legend = [("t_s", t, f"толщина листа{crit}; t_s_min {tmin} (Д-93, OQ-27)"),
-                ("D", j["D"], "Ø листа = Ø бурта .02B"),
+                ("D", j["D"], f"Ø листа = Ø расточки обечайки .02C, посадка {j.get('fit') or '—'} (Д-97)"
+                 if ring else "Ø листа = Ø бурта .02B"),
                 ("dотв", round(2 * rb, 3), "под ступицу d.09 (Д-94)" if fl else "под .10"),
-                ("шт. бурта", f"{j['pin_n']}×Ø{j['pin_d']:g} r {j['r_j']:g}", "осевые сквозные (CP-79)"),
+                ("шт. кольца" if ring else "шт. бурта", f"{j['pin_n']}×Ø{j['pin_d']:g} r {j['r_j']:g}",
+                 "осевые сквозные, сверловка с кольцом .14 в сборе (Д-97)" if ring else "осевые сквозные (CP-79)"),
                 ("шт. ступицы", f"{h['n']}×Ø{h['d']:g} r {h['r_h']:g}", "осевые сквозные (CP-80)")]
     return m
 
@@ -212,4 +217,9 @@ def self_test():
     assert f3.d_out == 40.0 and f3.thick == 10.5 and len(f3.axial) == 12 and not f3.bands, f3
     assert techdraw.extent(f3) == (40.0, 0.0, 10.5), techdraw.extent(f3)
     assert len(s3.axial) == 20 and "Легенда" in svg.render(f3) and "Легенда" in svg.render(s3)
+    jl = {**jx, "scheme": "ring", "D": 66.12, "fit": "H7/js6", "r_j": 28.56, "pin_n": 10,
+          "pin_a": [36.0 * k + 18.0 for k in range(10)]}                                    # CP-84, Д-97: L4
+    s4 = build_leaf({}, {"id": "PTK-T.13-K", "rows": [1], "join": jl})
+    assert s4.d_out == 66.12 and len(s4.axial) == 20 and "Д-97" in s4.notes[0], s4
+    assert techdraw.extent(s4) == (66.12, 0.0, 3.0), techdraw.extent(s4)
     return True

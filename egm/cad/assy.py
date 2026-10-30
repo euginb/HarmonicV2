@@ -85,7 +85,7 @@ def _layout_inst(cfg, rows):
         elif nn == "11":
             for r in rows[:-1]:
                 at(q["id"], nn, r["zc"] + cfg["ecc"]["t"] / 2)
-        elif nn == "14" and cup.get("z_in"):          # CP-81: кольцо-бурт .14 — в торце обечайки от z стыка
+        elif nn == "14" and cup.get("z_in"):          # CP-81/CP-84: кольцо .14 от z стыка; торец обечайки z_in + L_r + t_s, лист .13 в расточке (Д-97)
             at(q["id"], nn, round(cup["z_in"], 3))
         elif nn in ("12", "13") and cup.get("z_in"):  # CP-63: .12A | .12B от дна; CP-80: .13 за буртом,
             j = q.get("join") or {}                   # .12 (фланец) за дном-листом

@@ -58,7 +58,8 @@ def build(cfg, part, row=None):
     if jn:                               # CP-63: .02B — бурт (collar), .02C — стенка под .12B (insert)
         W, z, L = s["length"], jn["z"], jn["L"]
         ins = jn["scheme"] in ("insert", "ring")   # CP-81: L4 — обечайка .02C без бурта, кольцо .14 внутри
-        end = z + L if ins else z
+        lf = jn.get("t_s", 0.0) if jn["scheme"] == "ring" else 0.0   # CP-84, Д-97: лист .13 в расточке обечайки
+        end = z + L + lf if ins else z
         if end > W + 1e-9:
             m.bands.append(Band(s["r_in"], s["r_out"], W, end - W))
         r0, r1 = (s["r_in"], s["r_out"]) if ins else (jn["d"] / 2, jn["D"] / 2)
@@ -73,7 +74,8 @@ def build(cfg, part, row=None):
         else:
             m.pins = [PinHole(a, jn["pin_z"], jn["pin_d"], r0 - 1.0, r1 + 1.0) for a in jn["pin_a"]]
         pl = f"×{jn['pin_l']:g}" if jn.get("pin_l") else ""
-        under = "кольцо-бурт .14 (L4, Д-96)" if jn["scheme"] == "ring" else "дно-вставку .12B"
+        under = (f"кольцо-бурт .14 (L4, Д-96) и дно-лист .13 t_s {lf:g} в расточке, заподлицо с торцом (Д-97)"
+                 if jn["scheme"] == "ring" else "дно-вставку .12B")
         m.notes.append((f"обечайка .02C без бурта: стенка до z {end:g} под {under}" if ins else
                         f"бурт .02B Ø{2 * r0:g}/Ø{2 * r1:g} на z {z:g}…{z + L:g}: поясок .12A — в отверстии")
                        + f"; штифты {jn['pin_n']}×Ø{jn['pin_d']:g}{pl} радиально на z {jn['pin_z']:g}, "
@@ -113,4 +115,10 @@ def self_test():
           "pin_l": 8.0, "pin_z": 40.25, "pin_a": [60.0 * k for k in range(6)]}
     m2 = build(cfg, {"id": "PTK-T.02B", "rows": [1, 2, 3, 4], "join": jn}, 1)
     assert not m2.pins and len(m2.axial) == 6 and m2.bands[-1].h == 4.5, (m2.pins, m2.bands)
+    jr = {"scheme": "ring", "z": 36.5, "L": 9.0, "t_s": 3.0, "pin_d": 3.0, "pin_n": 10, "pin_l": 8.0,
+          "pin_z": 41.0, "pin_a": [36.0 * k for k in range(10)]}                       # CP-84, Д-97: L4
+    m3 = build(cfg, {"id": "PTK-T.02C", "rows": [1, 2, 3, 4], "join": jr}, 1)
+    b3 = m3.bands[-1]
+    assert (b3.z0, b3.h) == (33.0, 15.5) and len(m3.pins) == 10 and not m3.axial, (m3.bands, m3.pins)
+    assert any("Д-97" in x for x in m3.notes), m3.notes
     return True

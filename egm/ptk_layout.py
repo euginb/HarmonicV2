@@ -214,11 +214,12 @@ def join_cad(cfg, rec):
         a, rg, L_r = q["ax"], p["ring"], q["L_r"]      # ax — осевые лист–кольцо (для .12/.13 — cad_parts)
         res.update(L=L_r, pin_z=round(c["z_in"] + L_r / 2, 3), ring=rg, t_s=q["t_s"], crit=q["crit"],
                    t_s_min=q["t_s_min"], hub=q.get("hub"),
-                   ax={"axial": True, "h_b": L_r, "r_j": a["r_j"], "pin_d": a["d"], "pin_n": a["n"],
-                       "pin_l": a.get("l"), "D": round(2 * r_out, 3), "d": round(2 * rg["r0"], 3),
+                   ax={"axial": True, "h_b": L_r, "r_j": a["r_j"], "pin_d": a["d"], "pin_n": a["n"],   # CP-84, Д-97:
+                       "pin_l": a.get("l"), "D": round(2 * r_in, 3), "d": round(2 * rg["r0"], 3),   # лист Ø = расточка
                        "pin_a": [round((last["cage"] + (j + 0.5) * 360.0 / a["n"]) % 360, 4)
                                  for j in range(a["n"])]})
-        res["ax"].update(t_s=q["t_s"], hub=q.get("hub"))
+        res["ax"].update(t_s=q["t_s"], hub=q.get("hub"), scheme="ring",
+                         fit=(q.get("leaf") or {}).get("fit"))   # CP-84, Д-97: посадка листа в обечайку
     return res
 
 
@@ -353,6 +354,13 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
                 warn.append(f".02C: штифтов {q['n']} не делитель числа окон {n_w} — отверстия "
                             "не по делению окон (Д-72)")
     ax, aw = axial(width, row_gap, b09, b10, r_pk, cfg, o, "07" in pr, belt)
+    if jn and jn.get("pick") and jn["pick"]["scheme"] == "ring":            # CP-84, Д-97: радиальные L4 вне окон
+        qr = jn["pick"]["pins"]
+        zw = max((w["z0"] for w in sep.get("rows") or []), default=0.0) + float(sep.get("h") or 0.0)
+        z_lo = ax["cup"]["z_in"] + qr["L_r"] / 2 - qr["d"] / 2
+        if z_lo < zw + o["pin_wall"] - 1e-9:
+            warn.append(f".02C: радиальные штифты L4 от z {z_lo:.2f} заходят в зону окон (до {zw:.2f}) "
+                        f"+ pin_wall {o['pin_wall']:g} мм (Д-97)")
     warn += aw
     bl = blanks(r_in, r_out, stock, mats02,
                 FORMS_BY_02.get(pr.get("02"), MAT.FORMS))
