@@ -25,8 +25,8 @@ from datetime import datetime
 from pathlib import Path
 
 from egm import config, products, ptk, ptk_design, ptk_layout
-from egm.cad import (assy, freecad, ptk_cover, ptk_ecc, ptk_hub, ptk_ring, ptk_sep, ptk_spacer,
-                     step, svg)
+from egm.cad import (assy, freecad, ptk_collar, ptk_cover, ptk_ecc, ptk_hub, ptk_ring, ptk_sep,
+                     ptk_spacer, step, svg)
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = config.load_app()                     # общий конфиг приложения (Д-79)
@@ -43,7 +43,8 @@ FC_ON = _FC.get("enabled", False)               # альтернативный �
 FC_CMD = _FC.get("command") or freecad.DEFAULT_COMMAND
 GENERATORS = {"ptk_ring": ptk_ring.build, "ptk_sep": ptk_sep.build, "ptk_ecc": ptk_ecc.build,
               "ptk_spacer": ptk_spacer.build, "ptk_cover": ptk_cover.build,
-              "ptk_hub": ptk_hub.build, "ptk_leaf": ptk_hub.build_leaf}
+              "ptk_hub": ptk_hub.build, "ptk_leaf": ptk_hub.build_leaf,
+              "ptk_collar": ptk_collar.build}                              # CP-81: кольцо-бурт .14
 
 
 def _rel(p):

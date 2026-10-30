@@ -210,6 +210,15 @@ def join_cad(cfg, rec):
         res.update(dir=p["dir"], axial=True, h_b=q["h_b"], t_s=q["t_s"],
                    crit=q["crit"], t_s_min=q["t_s_min"], hub=q.get("hub"),   # CP-80: ступица–лист
                    pin_a=[round(j * 360.0 / q["n"], 4) for j in range(q["n"])])
+    if p["scheme"] == "ring":                # CP-81, Д-96: pin_* — радиальные обечайка–кольцо по окнам;
+        a, rg, L_r = q["ax"], p["ring"], q["L_r"]      # ax — осевые лист–кольцо (для .12/.13 — cad_parts)
+        res.update(L=L_r, pin_z=round(c["z_in"] + L_r / 2, 3), ring=rg, t_s=q["t_s"], crit=q["crit"],
+                   t_s_min=q["t_s_min"], hub=q.get("hub"),
+                   ax={"axial": True, "h_b": L_r, "r_j": a["r_j"], "pin_d": a["d"], "pin_n": a["n"],
+                       "pin_l": a.get("l"), "D": round(2 * r_out, 3), "d": round(2 * rg["r0"], 3),
+                       "pin_a": [round((last["cage"] + (j + 0.5) * 360.0 / a["n"]) % 360, 4)
+                                 for j in range(a["n"])]})
+        res["ax"].update(t_s=q["t_s"], hub=q.get("hub"))
     return res
 
 
@@ -234,11 +243,14 @@ def cad_parts(cfg, name, rec):
     if rec.get("r11"):
         out.append({"id": f"{cid}.11{sfx}", "base": f"{cid}.11", "rows": rows})
     l12 = (rec.get("var") or {}).get("12")
+    jl = {**jc, **jc["ax"]} if jc and jc.get("ax") else jc         # CP-81: .12/.13 в L4 — осевые штифты кольца
     if jc and l12:                                                   # CP-63: ступица .12A | .12B
         base = f"{cid}.12{l12}"
-        out.append({"id": base + sfx, "base": base, "rows": rows, "join": jc})
+        out.append({"id": base + sfx, "base": base, "rows": rows, "join": jl})
     if jc and jc.get("hub") and rec["parts"].get("13"):              # CP-80, Д-93: дно-лист .13
-        out.append({"id": f"{cid}.13{sfx}", "base": f"{cid}.13", "rows": rows, "join": jc})
+        out.append({"id": f"{cid}.13{sfx}", "base": f"{cid}.13", "rows": rows, "join": jl})
+    if jc and jc.get("ring") and rec["parts"].get("14"):             # CP-81, Д-96: кольцо-бурт .14
+        out.append({"id": f"{cid}.14{sfx}", "base": f"{cid}.14", "rows": rows, "join": jc})
     return out
 
 
@@ -303,6 +315,8 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
         jopt.setdefault("r_lim", float(cfg["d_bc"]) / 2 - bolt_clear(cfg["id"]) / 2
                         - o["seat_wall"] - o["ax_gap"])
         jopt.setdefault("r_free", max(D10 / 2, (r11 or {}).get("d_out", 0.0) / 2) + o["seat_wall"])
+        if "14" in pr:                                       # CP-81: марки кольца-бурта .14 (L4)
+            jopt.setdefault("ring_mats", MAT.part_materials(prods, "PTK", "14"))
         # CP-83: .09 — первый по D, при котором дно-лист .13 крепится к ступице напрямую (обод под штифты);
         # нет такого — наименьший .09 и фланец (Д-94 → CP-80)
         b0 = b09
@@ -330,12 +344,12 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
                     + (0.0 if (q.get("hub") or {}).get("flush")                 # Д-94: фланец в бурте
                        else (q.get("hub") or {}).get("h_f", 0.0)))                # CP-80: + фланец .12
             wall = (p["geom"]["r_j"] - q["hole12"] - (b10 or {}).get("D", 0.0) / 2
-                    if not p.get("dir") else o["pin_wall"])          # CP-79: collar — осевые, гнёзд нет
+                    if p["scheme"] == "insert" else o["pin_wall"])   # CP-79: collar — осевые; CP-81: ring — w ≥ hole12 + pin_wall
             if wall < o["pin_wall"] - 1e-9:
                 warn.append(f".12: стенка под гнездом штифта {wall:.2f} < pin_wall {o['pin_wall']:g} мм "
                             "(TECH-01, Д-76)")
             n_w = int(cfg.get("n") or 0)
-            if p["scheme"] == "insert" and n_w and n_w % q["n"]:
+            if p["scheme"] in ("insert", "ring") and n_w and n_w % q["n"]:
                 warn.append(f".02C: штифтов {q['n']} не делитель числа окон {n_w} — отверстия "
                             "не по делению окон (Д-72)")
     ax, aw = axial(width, row_gap, b09, b10, r_pk, cfg, o, "07" in pr, belt)
