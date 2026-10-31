@@ -571,6 +571,102 @@ python main.py all
 - Прогон и отметка OK — **заказчиком** (Д-01), но агент может прогнать
   для предварительной проверки
 
+### 8.8. Создание PR через `tools/create_pr.py`
+
+После успешного коммита и прогона `main.py`, при явной команде пользователя
+создать и запушить PR, затем выполнить мердж и создать новую ветку ревизии.
+
+#### 8.8.1. Подготовка
+
+1. Убедиться, что ветка с изменениями запушена на origin:
+   ```
+   git push origin <ветка>
+   ```
+2. Переменная окружения `GITHUB_TOKEN` или `GH_TOKEN` должна содержать
+   токен с правами `repo` (или `public_repo` для публичных репозиториев).
+
+#### 8.8.2. Создание PR
+
+```bash
+python tools/create_pr.py <head> <base> [options]
+```
+
+Параметры:
+- `head` — имя ветки с изменениями (обязательно, должна быть на origin)
+- `base` — базовая ветка для мерджа (обычно `main`)
+- `-t, --title` — заголовок PR (по умолчанию: `[rev-NN.N] <описание>`)
+- `-m, --message` — тело PR (Markdown, по умолчанию — краткое описание)
+- `--dry-run` — вывести JSON запроса, не отправляя
+- `--repo` — репозиторий в формате `owner/repo` (по умолчанию: `euginb/HarmonicV2`)
+
+Примеры:
+```bash
+# Автозаголовок, авто-тело
+python tools/create_pr.py rev11.8 main
+
+# Кастомный заголовок
+python tools/create_pr.py rev11.8 main -t "[rev-11.8] CP-90 Новые расчёты"
+
+# Кастомное тело
+python tools/create_pr.py rev11.8 main -t "Заголовок" -m "## Изменения\n- ... \n\n## Проверки\n- OK"
+
+# Dry-run
+python tools/create_pr.py rev11.8 main --dry-run
+```
+
+Результат — URL созданного PR в stdout.
+
+#### 8.8.3. Мерж PR
+
+Пользователь мержит PR вручную через GitHub UI или командой:
+```bash
+gh pr merge <PR-NUMBER> --squash --delete-branch
+```
+
+Или через API:
+```bash
+gh pr merge <PR-NUMBER>
+```
+
+После мерджа убедиться, что локальная ветка `main` обновлена:
+```bash
+git fetch origin && git checkout main && git pull origin main
+```
+
+#### 8.8.4. Создание новой ветки ревизии
+
+После мерджа создать новую ветку для следующей итерации:
+```bash
+git checkout main
+git pull origin main
+git checkout -b rev<NN.N+1>
+git push origin rev<NN.N+1>
+```
+
+Пример:
+```bash
+git checkout main
+git pull origin main
+git checkout -b rev11.9
+git push origin rev11.9
+```
+
+#### 8.8.5. Полный сценарий
+
+```
+git push origin <ветка>
+  ├─→ python tools/create_pr.py <ветка> main
+  │     → PR URL в stdout
+  │
+  ├─→ (пользователь мержит PR через GitHub)
+  │
+  ├─→ git fetch origin && git checkout main && git pull origin main
+  │
+  ├─→ git checkout -b rev<новая>
+  │
+  └─→ git push origin rev<новая>
+```
+
 ### 8.9. Интеллектуальная обработка ошибок (auto-fix retry)
 
 Ошибки при применении патчей от ИИ — **ожидаемое явление**. Модель ошибается
