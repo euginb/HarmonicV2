@@ -166,11 +166,13 @@ def main(argv=None):
 
     # Добавляем затрагиваемые файлы по смыслу задачи
     if "CP-88" in ns.keys or "CP-89" in ns.keys:
-        # CP-88: ptk_design_input.yaml, products.yaml, ptk_layout.py, Д-100
+        # CP-88: ptk_design_input.yaml, products.yaml, stock.yaml, ptk_layout.py, Д-100
+        #        stock.yaml КРИТИЧЕН — калькулятор перебирает марки в порядке layout
         # CP-89: materials.yaml, materials.py
         semantic_files = [
             "specs/ptk_design_input.yaml",
             "specs/products.yaml",
+            "specs/stock.yaml",              # КРИТИЧНО: порядок layout влияет на выбор заготовки
             "specs/materials.yaml",
             "egm/materials.py",
             "egm/config.py",

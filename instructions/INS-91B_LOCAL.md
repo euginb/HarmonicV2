@@ -215,7 +215,7 @@ python tools/ctx_task.py [--sha SHA] CP-## ... > patch/response/ctx_<key>.md
 **Отличие от context_bundle.py:**
 1. Читает CODE_PLAN.md → извлекает файлы из столбца «Файлы» каждого CP
 2. Добавляет **семантические файлы** по смыслу задачи:
-   - Для CP-88 (layout, products): ptk_design_input.yaml, products.yaml, ptk_layout.py
+   - Для CP-88 (layout, products): ptk_design_input.yaml, products.yaml, **stock.yaml** (КРИТИЧНО — порядок layout влияет на выбор заготовки из stock), ptk_layout.py
    - Для CP-89 (materials): materials.yaml, materials.py, config.py
 3. Для .py файлов: если ключи есть в файле — включает строки с ключами ±3; иначе — скелеты
 4. Для .yaml: целиком (структура важна)
