@@ -55,7 +55,11 @@ designs:
       drills: [3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]
       # имеющиеся свёрла, мм; пусто — от bal_d_min с шагом bal_d_step (шаг 1)
     lighten: none    # облегчение ступицы — пока не используется (OQ-12)
-    output: flange   # соединение сепаратора с выходом — пока не используется (OQ-12)
+    output:          # выходной вал в ступице (Д-102, CP-90); формат — как shaft, шпонки — keys.table
+      link: key      # key | spline (только кручение); flange — до реализации отказ
+      d: 0.0         # Ø вала, мм; 0 — подбор по кручению
+      tau_allow: 25.0     # [τ] кручения; изгиб от потребителя не считается (OQ-17)
+      sigma_crush: 130.0  # [σсм] шпонки в стальной ступице 40Х, спокойная нагрузка (130…200)
     layout: [L4, L3, L2]
     # layout: L1     # конструктив из products.yaml → PTK.layouts, по умолчанию L1:
                      #   L1 — стакан монолитом .02A (пруток);
@@ -84,5 +88,5 @@ designs:
     shaft: {d: 10.0, bore: 0.0, link: key, tau_allow: 25.0, sigma_crush: 100.0, wall_min: 1.5}
     balance: {n_max: 3, wall: 1.0, drills: [3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]}
     lighten: none
-    output: flange
+    output: {link: key, d: 0.0, tau_allow: 25.0, sigma_crush: 130.0}
     layout: [L4, L3, L2]

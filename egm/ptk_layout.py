@@ -12,7 +12,8 @@ from egm import materials as MAT
 from egm import ptk_join
 
 SUP = {"tau_allow": 25.0, "hub_wall": 2.0, "seat_wall": 2.0, "ring_w": 2.0,
-       "lip": 1.0, "cup_t": 2.0, "ax_gap": 0.5, "nut_h": 4.0, "out_ext": 2.0, "pin_wall": 1.0}
+       "lip": 1.0, "cup_t": 2.0, "ax_gap": 0.5, "nut_h": 4.0, "out_ext": 2.0, "pin_wall": 1.0,
+       "hub_web": 2.0, "snap_h": 1.5}   # CP-90, Д-102: перемычка за гнездом .10; стопорное кольцо ГОСТ 13942
 HEAD = ("| Проработка | Конструктив | Детали | .09 d×D×B | τ ступицы / [τ], МПа | .10 d×D×B | "
         ".11 n × h, мм | Крышки tA / tB, мм | Дно .02 z / t, мм; ступица | Длина, мм | Заготовка .02: марка, формы |")
 RULE = "|---" * 11 + "|"
@@ -55,6 +56,51 @@ def hub_brg(bears, M, D10, o, D_max):
     """.09 на полой ступице: наименьший из hub_brgs -> (подшипник, τ) | (None, None)."""
     c = hub_brgs(bears, M, D10, o, D_max)
     return c[0] if c else (None, None)
+
+
+def out_shaft(M, oo, keys, bears, b10, o, D_max):
+    """CP-90, Д-102: выходной вал в ступице -> (dict | None, причина).
+    d_o: 16M/(π(d − t1)³) ≤ [τ] (шпонка из keys, spline — без паза); l_key ≥ 2M/(d(h − t1)[σсм]) + b;
+    .09 по возрастанию D: (d.09 − d_o)/2 − t2 ≥ hub_wall, d.09 ≥ D.10 + 2·hub_wall, D ≤ D_max, τ полой ступицы;
+    hub_l = max(ax_gap + B.09 + snap_h + out_ext, B.10 + hub_web + l_key + ax_gap)."""
+    link = oo.get("link", "key")
+    if link not in ("key", "spline"):
+        return None, f"output.link {link}: не реализован (flange — после 3D, Д-102)"
+    ta, sa, T = float(oo.get("tau_allow", 25.0)), float(oo.get("sigma_crush", 100.0)), M * 1e3
+    ks = sorted(keys, key=lambda k: k["d_max"])
+    d0 = float(oo.get("d") or 0.0)
+    dd = kk = None
+    for x in ([d0] if d0 > 0 else [float(v) for v in range(6, 101)]):
+        k = next((q for q in ks if x <= q["d_max"] + 1e-9), None) if link == "key" else None
+        if link == "key" and k is None:
+            continue
+        if 16 * T / (math.pi * (x - (k["t1"] if k else 0.0)) ** 3) <= ta + 1e-9:
+            dd, kk = x, k
+            break
+    if dd is None:
+        return None, (f"вал Ø{d0:g}: τ > [τ] {ta:g} МПа" if d0 > 0 else
+                      f"нет Ø вала ≤ 100 мм с τ ≤ {ta:g} МПа и шпонкой из keys")
+    t1, t2 = (kk["t1"], kk["t2"]) if kk else (0.0, 0.0)
+    l_key = float(math.ceil(2 * T / (dd * (kk["h"] - t1) * sa) + kk["b"])) if kk else 0.0
+    D10, B10 = (b10 or {}).get("D", 0.0), (b10 or {}).get("B", 0.0)
+    c09 = []
+    for _, d9, k9 in _brgs(bears):
+        b = bears[k9]
+        if (b["D"] > D_max + 1e-9 or (d9 - dd) / 2 - t2 < o["hub_wall"] - 1e-9
+                or d9 < D10 + 2 * o["hub_wall"] - 1e-9):
+            continue
+        tau = 16 * T / (math.pi * d9 ** 3 * (1 - (dd / d9) ** 4))
+        if tau <= o["tau_allow"] + 1e-9:
+            c09.append(({"id": k9, **b}, tau))
+    if not c09:
+        return None, (f"нет .09 со стенкой ступицы (d − {dd:g})/2 − t2 {t2:g} ≥ {o['hub_wall']:g}, "
+                      f"D ≤ {D_max:.1f} мм в vendor_prices.yaml → bearings")
+    B09 = c09[0][0]["B"]
+    hl = max(o["ax_gap"] + B09 + o["snap_h"] + o["out_ext"], B10 + o["hub_web"] + l_key + o["ax_gap"])
+    return {"link": link, "d": dd, "key": kk, "l_key": l_key,
+            "tau": round(16 * T / (math.pi * (dd - t1) ** 3), 1), "tau_allow": ta, "sigma_allow": sa,
+            "c09": c09, "hub_l": round(hl, 2),
+            "hub_by": "шпонка" if hl > o["ax_gap"] + B09 + o["snap_h"] + o["out_ext"] + 1e-9 else ".09"}, ""
 
 
 def _fit(forms, Dn, Dv, need, st=None):
@@ -129,7 +175,7 @@ def axial(width, row_gap, b09, b10, r_out, cfg, o, covers, belt=0.0):
     bot = max(o["cup_t"], belt)
     z_b = max(width, width - row_gap + o["nut_h"]) + o["ax_gap"]
     pocket = z_b + bot + o["ax_gap"] - width
-    hub_l = o["ax_gap"] + B09 + o["lip"] + o["out_ext"]
+    hub_l = max(o["ax_gap"] + B09 + o["lip"] + o["out_ext"], o.get("hub_l_out") or 0.0)   # CP-90
     if B10 > bot + hub_l + 1e-9:
         warn.append(f".10 в ступице: B = {B10:g} > длины отверстия {bot + hub_l:g} мм")
     cov = None
@@ -144,7 +190,8 @@ def axial(width, row_gap, b09, b10, r_out, cfg, o, covers, belt=0.0):
                "pocket": [round(2 * r_pk, 2), round(pocket, 2)]}
     cup = {"z_in": round(z_b, 2), "t": round(bot, 2), "hub_d": (b09 or {}).get("d"),
            "hub_bore": D10, "hub_l": round(hub_l, 2)}
-    length = (cov["tA"] + cov["tB"] if cov else 0.0) + width + o["out_ext"]
+    length = ((cov["tA"] + cov["tB"] if cov else 0.0) + width + o["out_ext"]
+              + hub_l - (o["ax_gap"] + B09 + o["lip"] + o["out_ext"]))       # CP-90: ступица длиннее крышки
     return {"covers": cov, "cup": cup, "length": round(length, 2)}, warn
 
 
@@ -292,6 +339,16 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
     D_max = float(cfg["d_bc"]) - bolt_clear(cfg["id"]) - 2 * o["seat_wall"]
     c09 = hub_brgs(bears, M, D10, o, D_max)      # CP-83: кандидаты .09 по D; выбор — ниже, по креплению .13
     b09, tau = c09[0] if c09 else (None, None)
+    out = None
+    if isinstance(d.get("output"), dict):                    # CP-90, Д-102: вал со шпонкой в ступице
+        out, why = out_shaft(M, d["output"], d.get("_keys") or [], bears, b10, o, D_max)
+        if out is None:
+            err.append(f"выход: {why}")
+        else:
+            c09 = out["c09"]
+            b09, tau = c09[0]
+            o = {**o, "hub_l_out": out["hub_l"]}
+            out = {k: v for k, v in out.items() if k != "c09"}
     if b09 is None:
         err.append(f".09: нет подшипника с d ≥ {D10 + 2 * o['hub_wall']:g}, D ≤ {D_max:.1f} мм "
                    f"(гнездо в .07B внутри крепежа Ø{float(cfg['d_bc']):g}) и τ ступицы ≤ "
@@ -325,7 +382,8 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
             o2 = dict(jopt)
             o2.setdefault("hub_d", (b or {}).get("d"))              # CP-80: штифты ступица–лист на r_h
             o2.setdefault("hub_bore", D10)
-            o2.setdefault("hub_l", o["ax_gap"] + (b or {}).get("B", 0.0) + o["lip"] + o["out_ext"])
+            o2.setdefault("hub_l", o.get("hub_l_out")
+                          or o["ax_gap"] + (b or {}).get("B", 0.0) + o["lip"] + o["out_ext"])   # CP-90
             o2.setdefault("pin_wall", o["pin_wall"])
             j1 = ptk_join.choose(M, r_in, r_out, stock, mats02, o2, cfg.get("n"))
             if jn is None:
@@ -353,6 +411,16 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
             if p["scheme"] in ("insert", "ring") and n_w and n_w % q["n"]:
                 warn.append(f".02C: штифтов {q['n']} не делитель числа окон {n_w} — отверстия "
                             "не по делению окон (Д-72)")
+    if out and b09 and jn and jn.get("pick"):                # CP-90, Д-102 п. 4: вырождение L4 / L2-внутрь
+        r_h = (b09.get("da") or (b09["d"] + 0.3 * (b09["D"] - b09["d"]))) / 2   # da нет в каталоге — оценка
+        pk, cw = jn["pick"], o["seat_wall"]
+        out.update(r_h=round(r_h, 2), da_est=not b09.get("da"))
+        if pk["scheme"] == "ring" and pk["ring"]["r0"] < r_h + cw - 1e-9:
+            err.append(f"{code}: L4 вырождается в L3 — отв. кольца .14 r {pk['ring']['r0']:g} < "
+                       f"r_h .09 {r_h:.2f} + seat_wall {cw:g} (Д-102)")
+        if pk.get("dir") == "in" and pk["geom"]["r0"] < r_h + cw - 1e-9:
+            err.append(f"{code}: бурт внутрь доходит до ступицы — r0 {pk['geom']['r0']:g} < "
+                       f"{r_h + cw:.2f}; L1/L3 (Д-102)")
     ax, aw = axial(width, row_gap, b09, b10, r_pk, cfg, o, "07" in pr, belt)
     if jn and jn.get("pick") and jn["pick"]["scheme"] == "ring":            # CP-84, Д-97: радиальные L4 вне окон
         qr = jn["pick"]["pins"]
@@ -376,6 +444,7 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
            "tau_hub": round(tau, 1) if tau is not None else None, "tau_allow": o["tau_allow"],
            "r11": r11, "covers": ax["covers"], "cup": ax["cup"], "length": ax["length"],
            "blank": bl, "join": jn}
+    rec["output"] = out                                          # CP-90, Д-102
     rec["var"] = {nn: variant_letter(prods, nn, pr[nn]) for nn in ("02", "12") if pr.get(nn)}
     rec["var_name"] = {nn: variant_name(prods, nn, pr[nn]) for nn in rec["var"]}
     rec["tooling"] = tooling(rec, cfg, r_in, r_out)
@@ -470,6 +539,9 @@ def md_tables(items):
          ptk_join.JOIN_HEAD, ptk_join.JOIN_RULE]
     S = ["### Заготовка .02 (сепаратор) (Д-67, Д-68)", "", "| Проработка | Марка | Статус | Формы |",
          "|---" * 4 + "|"]
+    O = ["### Выход: вал в ступице .12 / дне .02A (Д-102, CP-90)", "",
+         "| Проработка | Вал d_o, мм | Шпонка b×h×l | τ вала / [τ], МПа | [σсм], МПа | .09 | "
+         "Ступица L, мм (по) | r_h .09 |", "|---" * 8 + "|"]
     for name, r in items:
         var, c = r.get("var") or {}, r["cup"]
         det = ", ".join("." + k + var.get(k, "") for k in sorted(r["parts"]))
@@ -484,7 +556,15 @@ def md_tables(items):
         if r.get("join"):
             J.append(ptk_join.join_row(name, r["join"]))
         S += _blank_rows(name, r["blank"])
-    out = A + [""] + B + ([""] + J if len(J) > 4 else []) + [""] + S
+        u = r.get("output")
+        if u:
+            k = u.get("key")
+            kt = f"{k['b']:g}×{k['h']:g}×{u['l_key']:g}" if k else u["link"]
+            rh = (f"{u['r_h']:g}" + (" (оценка da)" if u.get("da_est") else "")) if u.get("r_h") else "—"
+            O.append(f"| {name} | {u['d']:g} | {kt} | {u['tau']:g} / {u['tau_allow']:g} | "
+                     f"{u['sigma_allow']:g} | {_b(r['b09'])} | {u['hub_l']:g} ({u['hub_by']}) | {rh} |")
+    out = (A + [""] + B + ([""] + J if len(J) > 4 else []) + ([""] + O if len(O) > 4 else [])
+           + [""] + S)
     return "\n".join(out)
 
 
@@ -578,4 +658,10 @@ def self_test():
     jc = rc["cad_parts"][-1]["join"]
     assert (jc["scheme"], jc["f"], jc["pin_z"], len(jc["pin_a"])) == ("insert", 2.0, 41.0, 8), jc
     assert rc["cad_parts"][0]["join"] == jc and r["cup"]["t"] == 2.0, rc["cad_parts"][0]
+    ks = [{"d_max": 30, "b": 8, "h": 7, "t1": 4.0, "t2": 3.3},
+          {"d_max": 38, "b": 10, "h": 8, "t1": 5.0, "t2": 3.3}]                   # CP-90, Д-102
+    ro, eo, _ = layout(cfg, {"layout": "L1", "output": {"link": "key"}, "_keys": ks},
+                       ecc, 10.0, 1.0, prods, bears, stock)
+    assert not eo and ro["output"]["d"] >= 30 and ro["b09"]["id"] == "61810", (eo, ro["output"])
+    assert ro["cup"]["hub_l"] == ro["output"]["hub_l"] and "### Выход" in md_tables([("K", ro)])
     return True

@@ -124,7 +124,8 @@ def design(cfg, d, lim, keys, extra=None):
                        f"(l_p = {lp:g} мм)")
     lay = None
     if extra is not None:
-        lay, le, lw = ptk_layout.layout(cfg, d, ecc, dsh, L.row_gap, **extra)
+        lay, le, lw = ptk_layout.layout(cfg, {**d, "_keys": keys}, ecc, dsh, L.row_gap,
+                                        **extra)   # CP-90: шпонки выходного вала — та же keys.table
         err += le
         warn += lw
     parts = [{**p, "base": p["id"], "id": f"{p['id']}-{name}"}
