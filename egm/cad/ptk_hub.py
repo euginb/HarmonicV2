@@ -41,6 +41,11 @@ def build(cfg, part, row=None):
         m.bands.append(Band(rb, j["r_out"], L, j["f"]))
         z += j["f"]
     m.bands.append(Band(rb, j["hub_d"] / 2, z, j["hub_l"]))
+    o = (cfg.get("layout") or {}).get("output") or {}
+    lb = (o.get("l_key") or 0.0) + ((cfg.get("layout") or {}).get("ax_gap") or 0.0)
+    if o.get("d") and lb > 0:                    # CP-90, Д-102 п. 1: вал d_o с наружного торца; паз — этап 2
+        zt = z + j["hub_l"]
+        m.bands.append(Band(0.0, o["d"] / 2, zt - lb, lb + 1.0, "cut"))
     m.pins = [PinHole(a, L / 2, j["pin_d"], r0 - j["hole12"], r0 + 1.0) for a in j["pin_a"]]
     lab = "dс" if ins else "dпояс"
     m.axes = [Circle(j["hub_d"] / 2)]
@@ -67,6 +72,9 @@ def build(cfg, part, row=None):
                 ("угол шт. 1", j["pin_a"][0], "ось окна последнего ряда .02, ° (Д-76)")]
     if ins:
         m.legend.insert(3, ("Dб", round(2 * j["r_out"], 3), f"бурт-упор в торец .02C, f = {j['f']:g} мм"))
+    if o.get("d") and lb > 0:                    # CP-90: легенда вала d_o
+        m.legend.append(("d_o", o["d"], f"под выходной вал на {lb:g} мм; паз шпонки — этап 2 (Д-102)"))
+        m.notes.append(f"отверстие Ø{o['d']:g} под выходной вал с наружного торца на {lb:g} мм (CP-90)")
     return m
 
 
@@ -187,6 +195,12 @@ def self_test():
         "pin_a": [45.0 * k for k in range(8)]}})
     assert b.d_out == 66.12 and [(x.z0, x.h) for x in b.bands] == [(9.0, 2.0), (11.0, 10.5)], b.bands
     assert techdraw.extent(b) == (67.88, 0.0, 21.5), techdraw.extent(b)
+    lo = {"layout": {"ax_gap": 0.5, "output": {"d": 34.0, "l_key": 27.0,
+                                               "key": {"b": 10, "h": 8}}}}                   # CP-90, Д-102
+    bo = build(lo, {"id": "PTK-T.12B-K", "rows": [1], "join": {
+        **j, "scheme": "insert", "f": 2.0, "hole12": 7.62, "hub_d": 45.0, "hub_l": 34.5,
+        "pin_n": 8, "pin_a": [45.0 * k for k in range(8)]}})
+    assert (bo.bands[-1].r_out, bo.bands[-1].z0, bo.bands[-1].op) == (17.0, 18.0, "cut"), bo.bands
     for m in (a, b):
         assert "Легенда" in svg.render(m), m.id
     jx = {**j, "L": 7.5, "dir": "in", "axial": True, "h_b": 4.5, "t_s": 3.0, "crit": "k_fit",
