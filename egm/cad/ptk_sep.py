@@ -6,6 +6,7 @@
 """
 import math
 
+from egm.cad import ptk_hub
 from egm.cad.model import AxialHole, Band, Circle, Contour, Dim, PartModel, PinHole, Window
 
 
@@ -48,12 +49,18 @@ def build(cfg, part, row=None):
         m.thick = z
         m.bands = [Band(rb, s["r_out"], z, cup["t"]),
                    Band(rb, cup["hub_d"] / 2, z + cup["t"], cup["hub_l"])]
+        zh = z + cup["t"]                # CP-90 этап 2b: заплечик da .09, вал d_o и паз — в системе корпуса
+        fb, fs, fl, fn = ptk_hub.out_feats(cfg, zh, zh + cup["hub_l"], rb, 0.0)
+        m.bands += fb
+        m.slots = fs
         m.notes.append(f"стакан: дно z {z:g}…{z + cup['t']:g}, ступица Ø{cup['hub_d']:g}"
                        f"×{cup['hub_l']:g}, отв. Ø{2 * rb:g} — в STEP; на развёртке не показаны")
         m.legend += [("z дна", z, "внутренний торец дна от торца пакета, мм (Д-81)"),
                      ("t дна", cup["t"], "толщина дна, мм"),
                      ("ступица", f"Ø{cup['hub_d']:g}×{cup['hub_l']:g}", "посадка .09, длина"),
                      ("отв. ступицы", 2 * rb, "под .10 — опору конца входного вала")]
+        m.legend += fl
+        m.notes += fn
     jn = part.get("join") or {}
     if jn:                               # CP-63: .02B — бурт (collar), .02C — стенка под .12B (insert)
         W, z, L = s["length"], jn["z"], jn["L"]

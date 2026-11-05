@@ -113,6 +113,13 @@ PTK:
       variant: none         # L4: в торце обечайки .02C радиальными штифтами по окнам; к торцу — дно-лист .13 (Д-96)
       qty: 1
       cad: ptk_collar
+    "15":
+      name: входной вал
+      kind: make
+      material: [40Х]                  # предварительно (OQ-21, OQ-32)
+      variant: none         # Ø d, bore, связь с .03 (key/flat/spline/integral/press) — designs[].input.shaft (Д-48); шпонка — keys.table (Д-46)
+      qty: 1
+      cad: null             # генератор — OQ-32 (посадки .03/.10, маршрут, чертёж); в сборке пока REF-примитив
   layouts:
     # Д-55: конструктив — выбор деталей и вариантов; null — деталь не входит;
     # fixed / output — неподвижное и выходное звено
