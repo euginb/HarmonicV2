@@ -59,6 +59,12 @@ def solid(m, mode="spline"):
         body = body.cut(*tools)
         if hasattr(body, "Solids") and len(body.Solids()) == 1:
             body = body.Solids()[0]
+    if getattr(m, "slots", None):      # CP-90, Д-102: шпоночные пазы — призмы, одна булева операция
+        tools = [cq.Solid.makeBox(s.r1 - s.r0, s.b, s.h, V(s.r0, -s.b / 2, s.z0))
+                 .rotate(V(0, 0, 0), V(0, 0, 1), s.angle) for s in m.slots]
+        body = body.cut(*tools)
+        if hasattr(body, "Solids") and len(body.Solids()) == 1:
+            body = body.Solids()[0]
     if not body.isValid():
         raise ValueError(f"{m.id}: тело STEP невалидно (режим {mode}); попробуйте --step poly")
     return body
@@ -104,4 +110,10 @@ def self_test():
     ref3 = math.pi * (225.0 - 100.0) * 10.0 - 4 * math.pi * 1.0 * 5.0
     v3 = solid(m3, "spline").Volume()
     assert abs(v3 - ref3) < 0.005 * ref3, ("радиальные отверстия PinHole (CP-63)", v3, ref3)
+    from egm.cad.model import KeySlot
+    v4 = solid(PartModel("T4", 10.0, 30.0, Contour(pts)), "spline").Volume() - solid(
+        PartModel("T4", 10.0, 30.0, Contour(pts), slots=[KeySlot(0.0, 9.0, 12.0, 2.0, 2.0, 4.0)]),
+        "spline").Volume()
+    ref4 = 4.0 * (4.0 + 2.0 / 60.0)    # ∫(12 − √(100 − y²))dy, y ∈ [−1, 1], × h 4
+    assert abs(v4 - ref4) < 0.05 * ref4, ("шпоночный паз KeySlot (CP-90)", v4, ref4)
     return True

@@ -63,6 +63,16 @@ class AxialHole:
 
 
 @dataclass
+class KeySlot:
+    angle: float               # ось паза, град (CP-90, Д-102): шпоночный паз — призма, не тело вращения
+    r0: float                  # паз от радиуса r0 …
+    r1: float                  # … до r1, мм (паз ступицы под вал d_o: r1 = d_o/2 + t2)
+    b: float                   # ширина паза поперёк радиуса, мм
+    z0: float                  # начало по оси, мм (локальная система детали)
+    h: float                   # длина паза по оси, мм
+
+
+@dataclass
 class Band:
     r_in: float                # кольцо r_in…r_out вокруг оси (0, 0); r_in = 0 — сплошной цилиндр
     r_out: float
@@ -106,3 +116,4 @@ class PartModel:
     bands: list = field(default_factory=list)    # ступени вращения Band: дно, ступица, гнёзда (CP-45)
     pins: list = field(default_factory=list)     # радиальные отверстия PinHole: штифты .02–.12 (CP-63)
     axial: list = field(default_factory=list)    # осевые отверстия AxialHole: штифты collar (CP-79)
+    slots: list = field(default_factory=list)    # шпоночные пазы KeySlot: ступица / дно выхода (CP-90)

@@ -13,7 +13,7 @@ CP-80 (Д-93): collar с осевыми штифтами — .12A — флане
 """
 import math
 
-from egm.cad.model import AxialHole, Band, Circle, Contour, Dim, PartModel, PinHole
+from egm.cad.model import AxialHole, Band, Circle, Contour, Dim, KeySlot, PartModel, PinHole
 
 N_PTS = 360
 
@@ -21,6 +21,37 @@ N_PTS = 360
 def _circle(r):
     return Contour([(r * math.cos(2 * math.pi * i / N_PTS), r * math.sin(2 * math.pi * i / N_PTS))
                     for i in range(N_PTS)])
+
+
+def out_feats(cfg, z_hub, z_end, rb, z_in=None):
+    """CP-90 этап 2b (Д-102 п. 1): элементы выхода ступицы (.12B; дно .02A — ptk_sep) в локальной z
+    детали -> (bands, slots, legend, notes). Заплечик da .09 — от начала ступицы z_hub до торца
+    внутреннего кольца (.09 в .07B на W + карман; z_in — начало локальной системы в системе
+    корпуса, по умолчанию cup.z_in); da — vendor_prices.yaml → bearings (OQ-31), нет — не строится.
+    Отверстие вала d_o и шпоночный паз b × t2 (KeySlot, 0° системы детали) — с наружного торца
+    z_end на l_key + ax_gap."""
+    lay = cfg.get("layout") or {}
+    o, b09, cov = lay.get("output") or {}, lay.get("b09") or {}, lay.get("covers")
+    zi = (lay.get("cup") or {}).get("z_in", 0.0) if z_in is None else z_in
+    bands, slots, leg, notes = [], [], [], []
+    if b09.get("da") and cov and cfg.get("sep"):
+        h = round(cfg["sep"]["length"] + cov["pocket"][1] - zi - z_hub, 3)
+        if h > 1e-6 and b09["da"] > b09["d"]:
+            bands.append(Band(rb, b09["da"] / 2, z_hub, h))
+            leg.append(("da", b09["da"], f"заплечик .09 {b09.get('id', '')} на {h:g} мм — упор внутреннего "
+                                         "кольца со стороны пакета (Д-102, OQ-31)"))
+    elif b09 and o:
+        notes.append("заплечик .09 не построен: нет da в vendor_prices.yaml → bearings (OQ-31)")
+    lb = (o.get("l_key") or 0.0) + (lay.get("ax_gap") or 0.0)
+    if o.get("d") and lb > 0:
+        r, k = o["d"] / 2, o.get("key")
+        bands.append(Band(0.0, r, z_end - lb, lb + 1.0, "cut"))
+        if k:
+            slots.append(KeySlot(0.0, r - 1.0, r + k["t2"], k["b"], z_end - lb, lb + 1.0))
+        kt = f", паз {k['b']:g} × t2 {k['t2']:g} на 0°" if k else ""
+        leg.append(("d_o", o["d"], f"под выходной вал на {lb:g} мм{kt} (Д-102)"))
+        notes.append(f"отверстие Ø{o['d']:g} под выходной вал с наружного торца на {lb:g} мм{kt} (CP-90)")
+    return bands, slots, leg, notes
 
 
 def build(cfg, part, row=None):
@@ -41,11 +72,9 @@ def build(cfg, part, row=None):
         m.bands.append(Band(rb, j["r_out"], L, j["f"]))
         z += j["f"]
     m.bands.append(Band(rb, j["hub_d"] / 2, z, j["hub_l"]))
-    o = (cfg.get("layout") or {}).get("output") or {}
-    lb = (o.get("l_key") or 0.0) + ((cfg.get("layout") or {}).get("ax_gap") or 0.0)
-    if o.get("d") and lb > 0:                    # CP-90, Д-102 п. 1: вал d_o с наружного торца; паз — этап 2
-        zt = z + j["hub_l"]
-        m.bands.append(Band(0.0, o["d"] / 2, zt - lb, lb + 1.0, "cut"))
+    fb, fs, fl, fn = out_feats(cfg, z, z + j["hub_l"], rb)   # CP-90 этап 2b: заплечик da, вал d_o, паз
+    m.bands += fb
+    m.slots = fs
     m.pins = [PinHole(a, L / 2, j["pin_d"], r0 - j["hole12"], r0 + 1.0) for a in j["pin_a"]]
     lab = "dс" if ins else "dпояс"
     m.axes = [Circle(j["hub_d"] / 2)]
@@ -72,9 +101,8 @@ def build(cfg, part, row=None):
                 ("угол шт. 1", j["pin_a"][0], "ось окна последнего ряда .02, ° (Д-76)")]
     if ins:
         m.legend.insert(3, ("Dб", round(2 * j["r_out"], 3), f"бурт-упор в торец .02C, f = {j['f']:g} мм"))
-    if o.get("d") and lb > 0:                    # CP-90: легенда вала d_o
-        m.legend.append(("d_o", o["d"], f"под выходной вал на {lb:g} мм; паз шпонки — этап 2 (Д-102)"))
-        m.notes.append(f"отверстие Ø{o['d']:g} под выходной вал с наружного торца на {lb:g} мм (CP-90)")
+    m.legend += fl
+    m.notes += fn
     return m
 
 
@@ -196,11 +224,17 @@ def self_test():
     assert b.d_out == 66.12 and [(x.z0, x.h) for x in b.bands] == [(9.0, 2.0), (11.0, 10.5)], b.bands
     assert techdraw.extent(b) == (67.88, 0.0, 21.5), techdraw.extent(b)
     lo = {"layout": {"ax_gap": 0.5, "output": {"d": 34.0, "l_key": 27.0,
-                                               "key": {"b": 10, "h": 8}}}}                   # CP-90, Д-102
+                                               "key": {"b": 10, "h": 8, "t1": 5.0, "t2": 3.3}}}}  # CP-90, Д-102
     bo = build(lo, {"id": "PTK-T.12B-K", "rows": [1], "join": {
         **j, "scheme": "insert", "f": 2.0, "hole12": 7.62, "hub_d": 45.0, "hub_l": 34.5,
         "pin_n": 8, "pin_a": [45.0 * k for k in range(8)]}})
     assert (bo.bands[-1].r_out, bo.bands[-1].z0, bo.bands[-1].op) == (17.0, 18.0, "cut"), bo.bands
+    assert len(bo.slots) == 1 and abs(bo.slots[0].r1 - 20.3) < 1e-9 and bo.slots[0].z0 == 18.0, bo.slots
+    lo2 = {"sep": {"length": 33.0}, "layout": {**lo["layout"], "covers": {"pocket": [68.9, 15.0]},
+           "cup": {"z_in": 36.5}, "b09": {"id": "61809", "d": 45.0, "D": 58.0, "B": 7.0, "da": 47.0}}}
+    fb, fs, fl, _ = out_feats(lo2, 11.0, 45.5, 9.5)                                     # CP-90 этап 2b
+    assert (fb[0].r_out, fb[0].z0, fb[0].h, fb[0].op) == (23.5, 11.0, 0.5, "add") and len(fs) == 1, fb
+    assert [x[0] for x in fl] == ["da", "d_o"], fl
     for m in (a, b):
         assert "Легенда" in svg.render(m), m.id
     jx = {**j, "L": 7.5, "dir": "in", "axial": True, "h_b": 4.5, "t_s": 3.0, "crit": "k_fit",
