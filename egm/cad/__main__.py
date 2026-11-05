@@ -339,8 +339,10 @@ def _layout_des(cfg, des, code, prods, bears, pins, stock, rep):
     """CP-74: конструктив code из items[] cad_set.yaml — резолв на лету (ptk_layout.layout,
     Д-73) и запись-обёртка для build/build_assy: имя — код конструктива (файлы и сборка
     <ID>-<код>), .03/.11 — из проработки des или предварительные шага 1. None — ошибки."""
-    d = {"layout": code,
-         "supports": ((des or {}).get("input") or {}).get("supports") or {}}
+    inp = (des or {}).get("input") or {}
+    d = {"layout": code, "supports": inp.get("supports") or {}}
+    if isinstance(inp.get("output"), dict):      # CP-90, Д-102: выход проработки — тот же .09 и ступица
+        d.update(output=inp["output"], _keys=(des or {}).get("keys") or [])
     shaft_d = des["shaft"]["d"] if des else float(cfg["geom"]["limits"].get("shaft_d_min") or 0.0)
     ecc = des["ecc"] if des else cfg["ecc"]
     lay, errs, warns = ptk_layout.layout(cfg, d, ecc, shaft_d, cfg["geom"]["limits"]["row_gap"],

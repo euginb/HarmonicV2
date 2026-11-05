@@ -124,13 +124,14 @@ def design(cfg, d, lim, keys, extra=None):
                        f"(l_p = {lp:g} мм)")
     lay = None
     if extra is not None:
-        lay, le, lw = ptk_layout.layout(cfg, d, ecc, dsh, L.row_gap, **extra)
+        lay, le, lw = ptk_layout.layout(cfg, {**d, "_keys": keys}, ecc, dsh, L.row_gap,
+                                        **extra)   # CP-90: шпонки выходного вала — та же keys.table
         err += le
         warn += lw
     parts = [{**p, "base": p["id"], "id": f"{p['id']}-{name}"}
              for p in ptk_parts.parts(cfg["id"], ecc) if p["id"].split(".", 1)[1].startswith("03")]
     return {"id": cfg["id"], "name": name, "ok": not err, "errors": err, "warnings": warn,
-            "input": d, "layout": lay,
+            "input": d, "layout": lay, "keys": keys,       # CP-90: шпонки выхода — для egm.cad
             "shaft": {"d": dsh, "bore": bore, "link": link, "eta": eta, "ecc_share": share, "M": M,
                       "T_in": round(T_in, 3), "T_e": round(T_e, 3), "tau": round(tau, 1),
                       "tau_allow": ta, "d_req": round(d_req, 2)},
