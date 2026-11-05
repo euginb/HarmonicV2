@@ -13,7 +13,76 @@ from egm import ptk_join
 
 SUP = {"tau_allow": 25.0, "hub_wall": 2.0, "seat_wall": 2.0, "ring_w": 2.0,
        "lip": 1.0, "cup_t": 2.0, "ax_gap": 0.5, "nut_h": 4.0, "out_ext": 2.0, "pin_wall": 1.0,
-       "hub_web": 2.0, "snap_h": 1.5}   # CP-90, Д-102: перемычка за гнездом .10; стопорное кольцо ГОСТ 13942
+       "hub_web": 2.0, "snap_h": 1.5,   # CP-90, Д-102: перемычка за гнездом .10; стопорное кольцо ГОСТ 13942
+       "snap_web": 1.0, "fl_mu": 0.12, "fl_safety": 1.5, "fl_web": 1.0, "fl_tau_pin": 80.0}  # Д-104: фланец
+
+_VP = None
+
+
+def _vp():
+    """vendor_prices.yaml (screws, rings_*, pins) — лениво; нет — {} (CP-90 этап 2b-2)."""
+    global _VP
+    if _VP is None:
+        try:
+            from egm import config
+            _VP = config.load(config.cfg_file(config.load_app(), "configs.vendor_prices")) or {}
+        except Exception:
+            _VP = {}
+    return _VP
+
+
+def _lip_b(D09, o):
+    """Буртик .07B под канавку кольца ГОСТ 13943 у .09: max(lip, m + snap_web) (Д-104)."""
+    r = (_vp().get("rings_int") or {}).get(f"{D09:g}")
+    return max(o["lip"], r["m"] + o["snap_web"]) if r else o["lip"]
+
+
+def out_flange(M, oo, bears, b10, o, D_max):
+    """CP-90 этап 2b-2, Д-104: момент — фланцем на торце ступицы (винты трением, иначе штифты срезом);
+    ступица вровень: hub_l = ax_gap + B.09 + lip_B. .09 по возрастанию D: d ≥ D.10 + 2·hub_wall,
+    D ≤ D_max, τ ступицы; первый .09 с проходящим фланцем. d_o без паза (паз — в гайке-опции)."""
+    vp, T, sf = _vp(), M * 1e3, o["fl_safety"]
+    scr, pins = vp.get("screws") or {}, vp.get("pins") or {}
+    if not scr:
+        return None, "нет таблицы screws в vendor_prices.yaml (Д-104)"
+    D10 = (b10 or {}).get("D", 0.0)
+    for _, d9, k9 in _brgs(bears):
+        b = bears[k9]
+        if b["D"] > D_max + 1e-9 or d9 < D10 + 2 * o["hub_wall"] - 1e-9:
+            continue
+        tau = 16 * T / (math.pi * d9 ** 3 * (1 - (D10 / d9) ** 4))
+        if tau > o["tau_allow"] + 1e-9:
+            continue
+        lb = _lip_b(b["D"], o)
+        hl = o["ax_gap"] + b["B"] + lb
+        for ks, s in sorted(scr.items(), key=lambda x: x[1]["d"]):
+            dep = round(1.5 * s["d"] + 1.0, 1)
+            r_lo = D10 / 2 + s["d"] / 2 + o["hub_wall"]
+            r_hi = d9 / 2 - s["d"] / 2 - o["hub_wall"]
+            if dep > hl + 1e-9 or r_lo > r_hi + 1e-9:
+                continue
+            r = round((r_lo + r_hi) / 2, 1)
+            pd = max((p["d"] for p in pins.values() if p["d"] <= s["d"]), default=0.0)
+            for n in range(3, 13):
+                if 2 * math.pi * r / n < s["d"] + o["fl_web"]:
+                    break
+                Tf = n * s["F_M"] * o["fl_mu"] * r            # кН·мм = Н·м
+                n_p = 0
+                if Tf / sf < M:
+                    if not pd or math.pi * r / n < (s["d"] + pd) / 2 + o["fl_web"]:
+                        continue
+                    n_p = math.ceil(sf * T / (r * math.pi * pd ** 2 / 4 * o["fl_tau_pin"]))
+                    if n_p > n or n % n_p:
+                        continue
+                fl = {"screw": ks, "n": n, "r": r, "d_tap": s["d_tap"], "depth": dep, "T_fric": round(Tf, 1),
+                      "n_p": n_p, "pin_d": pd if n_p else 0.0, "pin_depth": round(min(2 * pd, hl), 1)}
+                txt = f"{n}×{ks} r {r:g}" + (f" + {n_p}×Ø{pd:g} шт." if n_p else "") + f", трение {Tf:.0f} Н·м"
+                return {"link": "flange", "d": float(oo.get("d") or 0.0), "key": None, "l_key": 0.0,
+                        "tau": round(tau, 1), "tau_allow": o["tau_allow"], "sigma_allow": 0.0,
+                        "c09": [({"id": k9, **b}, tau)], "hub_l": round(hl, 2), "hub_by": "фланец/корпус",
+                        "flush": True, "lip_B": round(lb, 2), "flange": fl, "fl_txt": txt}, ""
+    return None, (f"нет .09 с фланцем на торце ступицы под M {M:g} Н·м (винты screws, штифты pins, "
+                  f"D ≤ {D_max:.1f}) — Д-104")
 HEAD = ("| Проработка | Конструктив | Детали | .09 d×D×B | τ ступицы / [τ], МПа | .10 d×D×B | "
         ".11 n × h, мм | Крышки tA / tB, мм | Дно .02 z / t, мм; ступица | Длина, мм | Заготовка .02: марка, формы |")
 RULE = "|---" * 11 + "|"
@@ -176,6 +245,10 @@ def axial(width, row_gap, b09, b10, r_out, cfg, o, covers, belt=0.0):
     z_b = max(width, width - row_gap + o["nut_h"]) + o["ax_gap"]
     pocket = z_b + bot + o["ax_gap"] - width
     hub_l = max(o["ax_gap"] + B09 + o["lip"] + o["out_ext"], o.get("hub_l_out") or 0.0)   # CP-90
+    fl = bool(o.get("flush"))                                     # Д-103: ступица вровень с .07B
+    lipB = o.get("lip_B", o["lip"]) if fl else o["lip"]
+    if fl:
+        hub_l = o["ax_gap"] + B09 + lipB
     if B10 > bot + hub_l + 1e-9:
         warn.append(f".10 в ступице: B = {B10:g} > длины отверстия {bot + hub_l:g} мм")
     cov = None
@@ -185,13 +258,15 @@ def axial(width, row_gap, b09, b10, r_out, cfg, o, covers, belt=0.0):
         if r_pk > r_lim + 1e-9:
             warn.append(f".07B: карман под дно .02 r {r_pk:.2f} > {r_lim:.2f} мм — "
                         f"стенка до отверстий крепежа < seat_wall")
-        cov = {"tA": round(B10 + o["lip"], 2), "tB": round(pocket + B09 + o["lip"], 2),
+        cov = {"tA": round(B10 + o["lip"], 2), "tB": round(pocket + B09 + lipB, 2),
                "D": cfg["d_out"], "seat_A": D10, "seat_B": (b09 or {}).get("D"),
                "pocket": [round(2 * r_pk, 2), round(pocket, 2)]}
     cup = {"z_in": round(z_b, 2), "t": round(bot, 2), "hub_d": (b09 or {}).get("d"),
            "hub_bore": D10, "hub_l": round(hub_l, 2)}
     length = ((cov["tA"] + cov["tB"] if cov else 0.0) + width + o["out_ext"]
               + hub_l - (o["ax_gap"] + B09 + o["lip"] + o["out_ext"]))       # CP-90: ступица длиннее крышки
+    if fl:                                                                   # Д-103: вровень — tA + tB + W
+        length = (cov["tA"] + cov["tB"] if cov else 0.0) + width
     return {"covers": cov, "cup": cup, "length": round(length, 2)}, warn
 
 
@@ -341,13 +416,15 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
     b09, tau = c09[0] if c09 else (None, None)
     out = None
     if isinstance(d.get("output"), dict):                    # CP-90, Д-102: вал со шпонкой в ступице
-        out, why = out_shaft(M, d["output"], d.get("_keys") or [], bears, b10, o, D_max)
+        out, why = (out_flange(M, d["output"], bears, b10, o, D_max) if d["output"].get("link") == "flange"
+                    else out_shaft(M, d["output"], d.get("_keys") or [], bears, b10, o, D_max))   # Д-104
         if out is None:
             err.append(f"выход: {why}")
         else:
             c09 = out["c09"]
             b09, tau = c09[0]
-            o = {**o, "hub_l_out": out["hub_l"]}
+            o = {**o, "hub_l_out": out["hub_l"], "flush": bool(out.get("flush")),
+                 "lip_B": out.get("lip_B", o["lip"])}                                 # Д-103, Д-104
             out = {k: v for k, v in out.items() if k != "c09"}
     if b09 is None:
         err.append(f".09: нет подшипника с d ≥ {D10 + 2 * o['hub_wall']:g}, D ≤ {D_max:.1f} мм "
@@ -559,7 +636,7 @@ def md_tables(items):
         u = r.get("output")
         if u:
             k = u.get("key")
-            kt = f"{k['b']:g}×{k['h']:g}×{u['l_key']:g}" if k else u["link"]
+            kt = f"{k['b']:g}×{k['h']:g}×{u['l_key']:g}" if k else (u.get("fl_txt") or u["link"])   # Д-104
             rh = (f"{u['r_h']:g}" + (" (оценка da)" if u.get("da_est") else "")) if u.get("r_h") else "—"
             O.append(f"| {name} | {u['d']:g} | {kt} | {u['tau']:g} / {u['tau_allow']:g} | "
                      f"{u['sigma_allow']:g} | {_b(r['b09'])} | {u['hub_l']:g} ({u['hub_by']}) | {rh} |")
