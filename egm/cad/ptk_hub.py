@@ -54,6 +54,20 @@ def out_feats(cfg, z_hub, z_end, rb, z_in=None):
     return bands, slots, leg, notes
 
 
+def flange_holes(cfg, z_end):
+    """CP-90 этап 2b-2, Д-104: резьбовые отверстия фланца (Ø под резьбу, глубина depth) и штифты
+    между ними — с наружного торца ступицы z_end; данные — layout.output.flange."""
+    f = ((cfg.get("layout") or {}).get("output") or {}).get("flange")
+    if not f:
+        return []
+    out = [AxialHole(a, f["r"], f["d_tap"], z_end - f["depth"], f["depth"] + 1.0) for a in _ang(f["n"])]
+    if f.get("n_p"):
+        st = f["n"] // f["n_p"]
+        out += [AxialHole(round((j * st + 0.5) * 360.0 / f["n"], 4), f["r"], f["pin_d"],
+                          z_end - f["pin_depth"], f["pin_depth"] + 1.0) for j in range(f["n_p"])]
+    return out
+
+
 def build(cfg, part, row=None):
     j = part.get("join")
     if not j:
@@ -75,6 +89,7 @@ def build(cfg, part, row=None):
     fb, fs, fl, fn = out_feats(cfg, z, z + j["hub_l"], rb)   # CP-90 этап 2b: заплечик da, вал d_o, паз
     m.bands += fb
     m.slots = fs
+    m.axial = list(getattr(m, "axial", None) or []) + flange_holes(cfg, z + j["hub_l"])   # Д-104
     m.pins = [PinHole(a, L / 2, j["pin_d"], r0 - j["hole12"], r0 + 1.0) for a in j["pin_a"]]
     lab = "dс" if ins else "dпояс"
     m.axes = [Circle(j["hub_d"] / 2)]
@@ -235,6 +250,11 @@ def self_test():
     fb, fs, fl, _ = out_feats(lo2, 11.0, 45.5, 9.5)                                     # CP-90 этап 2b
     assert (fb[0].r_out, fb[0].z0, fb[0].h, fb[0].op) == (23.5, 11.0, 0.5, "add") and len(fs) == 1, fb
     assert [x[0] for x in fl] == ["da", "d_o"], fl
+    lf = {"layout": {"output": {"flange": {"n": 6, "r": 16.0, "d_tap": 4.2, "depth": 8.5,
+                                            "n_p": 3, "pin_d": 4.0, "pin_depth": 8.0}}}}   # Д-104
+    fh = flange_holes(lf, 10.0)
+    assert len(fh) == 9 and fh[0].r == 16.0 and abs(fh[6].angle - 30.0) < 1e-9, fh
+    assert flange_holes({}, 10.0) == []
     for m in (a, b):
         assert "Легенда" in svg.render(m), m.id
     jx = {**j, "L": 7.5, "dir": "in", "axial": True, "h_b": 4.5, "t_s": 3.0, "crit": "k_fit",

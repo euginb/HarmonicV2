@@ -53,6 +53,7 @@ def build(cfg, part, row=None):
         fb, fs, fl, fn = ptk_hub.out_feats(cfg, zh, zh + cup["hub_l"], rb, 0.0)
         m.bands += fb
         m.slots = fs
+        m.axial = list(getattr(m, "axial", None) or []) + ptk_hub.flange_holes(cfg, zh + cup["hub_l"])  # Д-104
         m.notes.append(f"стакан: дно z {z:g}…{z + cup['t']:g}, ступица Ø{cup['hub_d']:g}"
                        f"×{cup['hub_l']:g}, отв. Ø{2 * rb:g} — в STEP; на развёртке не показаны")
         m.legend += [("z дна", z, "внутренний торец дна от торца пакета, мм (Д-81)"),
