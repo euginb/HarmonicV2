@@ -51,6 +51,15 @@ def out_feats(cfg, z_hub, z_end, rb, z_in=None):
         kt = f", паз {k['b']:g} × t2 {k['t2']:g} на 0°" if k else ""
         leg.append(("d_o", o["d"], f"под выходной вал на {lb:g} мм{kt} (Д-102)"))
         notes.append(f"отверстие Ø{o['d']:g} под выходной вал с наружного торца на {lb:g} мм{kt} (CP-90)")
+    g = (o.get("grooves") or {}).get("ext")       # CP-90 2b-3: канавка кольца ГОСТ 13942 за .09
+    if g and b09.get("B") and cov and cfg.get("sep"):
+        zg = round(cfg["sep"]["length"] + cov["pocket"][1] - zi + b09["B"], 3)
+        if z_hub - 1e-6 <= zg and zg + g["m"] <= z_end + 1e-6:
+            bands.append(Band(g["d2"] / 2, b09["d"] / 2 + 1.0, zg, g["m"], "cut"))
+            leg.append(("канавка", g["d2"], f"кольцо {b09['d']:g} ГОСТ 13942: Ø{g['d2']:g} × m {g['m']:g} "
+                                             f"на z {zg:g} — фиксация внутр. кольца .09 снаружи (Д-102)"))
+        else:
+            notes.append(f"канавка ГОСТ 13942 не помещается в ступицу (z {zg:g} + m {g['m']:g} > {z_end:g})")
     return bands, slots, leg, notes
 
 
@@ -72,6 +81,8 @@ def build(cfg, part, row=None):
     j = part.get("join")
     if not j:
         raise ValueError(f"{part['id']}: нет соединения .02–.12 — строится только с --design (CP-63)")
+    if j.get("seat"):                            # CP-90 2b-3, Д-102 п. 2: L2/L4 без дна-листа .13
+        return _seat(cfg, part, j)
     if j.get("axial") and j.get("hub"):          # CP-80, Д-93: ступица с фланцем к дну-листу .13
         if j["hub"].get("mode") == "direct":     # CP-83: без фланца, лист — к торцу ступицы
             return _direct(part, j)
@@ -123,6 +134,44 @@ def build(cfg, part, row=None):
 
 def _ang(n):
     return [round(k * 360.0 / n, 4) for k in range(n)]
+
+
+def _seat(cfg, part, j):
+    """.12A по Д-102 п. 2 (CP-90 этап 2b-3), L2/L4 при designs[].output: дна-листа .13 нет — фланец
+    Ø D × t_f (t_f = t_s, критерии Д-93 п. 3) торцом к бурту .02B (L2) | кольцу .14 (L4), осевые штифты
+    на r_j; ступица d.09 × hub_l охватывает .09: заплечик da, канавка ГОСТ 13942, торец вровень с .07B
+    (Д-103); отверстия фланца под гайку .16 (Д-104). z = 0 — торец к бурту/кольцу (сборка: z_in + h_b)."""
+    rb, t, hl = (j.get("hub_bore") or 0.0) / 2, j["t_s"], j["hub_l"]
+    if rb <= 0:
+        raise ValueError(f"{part['id']}: нет .10 — отверстие ступицы не задано (CP-63)")
+    m = PartModel(part["id"], t, j["D"], _circle(rb))
+    m.bands.append(Band(rb, j["hub_d"] / 2, t, hl))
+    zi = ((cfg.get("layout") or {}).get("cup") or {}).get("z_in", 0.0) + j.get("h_b", 0.0)
+    fb, fs, fl, fn = out_feats(cfg, t, t + hl, rb, zi)
+    m.bands += fb
+    m.slots = fs
+    m.axial = ([AxialHole(a, j["r_j"], j["pin_d"], -1.0, t + 2.0) for a in j["pin_a"]]
+               + flange_holes(cfg, t + hl))
+    m.axes = [Circle(j["r_j"])]
+    m.dims = [Dim(j["D"], "Dф"), Dim(j["hub_d"], "d.09"), Dim(round(2 * rb, 3), "dотв")]
+    to = "кольца .14 (L4)" if j.get("scheme") == "ring" else "бурта .02B (L2)"
+    crit = f"; критерий — {j['crit']}" if j.get("crit") else ""
+    pl = f"×{j['pin_l']:g}" if j.get("pin_l") else ""
+    m.notes = [f"фланец Ø{j['D']:g} × {t:g} к торцу {to}; ступица Ø{j['hub_d']:g} × {hl:g} охватывает .09, "
+               "торец вровень с .07B; дно-листа .13 нет (Д-102 п. 2)",
+               f"штифты {j['pin_n']} × Ø{j['pin_d']:g}{pl} осевые сквозные (фланец + {to.split()[0]}) "
+               f"на r {j['r_j']:g}; посадка H7",
+               f"отверстие Ø{2 * rb:g} под .10 сквозное"]
+    m.legend = [("L", round(t + hl, 3), "длина .12: фланец t_f + ступица (вровень с .07B, Д-103)"),
+                ("Dф", j["D"], f"фланец = Ø {to}"),
+                ("t_f", t, f"толщина фланца — критерии бывшего листа (Д-93 п. 3){crit}"),
+                ("d.09", j["hub_d"], "ступица: посадка .09"),
+                ("ступица", hl, "ax_gap + B.09 + lip_B"),
+                ("dотв", round(2 * rb, 3), "сквозное под .10 — опору конца входного вала"),
+                ("штифты", f"{j['pin_n']}×Ø{j['pin_d']:g}{pl} r {j['r_j']:g}", "ГОСТ 24296-93, к бурту/кольцу")]
+    m.legend += fl
+    m.notes += fn
+    return m
 
 
 def _direct(part, j):
@@ -255,6 +304,10 @@ def self_test():
     fh = flange_holes(lf, 10.0)
     assert len(fh) == 9 and fh[0].r == 16.0 and abs(fh[6].angle - 30.0) < 1e-9, fh
     assert flange_holes({}, 10.0) == []
+    lg = {**lo2, "layout": {**lo2["layout"], "output": {**lo2["layout"]["output"],
+          "grooves": {"ext": {"s": 1.7, "m": 1.9, "d2": 42.5}}}}}                        # 2b-3: ГОСТ 13942
+    gb = out_feats(lg, 11.0, 45.5, 9.5)[0]
+    assert (gb[-1].r_out, gb[-1].z0, gb[-1].h, gb[-1].op) == (23.5, 18.5, 1.9, "cut"), gb
     for m in (a, b):
         assert "Легенда" in svg.render(m), m.id
     jx = {**j, "L": 7.5, "dir": "in", "axial": True, "h_b": 4.5, "t_s": 3.0, "crit": "k_fit",
@@ -290,4 +343,9 @@ def self_test():
     s4 = build_leaf({}, {"id": "PTK-T.13-K", "rows": [1], "join": jl})
     assert s4.d_out == 66.12 and len(s4.axial) == 20 and "Д-97" in s4.notes[0], s4
     assert techdraw.extent(s4) == (66.12, 0.0, 3.0), techdraw.extent(s4)
+    js = {**jx, "seat": True, "hub_d": 45.0, "hub_l": 10.5}                                # 2b-3, Д-102 п. 2
+    g5 = build({}, {"id": "PTK-T.12A-K", "rows": [1], "join": js})
+    assert g5.thick == 3.0 and g5.d_out == 69.88 and len(g5.axial) == 8 and not g5.pins, g5
+    assert [(x.z0, x.h) for x in g5.bands] == [(3.0, 10.5)], g5.bands
+    assert techdraw.extent(g5) == (69.88, 0.0, 13.5) and "Легенда" in svg.render(g5), techdraw.extent(g5)
     return True

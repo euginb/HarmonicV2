@@ -80,7 +80,9 @@ def out_flange(M, oo, bears, b10, o, D_max):
                 return {"link": "flange", "d": float(oo.get("d") or 0.0), "key": None, "l_key": 0.0,
                         "tau": round(tau, 1), "tau_allow": o["tau_allow"], "sigma_allow": 0.0,
                         "c09": [({"id": k9, **b}, tau)], "hub_l": round(hl, 2), "hub_by": "фланец/корпус",
-                        "flush": True, "lip_B": round(lb, 2), "flange": fl, "fl_txt": txt}, ""
+                        "flush": True, "lip_B": round(lb, 2), "flange": fl, "fl_txt": txt,
+                        "grooves": {"ext": (vp.get("rings_ext") or {}).get(f"{d9:g}"),       # 2b-3: канавки
+                                    "int": (vp.get("rings_int") or {}).get(f"{b['D']:g}")}}, ""
     return None, (f"нет .09 с фланцем на торце ступицы под M {M:g} Н·м (винты screws, штифты pins, "
                   f"D ≤ {D_max:.1f}) — Д-104")
 HEAD = ("| Проработка | Конструктив | Детали | .09 d×D×B | τ ступицы / [τ], МПа | .10 d×D×B | "
@@ -342,6 +344,9 @@ def join_cad(cfg, rec):
                                  for j in range(a["n"])]})
         res["ax"].update(t_s=q["t_s"], hub=q.get("hub"), scheme="ring",
                          fit=(q.get("leaf") or {}).get("fit"))   # CP-84, Д-97: посадка листа в обечайку
+    if rec.get("output") and (p.get("dir") or p["scheme"] == "ring"):   # CP-90 2b-3, Д-102 п. 2: L2/L4 —
+        res["seat"] = True                   # без дна-листа .13, ступица фланцем t_s к торцу бурта/кольца
+        res["t_s"] = q["t_s"]
     return res
 
 
@@ -370,7 +375,7 @@ def cad_parts(cfg, name, rec):
     if jc and l12:                                                   # CP-63: ступица .12A | .12B
         base = f"{cid}.12{l12}"
         out.append({"id": base + sfx, "base": base, "rows": rows, "join": jl})
-    if jc and jc.get("hub") and rec["parts"].get("13"):              # CP-80, Д-93: дно-лист .13
+    if jc and jc.get("hub") and rec["parts"].get("13") and not jc.get("seat"):   # CP-80; Д-102 п. 2 — нет .13
         out.append({"id": f"{cid}.13{sfx}", "base": f"{cid}.13", "rows": rows, "join": jl})
     if jc and jc.get("ring") and rec["parts"].get("14"):             # CP-81, Д-96: кольцо-бурт .14
         out.append({"id": f"{cid}.14{sfx}", "base": f"{cid}.14", "rows": rows, "join": jc})

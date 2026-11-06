@@ -92,13 +92,17 @@ def _layout_inst(cfg, rows):
             jh = j.get("hub") or {}                   # Д-94: утопленный фланец .12 — в бурте под листом
             dz = (j.get("h_b", 0.0) + ((-jh.get("h_f", 0.0) if jh.get("flush") else j.get("t_s", 0.0))
                                        if nn == "12" else 0.0)) if jh else 0.0
+            if j.get("seat"):                         # CP-90 2b-3, Д-102 п. 2: .12A фланцем к торцу бурта/кольца
+                dz = j.get("h_b", 0.0)
             at(q["id"], nn, round(cup["z_in"] + dz, 3))
     b09, b10 = lay.get("b09"), lay.get("b10")
     if b10 and cov:
         at(f"{cid}.10", "10", -b10["B"])
     pr = lay.get("parts", {})
     if b10 and cup.get("hub_d") and (pr.get("02") == "cup" or pr.get("12")):   # .10 в ступице .02A | .12
-        at(f"{cid}.10", "10", cup["z_in"])
+        s12 = next(((q.get("join") or {}).get("h_b", 0.0) for q in lay.get("cad_parts", [])
+                    if _nn(q["id"]) == "12" and (q.get("join") or {}).get("seat")), 0.0)   # Д-102 п. 2
+        at(f"{cid}.10", "10", round(cup["z_in"] + s12, 3))
     if b09 and cov:
         at(f"{cid}.09", "09", W + cov["pocket"][1])
     return out
