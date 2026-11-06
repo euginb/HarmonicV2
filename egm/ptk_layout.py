@@ -80,7 +80,9 @@ def out_flange(M, oo, bears, b10, o, D_max):
                 return {"link": "flange", "d": float(oo.get("d") or 0.0), "key": None, "l_key": 0.0,
                         "tau": round(tau, 1), "tau_allow": o["tau_allow"], "sigma_allow": 0.0,
                         "c09": [({"id": k9, **b}, tau)], "hub_l": round(hl, 2), "hub_by": "фланец/корпус",
-                        "flush": True, "lip_B": round(lb, 2), "flange": fl, "fl_txt": txt}, ""
+                        "flush": True, "lip_B": round(lb, 2), "flange": fl, "fl_txt": txt,
+                        "grooves": {"ext": (vp.get("rings_ext") or {}).get(f"{d9:g}"),       # 2b-3: канавки
+                                    "int": (vp.get("rings_int") or {}).get(f"{b['D']:g}")}}, ""
     return None, (f"нет .09 с фланцем на торце ступицы под M {M:g} Н·м (винты screws, штифты pins, "
                   f"D ≤ {D_max:.1f}) — Д-104")
 HEAD = ("| Проработка | Конструктив | Детали | .09 d×D×B | τ ступицы / [τ], МПа | .10 d×D×B | "
@@ -342,6 +344,9 @@ def join_cad(cfg, rec):
                                  for j in range(a["n"])]})
         res["ax"].update(t_s=q["t_s"], hub=q.get("hub"), scheme="ring",
                          fit=(q.get("leaf") or {}).get("fit"))   # CP-84, Д-97: посадка листа в обечайку
+    if rec.get("output") and (p.get("dir") or p["scheme"] == "ring"):   # CP-90 2b-3, Д-102 п. 2: L2/L4 —
+        res["seat"] = True                   # без дна-листа .13, ступица фланцем t_s к торцу бурта/кольца
+        res["t_s"] = q["t_s"]
     return res
 
 
@@ -370,7 +375,7 @@ def cad_parts(cfg, name, rec):
     if jc and l12:                                                   # CP-63: ступица .12A | .12B
         base = f"{cid}.12{l12}"
         out.append({"id": base + sfx, "base": base, "rows": rows, "join": jl})
-    if jc and jc.get("hub") and rec["parts"].get("13"):              # CP-80, Д-93: дно-лист .13
+    if jc and jc.get("hub") and rec["parts"].get("13") and not jc.get("seat"):   # CP-80; Д-102 п. 2 — нет .13
         out.append({"id": f"{cid}.13{sfx}", "base": f"{cid}.13", "rows": rows, "join": jl})
     if jc and jc.get("ring") and rec["parts"].get("14"):             # CP-81, Д-96: кольцо-бурт .14
         out.append({"id": f"{cid}.14{sfx}", "base": f"{cid}.14", "rows": rows, "join": jc})
@@ -488,16 +493,22 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
             if p["scheme"] in ("insert", "ring") and n_w and n_w % q["n"]:
                 warn.append(f".02C: штифтов {q['n']} не делитель числа окон {n_w} — отверстия "
                             "не по делению окон (Д-72)")
-    if out and b09 and jn and jn.get("pick"):                # CP-90, Д-102 п. 4: вырождение L4 / L2-внутрь
+    # Вырождение L2/L4 → L3 (Д-102 п. 4, уточнение 2026-11-06): при малых диаметрах бурт .02B /
+    # кольцо .14 подходит вплотную к ступице — радиальный штифт со стороны окон (крепление фланца
+    # ступицы к бурту/кольцу) не помещается; детали неразделимы → единая деталь, т.е. схема L3.
+    # cw = seat_wall — минимальная перемычка от r_h ступицы до отверстия штифта (≈ d_r/2 + pin_wall):
+    # и для кольца (r0 кольца), и для бурта внутрь (r0 бурта).
+    if out and b09 and jn and jn.get("pick"):
         r_h = (b09.get("da") or (b09["d"] + 0.3 * (b09["D"] - b09["d"]))) / 2   # da нет в каталоге — оценка
         pk, cw = jn["pick"], o["seat_wall"]
         out.update(r_h=round(r_h, 2), da_est=not b09.get("da"))
         if pk["scheme"] == "ring" and pk["ring"]["r0"] < r_h + cw - 1e-9:
-            err.append(f"{code}: L4 вырождается в L3 — отв. кольца .14 r {pk['ring']['r0']:g} < "
-                       f"r_h .09 {r_h:.2f} + seat_wall {cw:g} (Д-102)")
+            err.append(f"{code}: L2/L4 вырождаются в L3 — бурт/кольцо вплотную к ступице, радиальный штифт "
+                       f"со стороны окон не помещается: отв. кольца .14 r {pk['ring']['r0']:g} < "
+                       f"r_h .09 {r_h:.2f} + seat_wall {cw:g} (Д-102 п. 4)")
         if pk.get("dir") == "in" and pk["geom"]["r0"] < r_h + cw - 1e-9:
-            err.append(f"{code}: бурт внутрь доходит до ступицы — r0 {pk['geom']['r0']:g} < "
-                       f"{r_h + cw:.2f}; L1/L3 (Д-102)")
+            err.append(f"{code}: бурт внутрь доходит до ступицы (радиальный штифт не помещается) — "
+                       f"r0 {pk['geom']['r0']:g} < {r_h + cw:.2f}; L1/L3 (Д-102 п. 4)")
     ax, aw = axial(width, row_gap, b09, b10, r_pk, cfg, o, "07" in pr, belt)
     if jn and jn.get("pick") and jn["pick"]["scheme"] == "ring":            # CP-84, Д-97: радиальные L4 вне окон
         qr = jn["pick"]["pins"]
@@ -505,7 +516,7 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
         z_lo = ax["cup"]["z_in"] + qr["L_r"] / 2 - qr["d"] / 2
         if z_lo < zw + o["pin_wall"] - 1e-9:
             warn.append(f".02C: радиальные штифты L4 от z {z_lo:.2f} заходят в зону окон (до {zw:.2f}) "
-                        f"+ pin_wall {o['pin_wall']:g} мм (Д-97)")
+                        f"+ pin_wall {o['pin_wall']:g} мм (Д-96)")
     warn += aw
     bl = blanks(r_in, r_out, stock, mats02,
                 FORMS_BY_02.get(pr.get("02"), MAT.FORMS))
