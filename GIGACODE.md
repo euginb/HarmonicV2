@@ -53,9 +53,9 @@ HarmonicV2/
 │   ├── vendor_prices.yaml   # Наличие, цены, сроки (поставщики)
 │   ├── ptk_input.yaml       # Входные параметры калькулятора ПТК
 │   ├── ptk_design_input.yaml # Параметры проработки (шаг 2)
-│   ├── ptk_configs.json     # Результаты шага 1 (машиночитаемые)
+│   ├── ptk_configs.yaml     # Результаты шага 1 (машиночитаемые)
 │   ├── ptk_designs.yaml     # Результаты шага 2 (комментированный YAML, Д-105)
-│   ├── catalog_hiwin_hg.json  # БД кареток HIWIN HG
+│   ├── catalog_hiwin_hg.yaml  # БД кареток HIWIN HG
 │   ├── cad_set.yaml         # Комплект чертежей
 │   ├── stock.yaml           # Остатки склада
 │   └── materials.yaml       # Справочник материалов
@@ -81,7 +81,7 @@ HarmonicV2/
 # Полный прогон (калькулятор + проработка + проверки + каталог)
 python main.py all
 
-# Только шаг 1: расчёт ПТК (SPEC-10 → ptk_configs.json)
+# Только шаг 1: расчёт ПТК (SPEC-10 → ptk_configs.yaml)
 python main.py calc
 
 # Только шаг 2: проработка (SPEC-11 → ptk_designs.yaml) по опубликованному шагу 1
@@ -153,7 +153,7 @@ python -m egm.cad --spec specs/cad_set.yaml
 - 4 ряда (0°/90°/180°/270°), Øнар ≤110 мм, передаточное u = 10…100
 - u = n = z − 1 (n — тел в ряду, z — впадин венца)
 - Типы генератора: `bearing` (на наружном кольце подшипника) / `eccentric` (на эксцентрике)
-- Шаги расчёта: 1) калькулятор SPEC-10 → ptk_configs.json; 2) проработка SPEC-11 → ptk_designs.yaml
+- Шаги расчёта: 1) калькулятор SPEC-10 → ptk_configs.yaml; 2) проработка SPEC-11 → ptk_designs.yaml
 
 ### Конструктивы сепаратора (Д-73)
 - **L1** — стакан монолитом (.02A)

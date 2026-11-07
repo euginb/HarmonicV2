@@ -9,7 +9,7 @@
 направление его эксцентрика.
 --spec specs/cad_set.yaml — комплект чертежей по спецификации (Д-61): записи items[] —
 исполнения целиком (id, design, layout, assy, фильтры rows/parts); ID из командной строки —
-низкоуровневый путь. Данные — specs/ptk_configs.json, specs/products.yaml.
+низкоуровневый путь. Данные — specs/ptk_configs.yaml, specs/products.yaml.
 Механизм и форматы 3D-экспорта — configs/application.yaml → cad: (Д-79): STEP —
 основной, FCStd (FreeCAD) — альтернативный; без FreeCAD/CadQuery — «пропущен».
 Пути в выводе — от корня репозитория; весь вывод консоли дублируется в
@@ -24,7 +24,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from egm import config, products, ptk, ptk_design, ptk_layout
+from egm import ptk_doc, config, products, ptk, ptk_design, ptk_layout
 from egm.cad import (assy, freecad, ptk_collar, ptk_cover, ptk_ecc, ptk_hub, ptk_ring, ptk_sep,
                      ptk_spacer, step, svg)
 
@@ -445,7 +445,7 @@ def main(argv):
     if a.spec and a.ids:
         ap.error("--spec и ID вместе не задаются")
     load = lambda n: json.loads((ROOT / "specs" / n).read_text(encoding="utf-8"))
-    configs, prods = load("ptk_configs.json"), config.load(
+    configs, prods = ptk_doc.load_specs(ROOT / "specs"), config.load(
         config.cfg_file(APP, "configs.products"))
     from egm import design_doc
     designs = design_doc.load_specs(ROOT / "specs")

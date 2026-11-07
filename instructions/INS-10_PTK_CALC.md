@@ -19,20 +19,20 @@
 
 Состав функционала: код — `egm/`; конфигурация — ручные YAML-файлы в `specs/`
 (описание каждого параметра — комментарием рядом с ним, Д-79); инструкции — этот файл
-и INS-30. Результаты прогона (SPEC-10/SPEC-11, `ptk_configs.json`, `ptk_designs.yaml`)
+и INS-30. Результаты прогона (SPEC-10/SPEC-11, `ptk_configs.yaml`, `ptk_designs.yaml`)
 машина пишет сама — руками их не править (code-first).
 
 ## 2. Правила и flow
 
 | Этап | Команда | Вход | Выход |
 |---|---|---|---|
-| 1. Расчёт | `python main.py calc --publish` | `specs/ptk_input.yaml`, `specs/vendor_prices.yaml` | `specs/SPEC-10_PTK_CALC.md`, `specs/ptk_configs.json` |
+| 1. Расчёт | `python main.py calc --publish` | `specs/ptk_input.yaml`, `specs/vendor_prices.yaml` | `specs/SPEC-10_PTK_CALC.md`, `specs/ptk_configs.yaml` |
 | — выбор | **человек**: по SPEC-10 выбрать исполнение (ID) | SPEC-10 | исполнение для шага 2 |
-| 2. Проработка | `python main.py design --publish` | **опубликованный** `specs/ptk_configs.json` (выход шага 1), `specs/ptk_design_input.yaml` | `specs/SPEC-11_PTK_DESIGN.md`, `specs/ptk_designs.yaml` |
-| 3. Чертежи | `python -m egm.cad --spec specs/cad_set.yaml` | `specs/cad_set.yaml` + `ptk_configs.json` + `ptk_designs.yaml` | `out/cad/**.svg|.step` |
+| 2. Проработка | `python main.py design --publish` | **опубликованный** `specs/ptk_configs.yaml` (выход шага 1), `specs/ptk_design_input.yaml` | `specs/SPEC-11_PTK_DESIGN.md`, `specs/ptk_designs.yaml` |
+| 3. Чертежи | `python -m egm.cad --spec specs/cad_set.yaml` | `specs/cad_set.yaml` + `ptk_configs.yaml` + `ptk_designs.yaml` | `out/cad/**.svg|.step` |
 
 Связь шагов явная (Д-79): вход шага 2 — опубликованный результат шага 1
-`specs/ptk_configs.json`. Шаг 2 гоняется отдельно, не пересчитывая шаг 1: прогнали шаг 1,
+`specs/ptk_configs.yaml`. Шаг 2 гоняется отдельно, не пересчитывая шаг 1: прогнали шаг 1,
 выбрали исполнение, вписали проработку в `designs[]`, прогнали шаг 2 — сколько угодно раз.
 `python main.py` без аргументов — прежний полный прогон: проверки ПО, шаг 1, шаг 2 по его
 же свежим исполнениям, проверка номенклатуры, каталог (INS-20).
@@ -86,7 +86,7 @@ c — расстояние от впадин до оси отверстия и �
 
 ### Выход
 
-`specs/ptk_configs.json` — все исполнения машиночитаемо (вход шага 2 и INS-30);
+`specs/ptk_configs.yaml` — все исполнения машиночитаемо (вход шага 2 и INS-30);
 `specs/SPEC-10_PTK_CALC.md` — та же таблица с расшифровкой. Оба — code-first.
 
 ### Как читать SPEC-10
@@ -115,7 +115,7 @@ c — расстояние от впадин до оси отверстия и �
 
 ### Вход
 
-**Опубликованный результат шага 1** — `specs/ptk_configs.json` (связь шагов, §2) —
+**Опубликованный результат шага 1** — `specs/ptk_configs.yaml` (связь шагов, §2) —
 ID шага 1 не меняются; и `specs/ptk_design_input.yaml` — проработки `designs[]`:
 имя (`name`), уточнение выбора (`bearing`, `gen`), вал (`shaft.d`, `bore`, `link`,
 допускаемые), балансировка (`balance.drills` — Ø только из имеющихся свёрл), конструктив
@@ -220,13 +220,13 @@ p = 360/z                 шаг впадин
 N                         порядок симметрии сверловки (болты + штифты)
 g = 360 / НОК(z, N)       шаг, по модулю которого сдвиги неразличимы
 s_k = (−φk) mod g         поворот сверловки ряда k от впадины 0, град
-s_k·π·Dотв/360            то же по дуге, мм (ptk_configs.json → s_arc_mm)
+s_k·π·Dотв/360            то же по дуге, мм (ptk_configs.yaml → s_arc_mm)
 cage_k = ((−s_k·z − φk)/n) mod (360/n)   поворот окон ряда k в сепараторе (Д-46)
 ```
 
 Венцы с одинаковым s — одна деталь. Буквы вариантов — `.01A`, `.01B`… — группы равного
 s по порядку рядов: первая группа — A, следующая новая — B; ряды варианта —
-`ptk_configs.json → parts[].rows` (таблица «Варианты деталей» — INS-30 §5). Все 4 венца
+`ptk_configs.yaml → parts[].rows` (таблица «Варианты деталей» — INS-30 §5). Все 4 венца
 одинаковы, если z кратно 4 или N кратно 4. Примеры для 8 болтов:
 
 | Штифты | N | Венцов при z = 20 | при z = 63 |
@@ -266,7 +266,7 @@ PTK-063-R2X4_2-8M3P2-BE3303
 └ тип редуктора (SPEC-01)
 ```
 
-Хэш — от снимка геометрии (`ptk_configs.json → geom`): `GEOM_REV`, u, тело, параметры
+Хэш — от снимка геометрии (`ptk_configs.yaml → geom`): `GEOM_REV`, u, тело, параметры
 `limits` (перечень в `egm/ptk.py`), крепление, `fasteners.<bolt>.d_clear, dk`,
 подшипник и тип генератора. Правка любого из них даёт новый ID; `mu`, `safety`, `F_M`,
 `web_min`, `u_list`, материалы, `sigma_H_*`, `groove_f`, имя крепления и `mount_mode`

@@ -328,12 +328,12 @@ def ring_parts(cid, ph):
 
 
 def find(rows, cid):
-    """Запись ptk_configs.json по ID исполнения или детали."""
+    """Запись ptk_configs.yaml по ID исполнения или детали."""
     base = cid.split(".")[0]
     for r in rows:
         if r.get("id") == base:
             return r
-    raise KeyError(f"конфигурация {base} не найдена в ptk_configs.json")
+    raise KeyError(f"конфигурация {base} не найдена в ptk_configs.yaml")
 
 
 def r_sum(u, D, a, lim):
@@ -526,7 +526,7 @@ def phasing_table(lim, holes):
 
 
 def to_rows(results, mounts):
-    """Строки ptk_configs.json; M, M_by считаются в calc (Д-41); mounts — для совместимости."""
+    """Строки ptk_configs.yaml; M, M_by считаются в calc (Д-41); mounts — для совместимости."""
     return [asdict(r) for r in results]
 
 
