@@ -1,7 +1,7 @@
 """Шаг 2 — проработка выбранного исполнения ПТК (Д-48, CP-38).
 
 Вход: specs/ptk_design_input.yaml → designs[]; исполнение шага 1 — ptk_configs.json.
-Выход: ptk_designs.json и SPEC-11_PTK_DESIGN.md; детали проработки — <ID>.03<вар>-<name>.
+Выход: ptk_designs.yaml (комментированный YAML, design_doc) и SPEC-11_PTK_DESIGN.md; детали проработки — <ID>.03<вар>-<name>.
 Исполнение задаётся полным ID или префиксом без хэша (+ bearing, gen): хэш меняется
 с геометрией шага 1 (Д-80), а проработка остаётся привязанной (Д-51).
 Считается: момент входного вала и доля эксцентрика, кручение вала (полый — 1 − β⁴),
@@ -163,7 +163,7 @@ def find(designs, cid, name):
     for r in designs:
         if r["id"] == base and r["name"] == name and r.get("ecc"):
             return r
-    raise KeyError(f"проработка {name} для {base} не найдена в specs/ptk_designs.json — "
+    raise KeyError(f"проработка {name} для {base} не найдена в specs/ptk_designs.yaml — "
                    f"проверить ptk_design_input.yaml, python main.py --publish (Д-48)")
 
 

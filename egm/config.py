@@ -4,8 +4,9 @@
 разделы продуктов, механизм чертежей; читается load_app(), ссылки на файлы
 резолвит cfg_file(). Ручные конфиги specs/*.yaml — только YAML: описание каждого
 параметра — комментарием прямо в файле («_comment»-ключи JSON больше не нужны).
-Code-first данные машина пишет в JSON (ptk_configs.json, ptk_designs.json,
-каталоги) — их читает json, не этот модуль. Зависимость — PyYAML (pip install pyyaml).
+Code-first данные машина пишет в JSON (ptk_configs.json, каталоги) — их читает json,
+не этот модуль; проработки шага 2 — комментированный YAML specs/ptk_designs.yaml
+(egm/design_doc.py, Д-105). Зависимость — PyYAML (pip install pyyaml).
 """
 
 from pathlib import Path

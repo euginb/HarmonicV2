@@ -3,7 +3,7 @@
 Связанные решения: Д-80 (ID исполнения), Д-80 (номенклатура), Д-30 (2D и 3D из одной
 геометрии), **Д-61** (спецификация комплекта). Код — `egm/cad/`; данные —
 опубликованные `specs/ptk_configs.json` (code-first, результат шага 1) и
-`specs/ptk_designs.json` (шаг 2), номенклатура — `specs/products.yaml` (spec-first,
+`specs/ptk_designs.yaml` (шаг 2), номенклатура — `specs/products.yaml` (spec-first,
 SPEC-03), комплект — `specs/cad_set.yaml` (Д-79, Д-61); конфигурация механизма
 (пути, форматы 3D-экспорта) — общий конфиг `configs/application.yaml` (Д-79, §7).
 
@@ -23,7 +23,7 @@ SPEC-03), комплект — `specs/cad_set.yaml` (Д-79, Д-61); конфиг
 ## 2. Правила и flow
 
 Место в цепочке (INS-10 §2): после шага 1 («Расчёт») и шага 2 («Проработка»).
-Генератор читает **опубликованные** `specs/ptk_configs.json` и `specs/ptk_designs.json` —
+Генератор читает **опубликованные** `specs/ptk_configs.json` и `specs/ptk_designs.yaml` —
 они должны соответствовать текущему коду и конфигам: сначала
 `python main.py --publish` с кодом выхода 0. Конфигурация механизма —
 `configs/application.yaml` (Д-79, §7); ручной конфиг комплекта —
@@ -69,12 +69,12 @@ products/vendor_prices/stock), ошибки и предупреждения — 
 | `python -m egm.cad <ID> --phase 90` | венец ряда с фазой φ = 90° (`row_phases`), на чертеже — направление его эксцентрика; файл `<NN><вар>-r<k>.svg` |
 | `python -m egm.cad <ID> --row 2` | то же по номеру ряда |
 | `python -m egm.cad <ID> --assy`              | сборка исполнения одним STEP `<ID>.step`: дерево ROWk (phi = …) → детали и BODIES_ROWk, слои 01_RING…REF, цвета, атрибуты CAx-IF; имя изделия (root-нода) — тег имени файла (Д-91); дубль дерева, метаданных и предлагаемые виды — `<ID>.assy.json` (Д-49, Д-50, OQ-14); имена узлов — только латиница (Д-52); метаданные во FreeCAD — макрос tools/freecad_meta.py; чертежи деталей во FreeCAD TechDraw — макрос tools/freecad_techdraw.py: геометрия и размеры по 3D из STEP, эталоны и легенда — `.assy.json → drawings`, расхождения — предупреждения на листе и в `<ID>.techdraw.md` (Д-65, OQ-20) |
-| `python -m egm.cad <ID>.03B-K10 --row 2` | эксцентрик проработки K10 шага 2 (`specs/ptk_designs.json`, Д-48): Ø вала, паз, балансировка — по SPEC-11; файл `03B-K10-r2.svg` |
+| `python -m egm.cad <ID>.03B-K10 --row 2` | эксцентрик проработки K10 шага 2 (`specs/ptk_designs.yaml`, Д-48): Ø вала, паз, балансировка — по SPEC-11; файл `03B-K10-r2.svg` |
 | `python -m egm.cad <ID> --design K10 --assy` | сборка с эксцентриками и валом проработки: `<ID>-K10.step`, `<ID>-K10.assy.json`; с конструктивом строятся `.02A\|B-<name>`, `.07A\|.07B-<name>`, `.11-<name>`; в сборке — `.09`, `.10` (×2), удлинённый вал (CP-45); без `--design` — предварительный эксцентрик шага 1 (вал `limits.shaft_d_min`) |
 
 ID исполнения — колонка ID в SPEC-10 или `ptk_configs.json → id`; ID деталей,
 их сдвиги s и ряды — `ptk_configs.json → parts[]`. В команде с `--design` указывайте
-ID с текущим хэшем (как в SPEC-10) — `ptk_designs.json` хранит полные ID; префикс без
+ID с текущим хэшем (как в SPEC-10) — `ptk_designs.yaml` хранит полные ID; префикс без
 хэша здесь не резолвится (в `--spec` — резолвится, §3).
 Коды выхода: 0 — построено; 1 — ID не найден, нет генератора или ошибка
 геометрии; 2 — нет аргументов.
