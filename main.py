@@ -1,7 +1,7 @@
 """Точка входа: python main.py [calc|design|all] [--publish]. Код выхода 0 — все проверки.
 
 Шаги (Д-79): calc — шаг 1 «Расчёт» (SPEC-10, ptk_configs.json из ptk_input.yaml +
-vendor_prices.yaml); design — шаг 2 «Проработка» (SPEC-11, ptk_designs.json из
+vendor_prices.yaml); design — шаг 2 «Проработка» (SPEC-11, ptk_designs.yaml из
 ptk_design_input.yaml по ОПУБЛИКОВАННОМУ specs/ptk_configs.json — связка выход шага 1 →
 вход шага 2); all (по умолчанию) — весь прогон, как прежде: шаг 1 → шаг 2 по его
 результату → проверки products → каталог.
@@ -170,7 +170,8 @@ def run_design(cfg_rows, require=False):
             config.cfg_file(APP, "products.PTK.configs.design_input")), cfg_rows, lim, extra)
     except (KeyError, ValueError, TypeError) as e:
         return [f"входные конфиги шага 2 (Д-79): {e!r}"]
-    write("specs", "ptk_designs.json", json.dumps(res, ensure_ascii=False, indent=2) + "\n")
+    from egm import design_doc
+    write("specs", design_doc.FILE + ".yaml", design_doc.dump(res))
     tpl = (TPL / "SPEC-11_PTK_DESIGN.md.tmpl").read_text(encoding="utf-8")
     text, missing = fill(tpl, **ptk_design.md(res))
     write("specs", "SPEC-11_PTK_DESIGN.md", text)

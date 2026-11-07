@@ -19,7 +19,7 @@
 
 Состав функционала: код — `egm/`; конфигурация — ручные YAML-файлы в `specs/`
 (описание каждого параметра — комментарием рядом с ним, Д-79); инструкции — этот файл
-и INS-30. Результаты прогона (SPEC-10/SPEC-11, `ptk_configs.json`, `ptk_designs.json`)
+и INS-30. Результаты прогона (SPEC-10/SPEC-11, `ptk_configs.json`, `ptk_designs.yaml`)
 машина пишет сама — руками их не править (code-first).
 
 ## 2. Правила и flow
@@ -28,8 +28,8 @@
 |---|---|---|---|
 | 1. Расчёт | `python main.py calc --publish` | `specs/ptk_input.yaml`, `specs/vendor_prices.yaml` | `specs/SPEC-10_PTK_CALC.md`, `specs/ptk_configs.json` |
 | — выбор | **человек**: по SPEC-10 выбрать исполнение (ID) | SPEC-10 | исполнение для шага 2 |
-| 2. Проработка | `python main.py design --publish` | **опубликованный** `specs/ptk_configs.json` (выход шага 1), `specs/ptk_design_input.yaml` | `specs/SPEC-11_PTK_DESIGN.md`, `specs/ptk_designs.json` |
-| 3. Чертежи | `python -m egm.cad --spec specs/cad_set.yaml` | `specs/cad_set.yaml` + `ptk_configs.json` + `ptk_designs.json` | `out/cad/**.svg|.step` |
+| 2. Проработка | `python main.py design --publish` | **опубликованный** `specs/ptk_configs.json` (выход шага 1), `specs/ptk_design_input.yaml` | `specs/SPEC-11_PTK_DESIGN.md`, `specs/ptk_designs.yaml` |
+| 3. Чертежи | `python -m egm.cad --spec specs/cad_set.yaml` | `specs/cad_set.yaml` + `ptk_configs.json` + `ptk_designs.yaml` | `out/cad/**.svg|.step` |
 
 Связь шагов явная (Д-79): вход шага 2 — опубликованный результат шага 1
 `specs/ptk_configs.json`. Шаг 2 гоняется отдельно, не пересчитывая шаг 1: прогнали шаг 1,
@@ -141,7 +141,7 @@ B пакета; тела не учитываются. J вх — на входн
 
 ### Выход
 
-`specs/ptk_designs.json` — проработки машиночитаемо (вход INS-30, в том числе для
+`specs/ptk_designs.yaml` — проработки машиночитаемо (вход INS-30, в том числе для
 `--design`); `specs/SPEC-11_PTK_DESIGN.md` — таблицы проработок, конструктива и оснастки.
 
 ### Как читать SPEC-11

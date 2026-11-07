@@ -3,7 +3,7 @@
 -> out/cad/<ID>/<деталь>[-r<k>].svg|.step
 --assy — сборка исполнения: out/cad/<ID>/<ID>.step + <ID>.assy.json (Д-49).
 --design NAME или ID детали <ID>.03B-NAME — эксцентрики и вал проработки шага 2 (Д-48)
-из specs/ptk_designs.json; файлы <деталь>-NAME…, сборка <ID>-NAME.step.
+из specs/ptk_designs.yaml; файлы <деталь>-NAME…, сборка <ID>-NAME.step.
 
 --phase φ / --row k — ряд редуктора: строится только венец этого ряда, на чертеже —
 направление его эксцентрика.
@@ -436,7 +436,7 @@ def main(argv):
                          "(по умолчанию — step: комплекта или cad.export.step.mode, Д-79)")
     ap.add_argument("--assy", action="store_true",
                     help="сборка исполнения в один STEP: дерево, слои, метаданные (Д-49)")
-    ap.add_argument("--design", help="проработка шага 2 из specs/ptk_designs.json (Д-48)")
+    ap.add_argument("--design", help="проработка шага 2 из specs/ptk_designs.yaml (Д-48)")
     ap.add_argument("--spec", help="спецификация комплекта чертежей (YAML, Д-61), "
                                    "например specs/cad_set.yaml; вместе с ID не задаётся")
     a = ap.parse_args(argv)
@@ -447,7 +447,8 @@ def main(argv):
     load = lambda n: json.loads((ROOT / "specs" / n).read_text(encoding="utf-8"))
     configs, prods = load("ptk_configs.json"), config.load(
         config.cfg_file(APP, "configs.products"))
-    designs = load("ptk_designs.json") if (ROOT / "specs" / "ptk_designs.json").exists() else []
+    from egm import design_doc
+    designs = design_doc.load_specs(ROOT / "specs")
     rep = _open_report(argv)
     try:
         if a.spec:
