@@ -59,9 +59,19 @@ def _cover(cfg, part):
         bands = [Band(0.0, pD / 2, -1.0, pH + 1.0, "cut")]
         if b09:
             bands.append(Band(0.0, b09["D"] / 2, pH - 0.5, b09["B"] + 0.5, "cut"))
+        g = (((lay.get("output") or {}).get("grooves") or {}).get("int")) if b09 else None
+        if g and g.get("d2") and g.get("m"):         # CP-90 2b-3 ч. 2, Д-102 п. 1: канавка ГОСТ 13943 за .09
+            zg = pH + b09["B"]
+            if zg + g["m"] <= t - c.get("snap_web", 0.0) + 1e-6 or zg + g["m"] < t:
+                bands.append(Band(0.0, g["d2"] / 2, zg, g["m"], "cut"))
+                gtxt = f"; канавка кольца {b09['D']:g} ГОСТ 13943 Ø{g['d2']:g} × m {g['m']:g} на z {zg:g}"
+            else:
+                gtxt = f"; канавка ГОСТ 13943 не помещается (z {zg:g} + m {g['m']:g} ≥ t {t:g})"
+        else:
+            gtxt = ""
         lip = t - pH - b09.get("B", 0.0)
         what = (f"карман Ø{pD:g}×{pH:g} под дно .02, гнездо .09 {b09.get('id', '—')} "
-                f"Ø{b09.get('D', 0):g}×{b09.get('B', 0):g}")
+                f"Ø{b09.get('D', 0):g}×{b09.get('B', 0):g}{gtxt}")
     m = PartModel(part["id"], t, c["D"], _circle(r_h), holes=holes, bands=bands)
     m.axes = [Circle(cfg["d_bc"] / 2)] + [Circle(b.r_out) for b in bands]
     m.dims = [Dim(c["D"], "D"), Dim(cfg["d_bc"], "Dотв"), Dim(round(2 * r_h, 2), "dотв")]
@@ -117,6 +127,10 @@ def self_test():
     assert [(x.z0, x.h) for x in a.bands] == [(1.0, 6.0)], a.bands
     assert len(b.bands) == 2 and b.bands[1].z0 + b.bands[1].h == 13.0, b.bands
     assert abs(math.hypot(*b.cut.pts[0]) - 15.5) < 1e-9
+    lg = {**lay, "covers": {**lay["covers"], "tB": 16.0},
+          "output": {"grooves": {"int": {"d2": 44.5, "m": 1.9}}}}                    # ГОСТ 13943
+    bg = build({**cfg, "layout": lg}, {"id": "PTK-T.07B-K", "side": "B", "rows": [1]})
+    assert len(bg.bands) == 3 and (bg.bands[2].z0, bg.bands[2].h) == (13.0, 1.9), bg.bands
     r = build(cfg, {"id": "PTK-T.11-K", "rows": [1]})
     assert r.thick == 1.0 and abs(math.hypot(*r.cut.pts[0]) - 5.0) < 1e-9
     for m in (a, b, r):

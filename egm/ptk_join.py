@@ -32,6 +32,7 @@ JOIN.update(k_fit=1.0, t_tech=2.0, tau_disk=80.0, r_lim=None, r_free=None, hub_d
             fl_gap=0.5)   # OQ-28, Д-94: радиальный зазор утопленного фланца .12 в отверстии бурта
 JOIN.update(hub_bore=None, hub_l=None, pin_wall=1.0)   # CP-83: обод ступицы D.10…d.09, длина, стенка за гнездом
 JOIN.update(leaf_fit="H7/js6")   # CP-84, Д-97: посадка дна-листа .13 в расточку обечайки .02C (L4); предварительно
+JOIN.update(seat_fit="H7/js6")   # CP-90 2b-3 ч. 2, Д-102 п. 2: опорный обод .12A в отверстии бурта/кольца; предварительно
 SCHEMES = ("collar", "insert", "ring")   # ring — L4: обечайка .02C + кольцо-бурт .14 (CP-81, Д-96); в join_order не входит
 DIRS = ("out", "in")          # направление бурта collar: наружу | внутрь (Д-93)
 
@@ -188,6 +189,34 @@ def _pin_ds(o, cat):
     return [d for d in ds if float(d) in cat] if cat else ds
 
 
+def _seat_pins(M, geo, o, n_win=None, cat=None):
+    """CP-90 2b-3 ч. 2, Д-102 п. 2: радиальные штифты бурт .02B / (стенка .02C + кольцо .14) → опорный
+    обод ступицы .12A, сидящий В ОТВЕРСТИИ бурта/кольца (посадка по цилиндру, не в торец).
+    geo(d) -> (r0 — отверстие бурта/кольца = радиус обода, t — стенка, сквозь которую идёт штифт).
+    Расчёт как insert (check): F = M/r0, срез, смятие стенки t и обода (pin_depth_k·d), срез к торцу;
+    n | n_win — по делению окон (одна установка SM-1, ось C); длина ≥ t + pin_depth_k·d;
+    гнездо в ободе hole12 = l − t + pin_gap (Д-74); осевая длина бурта/кольца/обода L = 2·edge_k·d."""
+    for d in _pin_ds(o, cat):
+        r0, t = geo(d)
+        g = {"r_j": r0, "t": t}
+        need = t + o["pin_depth_k"] * d
+        l, des = pin_len(d, need, cat)
+        if cat and l is None:
+            continue
+        ok = [n for n in sorted(o["pin_n"]) if not check(M, g, d, n, o)[1]]
+        if n_win:
+            ok = [n for n in ok if int(n_win) % n == 0] or ok
+        if not ok:
+            continue
+        s, _ = check(M, g, d, ok[0], o)
+        q = {"d": d, "n": ok[0], **{k: round(v, 1) for k, v in s.items()}}
+        q.update(seat=True, t=round(t, 2), need=round(need, 2), l=l, des=des, r0=round(r0, 2),
+                 key=f"{cat[float(d)]['key']}x{l:g}" if l else "", fit=o.get("seat_fit", "H7/js6"),
+                 hole12=round((l or need) - t + o["pin_gap"], 2))
+        return q
+    return None
+
+
 def _direct_pins(M, hub_d, g, d, dh, o):
     """CP-83: дно-лист .13 к ступице .12 напрямую, без фланца — штифты через лист в глухие гнёзда обода.
     Обод D.10/2…d.09/2, e = edge_k·d_h: r_h = d.09/2 − e, r_h − D.10/2 ≥ e; концы штифтов со стороны
@@ -262,6 +291,8 @@ def _ring(M, r_in, r_out, stock, by, tried, ta, o, cat, n_win):
             fit[m] = min(ts, key=_area)
     v = {"scheme": "ring", "geom": {k: round(x, 2) for k, x in g.items()}, "pins": None, "need": need,
          "fit": fit, "house": "", "rej": "", "note": "", "margin": None}
+    if o.get("seat"):                                            # CP-90 2b-3 ч. 2, Д-102 п. 2, Д-96
+        return [_ring_seat(M, r_in, r_out, stock, by, tried, ta, o, cat, n_win, v)]
     rad = pins(M, g, o, n_win, cat)
     if rad is None:
         v["note"] = "кольцо: радиальные штифты обечайка–кольцо не проходят"
@@ -321,6 +352,50 @@ def _ring(M, r_in, r_out, stock, by, tried, ta, o, cat, n_win):
             return [v]
     v["note"] = note or "кольцо: осевые штифты лист–кольцо не проходят"
     return [v]
+
+
+def _ring_seat(M, r_in, r_out, stock, by, tried, ta, o, cat, n_win, v):
+    """L4 по Д-102 п. 2 / Д-96 (2026-11-06): кольцо .14 r0…r_in × L_r в выходном торце обечайки .02C
+    (обечайка исходной длины, без +t_s); опорный обод .12A — в отверстии кольца (Ø 2·r0); ОДИН комплект
+    радиальных штифтов насквозь через стенку .02C и кольцо в гнездо обода, по делению окон.
+    w = max(t_tech, k_fit·d) — посадочная длина штифта в кольце (H7); L_r = 2·edge_k·d.
+    Фильтр r_free не применяется: отверстие кольца занято ободом ступицы -> вариант."""
+    def wf(d):
+        return max(o["t_tech"], o["k_fit"] * d)
+
+    q = _seat_pins(M, lambda d: (r_in - wf(d), r_out - r_in + wf(d)), o, n_win, cat)
+    if q is None:
+        v["note"] = "кольцо: радиальные штифты .02C + .14 → опорный обод не проходят"
+        return v
+    w = round(wf(q["d"]), 2)
+    r0, L_r = r_in - w, _up(q["L"])
+    q.update(L=L_r, L_r=L_r, w=w)
+    rb = _ring_blank(stock, by, o.get("ring_mats") or tried, r0, r_in, ta)
+    v.update(pins=q, ring={"r0": round(r0, 2), "r1": round(r_in, 2), "L": L_r, "w": w}, ring_blank=rb)
+    if rb is None:
+        v["rej"] = (f"кольцо .14: нет трубы/прутка Ø ≥ {2 * r_in + 2 * ta:.2f} с отв. ≤ "
+                    f"{2 * r0 - 2 * ta:.2f} из {', '.join(map(str, o.get('ring_mats') or tried))}")
+    return v
+
+
+def _sch_seat(p):
+    """Ячейка «Схема» L2/L4 по Д-102 п. 2: опорный обод .12A в отверстии бурта/кольца, радиальные штифты."""
+    q = p["pins"]
+    mg = f"; запас корпуса {p['margin']:g} мм" if p.get("margin") is not None else ""
+    if p["scheme"] == "ring":
+        rg, b = p["ring"], p.get("ring_blank") or {}
+        bl = (f"труба {b['tube']['D']:g}×{b['tube']['s']:g}" if b.get("tube") else
+              f"пруток Ø{b['bar']:g}" if b.get("bar") else "нет заготовки")
+        mt = f"{b['material']} " if b.get("material") else ""
+        r0 = rg["r0"]
+        head = (f"ring (L4): кольцо .14 Ø{2 * rg['r1']:g}/Ø{2 * r0:g}×{rg['L']:g} ({mt}{bl}) в торце .02C; "
+                "штифты насквозь .02C + кольцо")
+    else:
+        r0 = p["geom"]["r0"]
+        head = (f"collar (L2): бурт {'наружу' if p.get('dir') == 'out' else 'внутрь'} Ø{2 * r0:g}×{q['L']:g}; "
+                "штифты через бурт")
+    return (head + f" в опорный обод .12A Ø{2 * r0:g} (в отверстии, {q.get('fit') or 'H7/js6'}), радиально "
+            f"по делению окон, гнездо в ободе {q['hole12']:g}{mg}; лист .13 и осевые штифты — нет (Д-102 п. 2)")
 
 
 def hub_pins(M, hub_d, g, d, o, cat=None):
@@ -418,11 +493,19 @@ def collar_pins(M, dr, r_in, r_out, o, cat=None):
     return None, g, note
 
 
-def _collar(M, r_in, r_out, stock, by, tried, ta, o, cat):
-    """Варианты collar по направлениям бурта: штифты, труба по бурту, фильтр корпуса (Д-93)."""
+def _collar(M, r_in, r_out, stock, by, tried, ta, o, cat, n_win=None):
+    """Варианты collar по направлениям бурта: штифты, труба по бурту, фильтр корпуса (Д-93).
+    o["seat"] (CP-90 2b-3 ч. 2, Д-102 п. 2): опорный обод .12A в отверстии бурта, радиальные штифты
+    через бурт в обод по делению окон (_seat_pins); фильтр r_free (бурт внутрь) не применяется."""
     out = []
     for dr in DIRS:
-        q, g, note = collar_pins(M, dr, r_in, r_out, o, cat)
+        if o.get("seat"):
+            q = _seat_pins(M, lambda d, dr=dr: (lambda c: (c["r0"], c["t"]))(collar_geom(dr, r_in, r_out, d, o)),
+                           o, n_win, cat)
+            g = collar_geom(dr, r_in, r_out, q["d"] if q else (_pin_ds(o, cat) or [3.0])[0], o)
+            note = "" if q else "радиальные штифты бурт → опорный обод не проходят"
+        else:
+            q, g, note = collar_pins(M, dr, r_in, r_out, o, cat)
         need = [round(g["D"] + 2 * ta, 2), round(g["d"] - 2 * ta, 2)]
         fit = {}
         for m in tried:
@@ -434,7 +517,7 @@ def _collar(M, r_in, r_out, stock, by, tried, ta, o, cat):
             margin = o["r_lim"] - g["r1"]
             if margin < -1e-9:
                 house = f"корпус: r бурта {g['r1']:.2f} > {o['r_lim']:.2f} (карман .07B до болтов)"
-        if dr == "in" and o.get("r_free") is not None:
+        if dr == "in" and o.get("r_free") is not None and not o.get("seat"):   # Д-102 п. 2: отв. бурта — под обод
             margin = g["r0"] - o["r_free"]
             if margin < -1e-9:
                 house = f"корпус: r отв. бурта {g['r0']:.2f} < {o['r_free']:.2f} (.10/.11 + seat_wall)"
@@ -468,7 +551,7 @@ def choose(M, r_in, r_out, stock, mats=None, opt=None, n_win=None, cat=None):
             var += _ring(M, r_in, r_out, stock, by, tried, ta, o, cat, n_win)
             continue
         if s == "collar":                                        # CP-79, Д-93
-            var += _collar(M, r_in, r_out, stock, by, tried, ta, o, cat)
+            var += _collar(M, r_in, r_out, stock, by, tried, ta, o, cat, n_win)
             continue
         g = geometry(s, r_in, r_out, o)
         need = [round(g["D"] + 2 * ta, 2), round(g["d"] - 2 * ta, 2)]
@@ -566,6 +649,8 @@ def _sch_ring(p):
 
 def _sch(p):
     """Ячейка «Схема» SPEC-11: collar — направление, h_b, t_s с критерием, запас корпуса, отказ другого."""
+    if (p.get("pins") or {}).get("seat"):                            # CP-90 2b-3 ч. 2, Д-102 п. 2
+        return _sch_seat(p)
     if p["scheme"] == "ring":                                        # CP-81
         return _sch_ring(p)
     if not p.get("dir"):
@@ -599,6 +684,8 @@ def self_test():
     st = {"tube_allow": 0.5, "sheet_allow": 0.3, "tube_tol_D": 0.008, "tube_tol_s": 0.15,
           "materials": {"40Х": {"tubes": [{"D": 73.0, "s": 5.0}, {"D": 73.0, "s": 7.0}]}}}
     r_in, r_out = 33.06, 33.94
+    qs = _seat_pins(100.0, lambda d: (r_in - max(2.0, d), r_out - r_in + max(2.0, d)), JOIN, 50)   # Д-102 п. 2
+    assert qs["seat"] and (qs["d"], qs["n"], qs["hole12"], qs["L"]) == (3.0, 10, 5.0, 9.0), qs
     assert tube_ok({"D": 73.0, "s": 5.0}, 68.88, 65.12, st)
     assert not tube_ok({"D": 73.0, "s": 5.0}, 70.88, 63.12, st)
     assert tube_ok({"D": 73.0, "s": 5.0}, 70.88, 63.12)
