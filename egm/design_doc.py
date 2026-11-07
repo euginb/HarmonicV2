@@ -291,6 +291,8 @@ GLOSSARY = {
     "layout.cad_parts[].join.hub_bore": "Ø отверстия под .10, мм.",
     "layout.cad_parts[].join.hub_l": "Длина ступицы, мм.",
     "layout.cad_parts[].join.weld": "Сварной маршрут (null — не применяется).",
+    "layout.cad_parts[].side": "Сторона детали: A — вход, B — выход (крышки .07A/.07B).",
+    "layout.output.fl_txt": "Готовая строка вывода для SPEC-11 (фланец или причина его неприменимости).",
     "layout.cad_parts[].join.seat": "true — схема «опорный обод .12A в отверстии бурта/кольца» (Д-102 п. 2).",
     "layout.cad_parts[].join.axial": "Осевые штифты (в seat-схеме false — их нет).",
     "layout.cad_parts[].join.r_seat": "Радиус опорного обода = радиус отверстия бурта/кольца, мм.",
