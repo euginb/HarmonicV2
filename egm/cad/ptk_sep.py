@@ -66,7 +66,8 @@ def build(cfg, part, row=None):
     if jn:                               # CP-63: .02B — бурт (collar), .02C — стенка под .12B (insert)
         W, z, L = s["length"], jn["z"], jn["L"]
         ins = jn["scheme"] in ("insert", "ring")   # CP-81: L4 — обечайка .02C без бурта, кольцо .14 внутри
-        lf = jn.get("t_s", 0.0) if jn["scheme"] == "ring" else 0.0   # CP-84, Д-97: лист .13 в расточке обечайки
+        lf = (jn.get("t_s", 0.0) if jn["scheme"] == "ring" and not jn.get("seat")   # CP-84, Д-97 (ветка без output);
+              else 0.0)                                                              # Д-102 п. 2: .02C до торца кольца
         end = z + L + lf if ins else z
         if end > W + 1e-9:
             m.bands.append(Band(s["r_in"], s["r_out"], W, end - W))
@@ -83,7 +84,9 @@ def build(cfg, part, row=None):
             m.pins = [PinHole(a, jn["pin_z"], jn["pin_d"], r0 - 1.0, r1 + 1.0) for a in jn["pin_a"]]
         pl = f"×{jn['pin_l']:g}" if jn.get("pin_l") else ""
         under = (f"кольцо-бурт .14 (L4, Д-96) и дно-лист .13 t_s {lf:g} в расточке, заподлицо с торцом (Д-97)"
-                 if jn["scheme"] == "ring" else "дно-вставку .12B")
+                 if jn["scheme"] == "ring" and not jn.get("seat")
+                 else "кольцо-бурт .14 (L4, Д-96); опорный обод .12A — в его отверстии" if jn["scheme"] == "ring"
+                 else "дно-вставку .12B")
         m.notes.append((f"обечайка .02C без бурта: стенка до z {end:g} под {under}" if ins else
                         f"бурт .02B Ø{2 * r0:g}/Ø{2 * r1:g} на z {z:g}…{z + L:g}: поясок .12A — в отверстии")
                        + f"; штифты {jn['pin_n']}×Ø{jn['pin_d']:g}{pl} радиально на z {jn['pin_z']:g}, "

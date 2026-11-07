@@ -330,6 +330,11 @@ def join_cad(cfg, rec):
             "weld": {"sheet": p["sheet"],
                      "seam": round((win[0]["cage"] + 180.0 / n) % 360, 4) if n else None}
             if weld else None}
+    if q.get("seat"):                        # CP-90 2b-3 ч. 2, Д-102 п. 2: L2/L4 — опорный обод .12A
+        r0 = p["ring"]["r0"] if p["scheme"] == "ring" else g["r0"]        # в отверстии бурта/кольца; радиальные
+        res.update(seat=True, axial=False, r_seat=r0, ring=p.get("ring"),  # штифты по окнам (pin_a, pin_z выше);
+                   fit=q.get("fit"), **({"dir": p["dir"]} if p.get("dir") else {}))   # .13 нет
+        return res
     if p.get("dir"):                         # CP-79, Д-93: collar — бурт h_b + дно-лист t_s, осевые сквозные
         res.update(dir=p["dir"], axial=True, h_b=q["h_b"], t_s=q["t_s"],
                    crit=q["crit"], t_s_min=q["t_s_min"], hub=q.get("hub"),   # CP-80: ступица–лист
@@ -344,9 +349,6 @@ def join_cad(cfg, rec):
                                  for j in range(a["n"])]})
         res["ax"].update(t_s=q["t_s"], hub=q.get("hub"), scheme="ring",
                          fit=(q.get("leaf") or {}).get("fit"))   # CP-84, Д-97: посадка листа в обечайку
-    if rec.get("output") and (p.get("dir") or p["scheme"] == "ring"):   # CP-90 2b-3, Д-102 п. 2: L2/L4 —
-        res["seat"] = True                   # без дна-листа .13, ступица фланцем t_s к торцу бурта/кольца
-        res["t_s"] = q["t_s"]
     return res
 
 
@@ -390,7 +392,11 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None, pi
     if pins:
         d = {**d, "join": {**(d.get("join") or {}), "pin_cat": ptk_join.pin_cat(pins)}}
     if isinstance(codes, str):
-        return _one(cfg, d, codes, ecc, shaft_d, row_gap, prods, bears, stock)
+        r, e, w = _one(cfg, d, codes, ecc, shaft_d, row_gap, prods, bears, stock)
+        if e and codes != "L3" and any(DEGEN in x for x in e):
+            return _to_l3(cfg, d, ecc, shaft_d, row_gap, prods, bears, stock, [f"{codes} — " + "; ".join(e)],
+                          (r, e, w))
+        return r, e, w
     rej = []
     for code in codes:
         r, e, w = _one(cfg, d, str(code), ecc, shaft_d, row_gap, prods, bears, stock)
@@ -398,7 +404,20 @@ def layout(cfg, d, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None, pi
             return r, e, w + [f"конструктив {code} выбран из {', '.join(map(str, codes))}"
                               + (": " + "; ".join(rej) if rej else "")]
         rej.append(f"{code} — " + "; ".join(e))
+    if "L3" not in map(str, codes) and any(DEGEN in x for x in rej):
+        return _to_l3(cfg, d, ecc, shaft_d, row_gap, prods, bears, stock, rej, (r, e, w))
     return r, e, w
+
+
+DEGEN = "вырождаются в L3"   # маркер ошибки _one (Д-102 п. 4): L2/L4 бессмысленны -> L3
+
+
+def _to_l3(cfg, d, ecc, shaft_d, row_gap, prods, bears, stock, rej, last):
+    """Д-102 п. 4: L2/L4 вырождены, L3 в списке нет — калькулятор подставляет L3 сам."""
+    r, e, w = _one(cfg, d, "L3", ecc, shaft_d, row_gap, prods, bears, stock)
+    if r is not None and not e:
+        return r, e, w + ["конструктив L3 подставлен (Д-102 п. 4): " + "; ".join(rej)]
+    return last[0], last[1] + [f"L3 (подстановка) — " + "; ".join(e)], last[2]
 
 
 def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None):
@@ -467,9 +486,12 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
             o2.setdefault("hub_l", o.get("hub_l_out")
                           or o["ax_gap"] + (b or {}).get("B", 0.0) + o["lip"] + o["out_ext"])   # CP-90
             o2.setdefault("pin_wall", o["pin_wall"])
+            o2["seat"] = out is not None                            # CP-90 2b-3 ч. 2, Д-102 п. 2: обод в отв. бурта/кольца
             j1 = ptk_join.choose(M, r_in, r_out, stock, mats02, o2, cfg.get("n"))
             if jn is None:
                 jn = j1
+            if out is not None:                                     # .09 выбран выходом (Д-104) — один проход
+                break
             if ptk_join.mode(j1) == "direct":
                 jn, b09, tau = j1, b, t
                 if b0 is not None and b is not b0:
@@ -484,13 +506,15 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
             belt = (q["L"] + (o["cup_t"] if p["scheme"] == "insert" else 0.0)    # CP-63, Д-76
                     + (0.0 if (q.get("hub") or {}).get("flush")                 # Д-94: фланец в бурте
                        else (q.get("hub") or {}).get("h_f", 0.0)))                # CP-80: + фланец .12
-            wall = (p["geom"]["r_j"] - q["hole12"] - (b10 or {}).get("D", 0.0) / 2
-                    if p["scheme"] == "insert" else o["pin_wall"])   # CP-79: collar — осевые; CP-81: ring — w ≥ hole12 + pin_wall
+            rs = ((p["ring"]["r0"] if p["scheme"] == "ring" else p["geom"]["r0"])     # Д-102 п. 2: обод в отв.
+                  if q.get("seat") else p["geom"]["r_j"] if p["scheme"] == "insert" else None)
+            wall = (rs - q["hole12"] - (b10 or {}).get("D", 0.0) / 2 if rs is not None
+                    else o["pin_wall"])   # CP-79: collar — осевые; CP-81: ring — w ≥ hole12 + pin_wall
             if wall < o["pin_wall"] - 1e-9:
                 warn.append(f".12: стенка под гнездом штифта {wall:.2f} < pin_wall {o['pin_wall']:g} мм "
                             "(TECH-01, Д-76)")
             n_w = int(cfg.get("n") or 0)
-            if p["scheme"] in ("insert", "ring") and n_w and n_w % q["n"]:
+            if (p["scheme"] in ("insert", "ring") or q.get("seat")) and n_w and n_w % q["n"]:
                 warn.append(f".02C: штифтов {q['n']} не делитель числа окон {n_w} — отверстия "
                             "не по делению окон (Д-72)")
     # Вырождение L2/L4 → L3 (Д-102 п. 4, уточнение 2026-11-06): при малых диаметрах бурт .02B /
@@ -502,15 +526,29 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
     # выходном торце (Д-104), к ободу отношения не имеет.
     if out and b09 and jn and jn.get("pick"):
         r_h = (b09.get("da") or (b09["d"] + 0.3 * (b09["D"] - b09["d"]))) / 2   # da нет в каталоге — оценка
-        pk, cw = jn["pick"], o["seat_wall"]
+        pk, q = jn["pick"], jn["pick"].get("pins") or {}
         out.update(r_h=round(r_h, 2), da_est=not b09.get("da"))
-        if pk["scheme"] == "ring" and pk["ring"]["r0"] < r_h + cw - 1e-9:
-            err.append(f"{code}: L2/L4 вырождаются в L3 — бурт/кольцо вплотную к ступице, радиальный штифт "
-                       f"со стороны окон не помещается: отв. кольца .14 r {pk['ring']['r0']:g} < "
-                       f"r_h .09 {r_h:.2f} + seat_wall {cw:g} (Д-102 п. 4)")
-        if pk.get("dir") == "in" and pk["geom"]["r0"] < r_h + cw - 1e-9:
-            err.append(f"{code}: бурт внутрь доходит до ступицы (радиальный штифт не помещается) — "
-                       f"r0 {pk['geom']['r0']:g} < {r_h + cw:.2f}; L1/L3 (Д-102 п. 4)")
+        # Д-102 п. 4 (2026-11-07, заказчик): L2/L4 имеют смысл, только если опорный обод .12A — отдельное
+        # утолщение ступицы: s_об = r0 − r_h вмещает гнездо штифта hole12 и перемычку pin_wall до зоны
+        # заплечика .09; ob_min — технологический минимум (supports). Иначе (тонкий обод или его нет,
+        # r0 ≤ r_h) деление на детали бессмысленно -> ошибка с маркером «вырождаются в L3»; layout()
+        # переходит к L3. Прежний критерий r0 ≥ r_h + seat_wall (обод к торцу) не применяется.
+        if q.get("seat"):
+            ring = pk["scheme"] == "ring"
+            r0 = pk["ring"]["r0"] if ring else pk["geom"]["r0"]
+            s_ob = r0 - r_h
+            s_need = max(q["hole12"] + o["pin_wall"], float(o.get("ob_min") or 0.0))
+            out.update(s_ob=round(s_ob, 2), s_ob_need=round(s_need, 2))
+            where = f"отв. {'кольца .14' if ring else 'бурта .02B'} r0 {r0:g}, заплечик .09 r_h {r_h:.2f}"
+            if s_ob < s_need - 1e-9:
+                why = (f"толщина {s_ob:.2f} < {s_need:.2f} (гнездо {q['hole12']:g} + pin_wall {o['pin_wall']:g}"
+                       + (f", ob_min {o['ob_min']:g}" if o.get("ob_min") else "") + ")"
+                       if s_ob > 1e-9 else "отсутствует (r0 ≤ r_h)")
+                err.append(f"{code}: L2/L4 вырождаются в L3 — опорный обод .12A {why}: {where}; "
+                           "деление на детали не имеет смысла (Д-102 п. 4)")
+            else:
+                warn.append(f"{code}: опорный обод .12A s_об {s_ob:.2f} ≥ {s_need:.2f} ({where}; Д-102 п. 4)"
+                            + (" — da .09 оценкой" if not b09.get("da") else ""))
     ax, aw = axial(width, row_gap, b09, b10, r_pk, cfg, o, "07" in pr, belt)
     if jn and jn.get("pick") and jn["pick"]["scheme"] == "ring":            # CP-84, Д-97: радиальные L4 вне окон
         qr = jn["pick"]["pins"]
