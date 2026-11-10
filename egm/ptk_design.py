@@ -188,40 +188,132 @@ def apply(cfg, des):
 
 
 def md(res):
-    """Поля шаблона SPEC-11."""
-    L = ["| Проработка | ID | Вал d / отв., мм | Соединение | M, Н·м | T вх / T э, Н·м | "
-         "τ / [τ], МПа | σ см / [σ], МПа | Балансировка | Остаток, г·мм | m пакета, г | "
-         "J вх, кг·м² | Статус |", "|---" * 13 + "|"]
+    """Формирование разделов SPEC-11.
+
+    Сводка: данные транспонированы — строки = параметры, колонки = проработки.
+    Каждая ячейка содержит расшифровку значения.
+    """
     P = ["| Деталь | Как на шаге 1 | Паз, ° | Ряды |", "|---|---|---|---|"]
     E, W, C, T = [], [], [], \
         [ptk_layout.TOOL_HEAD, ptk_layout.TOOL_RULE]
+
     for r in res:
         s = r.get("shaft")
         if s:
             k, b, m = r["link"], r["ecc"]["bal"], r["mass"]
-            lk = k["type"] + (f" {k['b']:g}×{k['h']:g}" if k.get("b") else "")
-            sig = f"{k['sigma']:g} / {k['sigma_allow']:g}" if k.get("sigma") is not None else "—"
-            bal = f"{b['n']}×Ø{b['d']:g}, r {b['r']:g}" if b["n"] else "нет"
-            L.append(f"| {r['name']} | {r['id']} | {s['d']:g} / {s['bore']:g} | {lk} | {s['M']:g} | "
-                     f"{s['T_in']:g} / {s['T_e']:g} | {s['tau']:g} / {s['tau_allow']:g} | {sig} | "
-                     f"{bal} | {b['res']:g} | {m['sum_g']:g} | {m['J_in']:.2e} | "
-                     f"{'OK' if r['ok'] else 'нет'} |")
             P += [f"| {p['id']} | {p['base']} | {p['key_angle']:g} | "
                   f"{', '.join(str(x) for x in p['rows'])} |" for p in r["parts"]]
             if r.get("layout"):
                 C.append((r["name"], r["layout"]))
                 T += ptk_layout.md_tool(r["name"], r["layout"])
-        else:
-            L.append(f"| {r['name']} | {r['id']} |" + " — |" * 10 + " нет |")
         tag = f"- {r['name']} ({r['id']}): "
         E += [tag + e for e in r["errors"]]
         W += [tag + w for w in r["warnings"]]
-    return {"summary": "\n".join(L) if res else "нет проработок",
+
+    return {"summary": _md_summary(res) if res else "нет проработок",
             "parts": "\n".join(P) if len(P) > 2 else "нет",
             "layouts": ptk_layout.md_tables(C) if C else "нет",
             "tooling": "\n".join(T) if len(T) > 2 else "нет",
             "errors": "\n".join(E) or "нет", "warnings": "\n".join(W) or "нет",
             "theory": THEORY, "n_ok": sum(r["ok"] for r in res), "n_all": len(res)}
+
+
+def _md_summary(res):
+    """Транспонированная таблица «Сводка»: параметры как строки, проработки как колонки."""
+    names = [r["name"] for r in res if r.get("shaft")]
+    if not names:
+        return "нет проработок"
+
+    H = f"| Параметр | { ' | '.join(names) } |"
+    R = "|---" * (len(names) + 1) + "|"
+    rows = []
+
+    def _ok(r):
+        return "✓" if r["ok"] else "✗"
+
+    for r in res:
+        s = r.get("shaft")
+        if not s:
+            continue
+        k = r["link"]
+        lk = k["type"]
+        if k.get("b"):
+            lk = f"шпонка {k['b']:g}×{k['h']:g}"
+        elif k.get("type") in ("flat",):
+            lk = "лыска"
+        elif k.get("type") in ("integral",):
+            lk = "вал-эксцентрик"
+
+        b = r["ecc"]["bal"]
+        bal = f"{b['n']}×Ø{b['d']:g} r {b['r']:g}" if b["n"] else "нет"
+
+        # Расшифровка значения: число + пояснение в скобках
+        def _val(name, val, unit="", extra=""):
+            """Ячейка: значение + пояснение, если есть."""
+            txt = f"{val}{unit}" if val not in ("—",) else "—"
+            if extra:
+                txt = f"{txt} ({extra})"
+            return txt
+
+        rows.append(("ID", _val("id", r["id"])))
+        rows.append(("Вал d", f"Ø{s['d']:g} мм" if s["d"] else "—"))
+        rows.append(("Соединение .03–вал", lk))
+        rows.append(("M выходной", f"{s['M']:g} Н·м"))
+        rows.append(("T вх / T э", f"{s['T_in']:g} / {s['T_e']:g} Н·м"))
+        rows.append(("τ кручения", f"{s['tau']:g} / {s['tau_allow']:g} МПа"))
+        if k.get("sigma") is not None:
+            rows.append(("σсм шпонки", f"{k['sigma']:g} / {k['sigma_allow']:g} МПа"))
+        else:
+            rows.append(("σсм шпонки", "—"))
+        rows.append(("Балансировка", bal))
+        rows.append(("Остат. дисб.", f"{b['res']:g} г·мм"))
+        rows.append(("m пакета", f"{r['mass']['sum_g']:g} г"))
+        rows.append(("J вх", f"{r['mass']['J_in']:.2e} кг·м²"))
+        rows.append(("Итог", _ok(r)))
+
+    # Транспонируем: теперь names — колонки, параметр — строка
+    # Строим по параметрам
+    params = {}
+    for r in res:
+        s = r.get("shaft")
+        if not s:
+            continue
+        k = r["link"]
+        b = r["ecc"]["bal"]
+
+        params.setdefault("ID", {})[r["name"]] = r["id"]
+        params.setdefault("Вал d", {})[r["name"]] = f"Ø{s['d']:g} мм" if s["d"] else "—"
+        lk = k["type"]
+        if k.get("b"):
+            lk = f"шпонка {k['b']:g}×{k['h']:g}"
+        elif k.get("type") in ("flat",):
+            lk = "лыска"
+        elif k.get("type") in ("integral",):
+            lk = "вал-эксцентрик"
+        params.setdefault("Соединение .03–вал", {})[r["name"]] = lk
+
+        params.setdefault("M выходной", {})[r["name"]] = f"{s['M']:g} Н·м"
+        params.setdefault("T вх / T э", {})[r["name"]] = f"{s['T_in']:g} / {s['T_e']:g} Н·м"
+        params.setdefault("τ кручения", {})[r["name"]] = f"{s['tau']:g} / {s['tau_allow']:g} МПа"
+
+        if k.get("sigma") is not None:
+            params.setdefault("σсм шпонки", {})[r["name"]] = f"{k['sigma']:g} / {k['sigma_allow']:g} МПа"
+        else:
+            params.setdefault("σсм шпонки", {})[r["name"]] = "—"
+
+        bal = f"{b['n']}×Ø{b['d']:g} r {b['r']:g}" if b["n"] else "нет"
+        params.setdefault("Балансировка", {})[r["name"]] = bal
+        params.setdefault("Остат. дисб.", {})[r["name"]] = f"{b['res']:g} г·мм"
+        params.setdefault("m пакета", {})[r["name"]] = f"{r['mass']['sum_g']:g} г"
+        params.setdefault("J вх", {})[r["name"]] = f"{r['mass']['J_in']:.2e} кг·м²"
+        params.setdefault("Итог", {})[r["name"]] = _ok(r)
+
+    out = [f"## Сводка", "", H, R]
+    for param, vals in params.items():
+        cells = " | ".join(f"{vals.get(n, '—')}" for n in names)
+        out.append(f"| {param} | {cells} |")
+
+    return "\n".join(out)
 
 
 def self_test():
