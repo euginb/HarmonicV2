@@ -693,6 +693,9 @@ def md_tables(items):
     for nid, nname in NOMEN:
         A.append(f"| {nid} | {nname} |")
 
+    # Пустая строка перед таблицей проработок
+    A.append("")
+
     for name, r in items:
         var, c = r.get("var") or {}, r["cup"]
         det = ", ".join("." + k + var.get(k, "") for k in sorted(r["parts"]))

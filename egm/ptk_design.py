@@ -308,7 +308,7 @@ def _md_summary(res):
         params.setdefault("J вх", {})[r["name"]] = f"{r['mass']['J_in']:.2e} кг·м²"
         params.setdefault("Итог", {})[r["name"]] = _ok(r)
 
-    out = [f"## Сводка", "", H, R]
+    out = [H, R]
     for param, vals in params.items():
         cells = " | ".join(f"{vals.get(n, '—')}" for n in names)
         out.append(f"| {param} | {cells} |")
