@@ -693,8 +693,10 @@ def md_tables(items):
     for nid, nname in NOMEN:
         A.append(f"| {nid} | {nname} |")
 
-    # Пустая строка перед таблицей проработок
+    # Пустая строка, затем шапка и строки проработок
     A.append("")
+    A.append("| Проработка | Конструктив | Сепаратор .02 | Ступица .12 | Детали | Длина, мм |")
+    A.append("|---|---|---|---|---|---|")
 
     for name, r in items:
         var, c = r.get("var") or {}, r["cup"]

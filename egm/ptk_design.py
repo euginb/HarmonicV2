@@ -219,60 +219,35 @@ def md(res):
 
 
 def _md_summary(res):
-    """Транспонированная таблица «Сводка»: параметры как строки, проработки как колонки."""
+    """Транспонированная таблица «Сводка»: параметры как строки, проработки как колонки.
+    Колонка «Описание» содержит расшифровку каждого параметра.
+    """
     names = [r["name"] for r in res if r.get("shaft")]
     if not names:
         return "нет проработок"
 
-    H = f"| Параметр | { ' | '.join(names) } |"
-    R = "|---" * (len(names) + 1) + "|"
-    rows = []
+    # Расшифровки параметров
+    DESCR = {
+        "ID": "ID исполнения шага 1 (SPEC-10).",
+        "Вал d": "Ø входного вала, мм (расчёт кручения, шпонка).",
+        "Соединение .03–вал": "Тип и размер: шпонка b×h / лыска / вал-эксцентрик.",
+        "M выходной": "M выходной, Н·м — допускаемый момент из SPEC-10.",
+        "T вх / T э": "T вх — момент на входе, Н·м; T э — доля на один эксцентрик, Н·м.",
+        "τ кручения": "τ вала, МПа — кручение с ослаблением шпоночным пазом.",
+        "σсм шпонки": "σсм шпонки, МПа — смятие рабочей высоты паза.",
+        "Балансировка": "Балансировка: число отверстий × Ø, радиус r (Д-36, Д-46).",
+        "Остат. дисб.": "Остаточный дисбаланс после балансировки, г·мм.",
+        "m пакета": "m пакета, г — суммарная масса эксцентриков, подшипников и вала.",
+        "J вх": "J вх, кг·м² — момент инерции пакета на входе (приведённый к выходу: J вых = J вх·u²).",
+        "Итог": "✓ — все проверки пройдены; ✗ — есть ошибки (не проходят вал/шпонка/стенка).",
+    }
+
+    H = "| Параметр | Описание | " + " | ".join(names) + " |"
+    R = "|---" * (2 + len(names)) + "|"
 
     def _ok(r):
         return "✓" if r["ok"] else "✗"
 
-    for r in res:
-        s = r.get("shaft")
-        if not s:
-            continue
-        k = r["link"]
-        lk = k["type"]
-        if k.get("b"):
-            lk = f"шпонка {k['b']:g}×{k['h']:g}"
-        elif k.get("type") in ("flat",):
-            lk = "лыска"
-        elif k.get("type") in ("integral",):
-            lk = "вал-эксцентрик"
-
-        b = r["ecc"]["bal"]
-        bal = f"{b['n']}×Ø{b['d']:g} r {b['r']:g}" if b["n"] else "нет"
-
-        # Расшифровка значения: число + пояснение в скобках
-        def _val(name, val, unit="", extra=""):
-            """Ячейка: значение + пояснение, если есть."""
-            txt = f"{val}{unit}" if val not in ("—",) else "—"
-            if extra:
-                txt = f"{txt} ({extra})"
-            return txt
-
-        rows.append(("ID", _val("id", r["id"])))
-        rows.append(("Вал d", f"Ø{s['d']:g} мм" if s["d"] else "—"))
-        rows.append(("Соединение .03–вал", lk))
-        rows.append(("M выходной", f"{s['M']:g} Н·м"))
-        rows.append(("T вх / T э", f"{s['T_in']:g} / {s['T_e']:g} Н·м"))
-        rows.append(("τ кручения", f"{s['tau']:g} / {s['tau_allow']:g} МПа"))
-        if k.get("sigma") is not None:
-            rows.append(("σсм шпонки", f"{k['sigma']:g} / {k['sigma_allow']:g} МПа"))
-        else:
-            rows.append(("σсм шпонки", "—"))
-        rows.append(("Балансировка", bal))
-        rows.append(("Остат. дисб.", f"{b['res']:g} г·мм"))
-        rows.append(("m пакета", f"{r['mass']['sum_g']:g} г"))
-        rows.append(("J вх", f"{r['mass']['J_in']:.2e} кг·м²"))
-        rows.append(("Итог", _ok(r)))
-
-    # Транспонируем: теперь names — колонки, параметр — строка
-    # Строим по параметрам
     params = {}
     for r in res:
         s = r.get("shaft")
@@ -281,8 +256,6 @@ def _md_summary(res):
         k = r["link"]
         b = r["ecc"]["bal"]
 
-        params.setdefault("ID", {})[r["name"]] = r["id"]
-        params.setdefault("Вал d", {})[r["name"]] = f"Ø{s['d']:g} мм" if s["d"] else "—"
         lk = k["type"]
         if k.get("b"):
             lk = f"шпонка {k['b']:g}×{k['h']:g}"
@@ -290,18 +263,18 @@ def _md_summary(res):
             lk = "лыска"
         elif k.get("type") in ("integral",):
             lk = "вал-эксцентрик"
-        params.setdefault("Соединение .03–вал", {})[r["name"]] = lk
 
+        bal = f"{b['n']}×Ø{b['d']:g} r {b['r']:g}" if b["n"] else "нет"
+
+        params.setdefault("ID", {})[r["name"]] = r["id"]
+        params.setdefault("Вал d", {})[r["name"]] = f"Ø{s['d']:g} мм" if s["d"] else "—"
+        params.setdefault("Соединение .03–вал", {})[r["name"]] = lk
         params.setdefault("M выходной", {})[r["name"]] = f"{s['M']:g} Н·м"
         params.setdefault("T вх / T э", {})[r["name"]] = f"{s['T_in']:g} / {s['T_e']:g} Н·м"
         params.setdefault("τ кручения", {})[r["name"]] = f"{s['tau']:g} / {s['tau_allow']:g} МПа"
-
-        if k.get("sigma") is not None:
-            params.setdefault("σсм шпонки", {})[r["name"]] = f"{k['sigma']:g} / {k['sigma_allow']:g} МПа"
-        else:
-            params.setdefault("σсм шпонки", {})[r["name"]] = "—"
-
-        bal = f"{b['n']}×Ø{b['d']:g} r {b['r']:g}" if b["n"] else "нет"
+        params.setdefault("σсм шпонки", {})[r["name"]] = (
+            f"{k['sigma']:g} / {k['sigma_allow']:g} МПа" if k.get("sigma") is not None else "—"
+        )
         params.setdefault("Балансировка", {})[r["name"]] = bal
         params.setdefault("Остат. дисб.", {})[r["name"]] = f"{b['res']:g} г·мм"
         params.setdefault("m пакета", {})[r["name"]] = f"{r['mass']['sum_g']:g} г"
@@ -311,7 +284,8 @@ def _md_summary(res):
     out = [H, R]
     for param, vals in params.items():
         cells = " | ".join(f"{vals.get(n, '—')}" for n in names)
-        out.append(f"| {param} | {cells} |")
+        desc = DESCR.get(param, "")
+        out.append(f"| {param} | {desc} | {cells} |")
 
     return "\n".join(out)
 
