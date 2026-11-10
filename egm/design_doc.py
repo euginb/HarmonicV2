@@ -22,8 +22,9 @@ specs/ptk_designs.yaml, где ПЕРЕД КАЖДЫМ ключом стоит �
 """
 
 import json
-import re
 from pathlib import Path
+
+from egm import doc_yaml
 
 try:
     import yaml
@@ -468,155 +469,29 @@ GENERIC = {
 }
 
 # ---------------------------------------------------------------------------
-# Эмиттер
+# Документ (эмиттер — общий, egm/doc_yaml.py)
 # ---------------------------------------------------------------------------
 
-_NUM = re.compile(r"^[-+]?(?:\d[\d_]*)(?:\.\d*)?(?:[eE][-+]?\d+)?$|^[-+]?\.\d+$")
-_YAML_KW = {"null", "true", "false", "yes", "no", "on", "off", "~"}
-_NEEDS_Q = re.compile(r"[:#\[\]{}&*!|>'\"%@`,\t]|^ | $")
-_PLAIN_KEY = re.compile(r"^[A-Za-zА-Яа-яЁё_][\wА-Яа-яЁё.\-]*$")
-_cache = {}
+class _Designs(doc_yaml.Doc):
+    """Проработки шага 2: шапка файла и таблица комментариев этого документа."""
+    HEADER = HEADER
+    GLOSSARY = GLOSSARY
+    PATTERNS = PATTERNS
+    GENERIC = GENERIC
+    EXTRA = GENERIC_PINS
 
 
-def _scalar(v):
-    """Скаляр YAML: строка с кавычками, если YAML прочитал бы её иначе."""
-    if v is None:
-        return "null"
-    if v is True:
-        return "true"
-    if v is False:
-        return "false"
-    if isinstance(v, int):
-        return str(v)
-    if isinstance(v, float):
-        if v != v or v in (float("inf"), float("-inf")):
-            return repr(v)
-        return repr(v)                           # точный round-trip (7.0 → «7.0», не «7»)
-    s = str(v)
-    if s == "" or _NUM.match(s) or s.lower() in _YAML_KW or _NEEDS_Q.search(s):
-        return json.dumps(s, ensure_ascii=False)
-    return s
-
-
-def _key(k):
-    """Ключ YAML: номер позиции и материал в кавычках, обычные имена — без."""
-    k = str(k)
-    if _NUM.match(k) or not _PLAIN_KEY.match(k) or k.lower() in _YAML_KW:
-        return json.dumps(k, ensure_ascii=False)
-    return k
-
-
-def _seg_re(seg):
-    """Сегмент шаблона -> регулярное выражение. '(a|b)' — альтернатива, '*' — любой
-    сегмент, '#' — номер, 'x[]' — элемент списка."""
-    if seg == "*":
-        return "[^.]+"
-    if seg == "#":
-        return r"\d+"
-    if seg.startswith("(") and seg.endswith(")"):
-        return seg                                  # альтернатива, напр. (ext|int)
-    if seg.endswith("[]"):
-        return re.escape(seg[:-2]) + r"\[\]"
-    return re.escape(seg)
-
-
-def _compile(pattern):
-    return re.compile("^" + r"\.".join(_seg_re(s) for s in pattern.split(".")) + "$")
-
-
-_RULES = [(_compile(p), t) for p, t in PATTERNS]
-_RULES.sort(key=lambda r: -r[0].pattern.count(r"\."))
+_DOC = _Designs()
 
 
 def comment(path):
-    """Комментарий к пути ключа: точное совпадение, затем шаблоны, затем штифты."""
-    if path in _cache:
-        return _cache[path]
-    txt = GLOSSARY.get(path)
-    if txt is None:
-        for rx, t in _RULES:
-            if rx.match(path):
-                if t is None:                       # штифты: общий словарь по последнему сегменту
-                    txt = GENERIC_PINS.get(path.rsplit(".", 1)[-1])
-                else:
-                    txt = t
-                break
-    if txt is None:                             # последний рубеж: по имени листа
-        txt = GENERIC.get(path.rsplit(".", 1)[-1].replace("[]", ""))
-    if txt is None and ("alt_fit" in path or ".fit." in path):
-        txt = "Заготовка по материалу-альтернативе (труба/пруток, размеры и примечание ниже)."
-    _cache[path] = txt or ""
-    return _cache[path]
-
-
-def _emit(node, indent, lines, path, inline=None):
-    """Узел -> строки YAML с комментариями. inline — префикс первой строки («- »)."""
-    pad = " " * indent
-    # элемент списка: первая строка начинается с «- » (2 знака), остальные ключи
-    # того же словаря выравниваются по нему -> отступ +2
-    pad2 = " " * (indent + 2) if inline else pad
-    step = 4 if inline else 2
-    if isinstance(node, dict):
-        if not node:
-            lines.append(pad + "{}")
-            return
-        first = True
-        for k, v in node.items():
-            p = f"{path}.{k}" if path else str(k)
-            pre = pad + (inline if (first and inline) else "")
-            if not (first and inline):
-                pre = pad2
-            c = comment(p)
-            if c:
-                lines.append((pad + "  " if (first and inline) else pad2) + "# " + c)
-            kt = _key(k)
-            if isinstance(v, dict) and v:
-                lines.append(f"{pre}{kt}:")
-                _emit(v, indent + step, lines, p)
-            elif isinstance(v, list) and v:
-                if all(not isinstance(x, (dict, list, tuple)) for x in v):
-                    lines.append(f"{pre}{kt}: [{', '.join(_scalar(x) for x in v)}]")
-                else:
-                    lines.append(f"{pre}{kt}:")
-                    if all(isinstance(x, (list, tuple)) and all(not isinstance(y, (dict, list, tuple)) for y in x)
-                           for x in v):         # список подсписков скаляров: [[a, b], …]
-                        for x in v:
-                            lines.append(" " * (indent + step) + "- [" +
-                                         ", ".join(_scalar(y) for y in x) + "]")
-                        first = False
-                        continue
-                    for item in v:
-                        if isinstance(item, (dict, list, tuple)):
-                            _emit(list(item) if isinstance(item, tuple) else item, indent + step, lines, p + "[]", inline="- ")
-                        else:                   # скаляр в списке (в т.ч. null-заготовка)
-                            lines.append(" " * (indent + step) + "- " + _scalar(item))
-            else:
-                if isinstance(v, list):
-                    lines.append(f"{pre}{kt}: []")
-                elif isinstance(v, dict):
-                    lines.append(f"{pre}{kt}: {{}}")
-                else:
-                    lines.append(f"{pre}{kt}: {_scalar(v)}")
-            first = False
-    elif isinstance(node, list):
-        for item in node:
-            if isinstance(item, (dict, list)):
-                _emit(item, indent, lines, path, inline="- ")
-            else:                                   # скаляр в списке (в т.ч. null-заготовка)
-                lines.append(pad + "- " + _scalar(item))
-    else:
-        lines.append(pad + _scalar(node))
+    """Комментарий к пути ключа (совместимость с прежним API модуля)."""
+    return _DOC.comment(path)
 
 
 def dump(res):
     """Список записей проработок -> текст specs/ptk_designs.yaml."""
-    _cache.clear()
-    lines = [HEADER.rstrip("\n"), ""]
-    for i, rec in enumerate(res):
-        if i:
-            lines.append("")
-        _emit(rec, 0, lines, "", inline="- ")
-    return "\n".join(lines) + "\n"
+    return _DOC.dump(res)
 
 
 def load_specs(specs_dir=None):

@@ -1,8 +1,8 @@
 """Точка входа: python main.py [calc|design|all] [--publish]. Код выхода 0 — все проверки.
 
-Шаги (Д-79): calc — шаг 1 «Расчёт» (SPEC-10, ptk_configs.json из ptk_input.yaml +
+Шаги (Д-79): calc — шаг 1 «Расчёт» (SPEC-10, ptk_configs.yaml из ptk_input.yaml +
 vendor_prices.yaml); design — шаг 2 «Проработка» (SPEC-11, ptk_designs.yaml из
-ptk_design_input.yaml по ОПУБЛИКОВАННОМУ specs/ptk_configs.json — связка выход шага 1 →
+ptk_design_input.yaml по ОПУБЛИКОВАННОМУ specs/ptk_configs.yaml — связка выход шага 1 →
 вход шага 2); all (по умолчанию) — весь прогон, как прежде: шаг 1 → шаг 2 по его
 результату → проверки products → каталог.
 
@@ -19,7 +19,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from egm import catalog, config, naming, products, ptk, ptk_design, ptk_force, ptk_parts, ptk_profile
+from egm import doc_yaml, ptk_doc, catalog_doc, design_doc, catalog, config, naming, products, ptk, ptk_design, ptk_force, ptk_parts, ptk_profile
 from egm.cad import (assy as cad_assy, freecad as cad_freecad, ptk_ring, ptk_sep, ptk_spacer,
                      step as cad_step, techdraw as cad_techdraw)
 
@@ -83,7 +83,7 @@ def run_ptk(prices):
         return [f"products.PTK.configs.input: {e!r}"]
     rows = ptk.to_rows(ptk.sweep(prices["rollers"], prices.get("bearings", {}), lim, mounts,
                                  fast, mode), mounts)
-    write("specs", "ptk_configs.json", json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
+    write("specs", ptk_doc.FILE + ".yaml", ptk_doc.dump(rows))
     table, errs, warns, excl = [], [], [], []
     for r in rows:
         if r["excluded"]:                                # Д-45: не молча — в конец SPEC-10
@@ -129,12 +129,12 @@ def run_ptk(prices):
 
 
 def run_catalog(prices):
-    """CP-02: CAT-01 -> catalog_hiwin_hg.json, пары (Д-80), отчёт проверок."""
+    """CP-02: CAT-01 -> catalog_hiwin_hg.yaml, пары (Д-80), отчёт проверок."""
     md = config.cfg_file(APP, "configs.catalog_md")
     db = catalog.parse_md(md.read_text(encoding="utf-8"), source=md.name)
     pairs = catalog.build_pairs(db)
     rep = catalog.validate(db, pairs, prices)
-    write("specs", "catalog_hiwin_hg.json", json.dumps(db, ensure_ascii=False, indent=1) + "\n")
+    write("specs", catalog_doc.FILE + ".yaml", catalog_doc.dump(db))
     write("specs", "catalog_hiwin_hg_pairs.json", catalog.pairs_json(pairs))
     write("reports", "catalog_report.md", catalog.report_md(db, pairs, rep))
     return [f"catalog: {e}" for e in rep["errors"]]
@@ -143,7 +143,7 @@ def run_catalog(prices):
 def run_design(cfg_rows, require=False):
     """SPEC-11: проработка выбранных исполнений, шаг 2 (Д-48).
 
-    cfg_rows — исполнения шага 1 (ptk_configs.json): полный прогон — свежие из
+    cfg_rows — исполнения шага 1 (ptk_configs.yaml): полный прогон — свежие из
     out/specs/, режим design — опубликованные specs/ (связь выход шага 1 → вход
     шага 2, Д-79)."""
     if not config.cfg_file(APP, "products.PTK.configs.design_input").exists():
@@ -153,7 +153,7 @@ def run_design(cfg_rows, require=False):
         return []
     if cfg_rows is None:
         if require:
-            return ["specs/ptk_configs.json: не найден — сначала шаг 1: "
+            return ["specs/ptk_configs.yaml: не найден — сначала шаг 1: "
                     "python main.py calc --publish (Д-79)"]
         return []
     try:
@@ -170,7 +170,6 @@ def run_design(cfg_rows, require=False):
             config.cfg_file(APP, "products.PTK.configs.design_input")), cfg_rows, lim, extra)
     except (KeyError, ValueError, TypeError) as e:
         return [f"входные конфиги шага 2 (Д-79): {e!r}"]
-    from egm import design_doc
     write("specs", design_doc.FILE + ".yaml", design_doc.dump(res))
     tpl = (TPL / "SPEC-11_PTK_DESIGN.md.tmpl").read_text(encoding="utf-8")
     text, missing = fill(tpl, **ptk_design.md(res))
@@ -187,7 +186,10 @@ def main(argv):
         shutil.rmtree(OUT / kind, ignore_errors=True)
     fails = []
     if mode in ("all", "calc"):         # шаг 1: проверки ПО + расчёт по диапазону (SPEC-10)
-        for name, test in (("config", config.self_test), ("ptk", ptk.self_test),
+        for name, test in (("doc_yaml", doc_yaml.self_test), ("ptk_doc", ptk_doc.self_test),
+                           ("catalog_doc", catalog_doc.self_test),
+                           ("design_doc", design_doc.self_test),
+                           ("config", config.self_test), ("ptk", ptk.self_test),
                            ("naming", naming.self_test),
                            ("catalog", catalog.self_test), ("products", products.self_test),
                            ("ptk_profile", ptk_profile.self_test), ("cad", ptk_ring.self_test),
@@ -217,20 +219,20 @@ def main(argv):
             prices = config.load(config.cfg_file(APP, "configs.vendor_prices"))
             fails += products.check_app(APP, prods)   # Д-79: разделы продуктов есть в реестре
             fails += run_ptk(prices)
-            cfg_path = OUT / "specs" / "ptk_configs.json"
-            rows = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else None
+            cfg_path = OUT / "specs"
+            rows = ptk_doc.load_specs(cfg_path) if cfg_path.exists() else None
             if mode == "all":           # шаг 2 — по свежим исполнениям шага 1
                 fails += run_design(rows)
             if cfg_path.exists():
                 fails += products.check(prods,
-                                        json.loads(cfg_path.read_text(encoding="utf-8")))
+                                        ptk_doc.load_specs(cfg_path))
             if mode == "all":
                 fails += run_catalog(prices)
         except (KeyError, ValueError, TypeError) as e:
             fails.append(f"входные конфигурации: {e!r}")
     elif mode == "design":              # шаг 2 — по ОПУБЛИКОВАННОМУ шагу 1 (Д-79)
-        cfg_path = SPECS / "ptk_configs.json"
-        rows = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else None
+        cfg_path = SPECS
+        rows = ptk_doc.load_specs(cfg_path) if cfg_path.exists() else None
         fails += run_design(rows, require=True)
     # TODO(CP-03): cost.report(); TODO(CP-04): машины по naming.MACHINES (HMC + VMC)
     write("reports", "checks.md", "# Проверки прогона (code-first, НЕ ПРАВИТЬ РУКАМИ)\n\n"

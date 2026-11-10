@@ -87,7 +87,7 @@ PROFILES = {
         "без производных данных прогона",
         {
             "specs/catalog_*.json": "code-first БД каталога (egm/catalog.py)",
-            "specs/ptk_configs.json": "code-first результаты калькулятора ПТК (egm/ptk.py), дублирует SPEC-10",
+            "specs/ptk_configs.yaml": "code-first результаты калькулятора ПТК (egm/ptk.py), дублирует SPEC-10",
         },
     ),
     "tools": (

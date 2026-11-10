@@ -165,7 +165,7 @@ def root_meta(cfg):
     keys = ("u", "z", "n", "roller", "Drol", "a_w", "R_sum", "gen", "bearing", "Dgen",
             "d_root", "d_tip", "d_out", "width", "alpha_max", "M", "M_by", "holes", "mount")
     m = {k: cfg[k] for k in keys if cfg.get(k) is not None}
-    m["source"] = "egm.cad.assy (Д-49) ← specs/ptk_configs.json"
+    m["source"] = "egm.cad.assy (Д-49) ← specs/ptk_configs.yaml"
     return m
 
 

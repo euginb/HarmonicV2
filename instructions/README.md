@@ -11,7 +11,7 @@
 | Инструкция | Назначение | Когда читать | Связанные решения                                                                 |
 |---|---|---|-----------------------------------------------------------------------------------|
 | [README.md](README.md) (INS-00) | реестр инструкций, режимы работы с ИИ, порядок code-first, глоссарий | в начале любой сессии | Д-79, Д-78                                                                        |
-| [INS-10_PTK_CALC.md](INS-10_PTK_CALC.md) | ПТК, шаги 1–2: правила и flow (calc → выбор исполнения → design), входы и выходы каждого этапа, конфигурация `ptk_input.yaml`, `ptk_design_input.yaml`, `vendor_prices.yaml` (описания параметров — комментариями в YAML, Д-79), чтение SPEC-10/SPEC-11 и `ptk_configs.json`, ID исполнения; справочник — формулы, профиль, фазировка, Т1–Т4, типовые правки | правка параметров ПТК, разбор SPEC-10/SPEC-11 | Д-08, Д-16, Д-79, Д-19, Д-80, Д-31, Д-33, Д-38, Д-40…Д-43, Д-45, Д-46, Д-48, Д-51, Д-79 |
+| [INS-10_PTK_CALC.md](INS-10_PTK_CALC.md) | ПТК, шаги 1–2: правила и flow (calc → выбор исполнения → design), входы и выходы каждого этапа, конфигурация `ptk_input.yaml`, `ptk_design_input.yaml`, `vendor_prices.yaml` (описания параметров — комментариями в YAML, Д-79), чтение SPEC-10/SPEC-11 и `ptk_configs.yaml`, ID исполнения; справочник — формулы, профиль, фазировка, Т1–Т4, типовые правки | правка параметров ПТК, разбор SPEC-10/SPEC-11 | Д-08, Д-16, Д-79, Д-19, Д-80, Д-31, Д-33, Д-38, Д-40…Д-43, Д-45, Д-46, Д-48, Д-51, Д-79 |
 | [INS-20_CATALOG.md](INS-20_CATALOG.md) | каталог HIWIN HG: разбор `docs/HG-Series-Catalog_opt.md`, БД `catalog_hiwin_hg*.json`, каталожные номера EGC, `reports/catalog_report.md` | правка каталога, цен, подбор направляющих | Д-07, Д-80                                                                        |
 | [INS-30_CAD.md](INS-30_CAD.md) | чертежи 2D/3D: комплект по спецификации `specs/cad_set.yaml` (`python -m egm.cad --spec`, Д-61) или по ID (`python -m egm.cad`, низкоуровневый путь); выход `out/cad/`, номенклатура `specs/products.yaml`, состав по умолчанию и его смена | построение комплекта чертежей, правка номенклатуры | Д-80, Д-30, Д-46…Д-52, Д-61, Д-65 |
 | [INS-90_AUDIT_BUNDLE.md](INS-90_AUDIT_BUNDLE.md) | ручная подготовка контекста для ИИ: `tools/context_bundle.py` (по ключам) и `tools/make_audit_bundle.py` (снимок `AUDIT_BUNDLE.md`, профили исключения) | работа с моделью в AI Chat; review | Д-78, Д-28                                                      |
@@ -144,8 +144,8 @@ Code-first спецификация — результат прогона `main.
 
 | Инструкция | Спецификация / БД | Входные файлы |
 |---|---|---|
-| [INS-10_PTK_CALC.md](INS-10_PTK_CALC.md) | `specs/SPEC-10_PTK_CALC.md`, `specs/SPEC-11_PTK_DESIGN.md`, `specs/ptk_configs.json`, `specs/ptk_designs.json` | `specs/ptk_input.yaml`, `specs/ptk_design_input.yaml`, `specs/vendor_prices.yaml` → `rollers`, `bearings` |
-| [INS-20_CATALOG.md](INS-20_CATALOG.md) | `specs/catalog_hiwin_hg.json`, `specs/catalog_hiwin_hg_pairs.json`, `reports/catalog_report.md` | `docs/HG-Series-Catalog_opt.md`, `specs/vendor_prices.json` |
+| [INS-10_PTK_CALC.md](INS-10_PTK_CALC.md) | `specs/SPEC-10_PTK_CALC.md`, `specs/SPEC-11_PTK_DESIGN.md`, `specs/ptk_configs.yaml`, `specs/ptk_designs.json` | `specs/ptk_input.yaml`, `specs/ptk_design_input.yaml`, `specs/vendor_prices.yaml` → `rollers`, `bearings` |
+| [INS-20_CATALOG.md](INS-20_CATALOG.md) | `specs/catalog_hiwin_hg.yaml`, `specs/catalog_hiwin_hg_pairs.json`, `reports/catalog_report.md` | `docs/HG-Series-Catalog_opt.md`, `specs/vendor_prices.json` |
 
 1. Правите входной файл — ручной конфиг `specs/*.yaml` (`ptk_input`, `ptk_design_input`,
    `vendor_prices`, `products`, `stock`; Д-79).

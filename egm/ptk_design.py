@@ -1,6 +1,6 @@
 """Шаг 2 — проработка выбранного исполнения ПТК (Д-48, CP-38).
 
-Вход: specs/ptk_design_input.yaml → designs[]; исполнение шага 1 — ptk_configs.json.
+Вход: specs/ptk_design_input.yaml → designs[]; исполнение шага 1 — ptk_configs.yaml.
 Выход: ptk_designs.yaml (комментированный YAML, design_doc) и SPEC-11_PTK_DESIGN.md; детали проработки — <ID>.03<вар>-<name>.
 Исполнение задаётся полным ID или префиксом без хэша (+ bearing, gen): хэш меняется
 с геометрией шага 1 (Д-80), а проработка остаётся привязанной (Д-51).
@@ -44,7 +44,7 @@ def select(configs, d):
         return c[0], ""
     if not c:
         f = "".join(f", {k} = {d[k]}" for k in ("bearing", "gen") if d.get(k) is not None)
-        return None, f"нет реализуемого исполнения {d['id']}{f} в ptk_configs.json (SPEC-10)"
+        return None, f"нет реализуемого исполнения {d['id']}{f} в ptk_configs.yaml (SPEC-10)"
     return None, f"id {d['id']} неоднозначен: {[r['id'] for r in c]} — уточнить bearing / gen"
 
 
