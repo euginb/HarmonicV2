@@ -242,8 +242,8 @@ def _md_summary(res):
         "Итог": "✓ — все проверки пройдены; ✗ — есть ошибки (не проходят вал/шпонка/стенка).",
     }
 
-    H = "| Параметр | Описание | " + " | ".join(names) + " |"
-    R = "|---" * (2 + len(names)) + "|"
+    H = "| Параметр | " + " | ".join(names) + " | Описание |"
+    R = "|---" * (len(names) + 2) + "|"
 
     def _ok(r):
         return "✓" if r["ok"] else "✗"
@@ -285,7 +285,7 @@ def _md_summary(res):
     for param, vals in params.items():
         cells = " | ".join(f"{vals.get(n, '—')}" for n in names)
         desc = DESCR.get(param, "")
-        out.append(f"| {param} | {desc} | {cells} |")
+        out.append(f"| {param} | {cells} | {desc} |")
 
     return "\n".join(out)
 
