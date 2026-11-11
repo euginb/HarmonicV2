@@ -188,14 +188,28 @@ def apply(cfg, des):
 
 
 def md(res):
-    """Формирование разделов SPEC-11.
+    """Формирование разделов SPEC-11 в новом порядке.
 
-    Сводка: данные транспонированы — строки = параметры, колонки = проработки.
-    Каждая ячейка содержит расшифровку значения.
+    Структура:
+    1. Сводка (транспонированная таблица параметров × проработок)
+    2. Детали проработки (таблица)
+    3. Проработка K8 — весь блок данных по проработке:
+       - Конструктив (выбранный)
+       - Состав (номенклатура деталей)
+       - Подшипники и опоры
+       - Соединение .02–.12
+       - Выход: вал в ступице
+       - Заготовка .02
+       - Балансировка и масса
+       - Оснастка
+       - Ошибки и предупреждения
+    4. Проработка K10 — аналогично
+    5. Конструктивы L1–L4 (справочный блок)
+    6. Номенклатура (01–14)
+    7. Расчёт (теория)
     """
     P = ["| Деталь | Как на шаге 1 | Паз, ° | Ряды |", "|---|---|---|---|"]
-    E, W, C, T = [], [], [], \
-        [ptk_layout.TOOL_HEAD, ptk_layout.TOOL_RULE]
+    E_all, W_all = [], []
 
     for r in res:
         s = r.get("shaft")
@@ -203,19 +217,253 @@ def md(res):
             k, b, m = r["link"], r["ecc"]["bal"], r["mass"]
             P += [f"| {p['id']} | {p['base']} | {p['key_angle']:g} | "
                   f"{', '.join(str(x) for x in p['rows'])} |" for p in r["parts"]]
-            if r.get("layout"):
-                C.append((r["name"], r["layout"]))
-                T += ptk_layout.md_tool(r["name"], r["layout"])
         tag = f"- {r['name']} ({r['id']}): "
-        E += [tag + e for e in r["errors"]]
-        W += [tag + w for w in r["warnings"]]
+        E_all += [tag + e for e in r["errors"]]
+        W_all += [tag + w for w in r["warnings"]]
 
-    return {"summary": _md_summary(res) if res else "нет проработок",
-            "parts": "\n".join(P) if len(P) > 2 else "нет",
-            "layouts": ptk_layout.md_tables(C) if C else "нет",
-            "tooling": "\n".join(T) if len(T) > 2 else "нет",
-            "errors": "\n".join(E) or "нет", "warnings": "\n".join(W) or "нет",
-            "theory": THEORY, "n_ok": sum(r["ok"] for r in res), "n_all": len(res)}
+    # Генерация блоков по проработкам
+    workpieces = []
+    for r in res:
+        if r.get("shaft"):
+            workpieces.append(_md_workpiece(r))
+
+    # Блок конструктивов L1–L4
+    layouts_block = ptk_layout.md_layouts_info()
+
+    # Блок номенклатуры
+    nomenclature_block = ptk_layout.md_nomenclature()
+
+    return {
+        "summary": _md_summary(res) if res else "нет проработок",
+        "parts": "\n".join(P) if len(P) > 2 else "нет",
+        "workpieces": "\n\n".join(workpieces) if workpieces else "нет",
+        "layouts": layouts_block,
+        "nomenclature": nomenclature_block,
+        "errors": "\n".join(E_all) or "нет",
+        "warnings": "\n".join(W_all) or "нет",
+        "theory": THEORY,
+        "n_ok": sum(r["ok"] for r in res),
+        "n_all": len(res)
+    }
+
+
+def _md_workpiece(r):
+    """Генерация полного блока данных по одной проработке (вертикальный формат)."""
+    lines = []
+    name = r["name"]
+    ok_mark = "✓ OK" if r["ok"] else "✗ ОШИБКА"
+
+    lines.append(f"### Проработка {name} — {ok_mark}")
+    lines.append("")
+    lines.append(f"**ID:** {r['id']}")
+    lines.append("")
+
+    # --- Конструктив ---
+    lay = r.get("layout")
+    if lay:
+        lines.append("#### Конструктив")
+        lines.append("")
+        code = lay.get("code", "—")
+        title = lay.get("name", "—")
+        lines.append(f"Выбран: **{code}** — {title}")
+        lines.append("")
+
+        # Состав — список деталей в этом конструктиве
+        parts_dict = lay.get("parts", {})
+        var = lay.get("var", {})
+        if parts_dict:
+            lines.append("| Позиция | Обозначение | Наименование |")
+            lines.append("|---|---|---|")
+            for pos in sorted(parts_dict.keys(), key=lambda x: int(x) if x.isdigit() else 0):
+                det = parts_dict[pos]
+                var_name = f"{det}{var.get(pos, '')}"
+                # Получаем расшифровку из номенклатуры
+                desc = ptk_layout.get_nomenclature_desc(pos)
+                lines.append(f"| .{pos} | {var_name} | {desc} |")
+            lines.append("")
+
+        # Длина
+        length = lay.get("length")
+        if length is not None:
+            lines.append(f"**Длина по оси:** {length:g} мм")
+            lines.append("")
+
+    # --- Подшипники и опоры ---
+    if lay:
+        b09 = lay.get("b09")
+        b10 = lay.get("b10")
+        if b09 or b10:
+            lines.append("#### Подшипники и опоры")
+            lines.append("")
+            lines.append("| Подшипник | Обозначение | d×D×B, мм | C, кН | da, мм |")
+            lines.append("|---|---|---|---|---|")
+            if b09:
+                lines.append(f"| .09 выход | {b09.get('id', '—')} | {b09.get('d', '—')}×{b09.get('D', '—')}×{b09.get('B', '—')} | {b09.get('C', '—')} | {b09.get('da', '—')} |")
+            if b10:
+                lines.append(f"| .10 вход | {b10.get('id', '—')} | {b10.get('d', '—')}×{b10.get('D', '—')}×{b10.get('B', '—')} | {b10.get('C', '—')} | {b10.get('da', '—')} |")
+            lines.append("")
+
+            # Доп. данные опор
+            tau_hub = lay.get("tau_hub")
+            if tau_hub is not None:
+                tau_allow = lay.get("tau_allow", 25)
+                lines.append(f"**τ ступицы:** {tau_hub:g} / [{tau_allow}] МПа")
+            r11 = lay.get("r11")
+            if r11:
+                lines.append(f"**Кольцо .11:** {r11.get('n', 0)} × {r11.get('h', 0):g} мм")
+            covers = lay.get("covers")
+            if covers:
+                tA = covers.get("tA")
+                tB = covers.get("tB")
+                if tA is not None and tB is not None:
+                    lines.append(f"**Крышки:** .07A = {tA:g} мм, .07B = {tB:g} мм")
+            cup = lay.get("cup")
+            if cup:
+                z_in = cup.get("z_in")
+                t = cup.get("t")
+                hub_d = cup.get("hub_d")
+                hub_l = cup.get("hub_l")
+                if z_in is not None and t is not None:
+                    txt = f"**Дно .02:** z = {z_in:g}, t = {t:g} мм"
+                    if hub_d and hub_l:
+                        txt += f"; ступица Ø{hub_d:g}×{hub_l:g} мм"
+                    lines.append(txt)
+            lines.append("")
+
+    # --- Соединение .02–.12 ---
+    if lay and lay.get("join"):
+        join = lay["join"]
+        pick = join.get("pick")
+        if pick:
+            lines.append("#### Соединение .02–.12")
+            lines.append("")
+            scheme = pick.get("scheme", "—")
+            lines.append(f"**Схема:** {scheme}")
+
+            pins = pick.get("pins")
+            if pins:
+                n = pins.get("n", 0)
+                d = pins.get("d", 0)
+                l = pins.get("l", 0)
+                tau = pins.get("tau")
+                sig_wall = pins.get("sig_wall")
+                sig_hub = pins.get("sig_hub")
+                tau_edge = pins.get("tau_edge")
+                des = pins.get("des", "")
+                lines.append(f"**Штифты:** {n} × Ø{d:g} × {l:g} мм — {des}")
+                if tau is not None:
+                    lines.append(f"  - τ среза штифта: {tau:g} МПа")
+                if sig_wall is not None:
+                    lines.append(f"  - σсм стенки .02: {sig_wall:g} МПа")
+                if sig_hub is not None:
+                    lines.append(f"  - σсм ступицы .12: {sig_hub:g} МПа")
+                if tau_edge is not None:
+                    lines.append(f"  - τ среза к торцу: {tau_edge:g} МПа")
+            lines.append("")
+
+    # --- Выход: вал в ступице ---
+    if lay and lay.get("output"):
+        out = lay["output"]
+        lines.append("#### Выход: вал в ступице")
+        lines.append("")
+        d_o = out.get("d")
+        if d_o:
+            lines.append(f"**Ø выходного вала:** {d_o:g} мм")
+        key = out.get("key")
+        if key:
+            b, h, l_key = key.get("b", 0), key.get("h", 0), out.get("l_key", 0)
+            lines.append(f"**Шпонка:** {b:g}×{h:g}×{l_key:g} мм")
+        tau = out.get("tau")
+        if tau is not None:
+            tau_allow = out.get("tau_allow", 25)
+            lines.append(f"**τ вала:** {tau:g} / [{tau_allow}] МПа")
+        flange = out.get("flange")
+        if flange:
+            fl_txt = out.get("fl_txt", "")
+            if fl_txt:
+                lines.append(f"**Фланец:** {fl_txt}")
+        hub_l = out.get("hub_l")
+        if hub_l is not None:
+            hub_by = out.get("hub_by", "")
+            lines.append(f"**Длина ступицы:** {hub_l:g} мм ({hub_by})")
+        rh = out.get("r_h")
+        if rh is not None:
+            lines.append(f"**r_h .09 (da/2):** {rh:g} мм")
+        lines.append("")
+
+    # --- Заготовка .02 ---
+    if lay and lay.get("blank"):
+        bl = lay["blank"]
+        lines.append("#### Заготовка .02")
+        lines.append("")
+        mat = bl.get("material")
+        if mat:
+            lines.append(f"**Материал:** {mat}")
+        tube = bl.get("tube")
+        if tube:
+            D = tube.get("D")
+            s = tube.get("s")
+            note = tube.get("note", "")
+            txt = f"**Труба:** Ø{D:g} × {s:g} мм"
+            if note:
+                txt += f" ({note})"
+            lines.append(txt)
+        alt = bl.get("alt")
+        if alt:
+            lines.append(f"**Альтернативы:** {', '.join(alt)}")
+        lines.append("")
+
+    # --- Балансировка и масса ---
+    ecc = r.get("ecc", {})
+    bal = ecc.get("bal", {})
+    mass = r.get("mass", {})
+    if bal or mass:
+        lines.append("#### Балансировка и масса")
+        lines.append("")
+        bal_n = bal.get("n", 0)
+        bal_d = bal.get("d", 0)
+        bal_r = bal.get("r", 0)
+        if bal_n:
+            lines.append(f"**Балансировка:** {bal_n} × Ø{bal_d:g} мм, радиус {bal_r:g} мм")
+        res_u = bal.get("res")
+        if res_u is not None:
+            lines.append(f"**Остаточный дисбаланс:** {res_u:g} г·мм")
+        lines.append(f"**m пакета:** {mass.get('sum_g', 0):g} г")
+        lines.append(f"**J вх:** {mass.get('J_in', 0):.2e} кг·м²")
+        lines.append(f"**J вых:** {mass.get('J_out', 0):.2e} кг·м²")
+        lines.append("")
+
+    # --- Оснастка ---
+    if lay and lay.get("tooling"):
+        tooling = lay["tooling"]
+        lines.append("#### Оснастка (Д-81)")
+        lines.append("")
+        lines.append("| Операция | Деталь | Размер | Маршрут |")
+        lines.append("|---|---|---|---|")
+        for t in tooling:
+            fx = t.get("fx", "—")
+            part = t.get("part", "—")
+            size = t.get("size", "—")
+            route = t.get("route", "—")
+            lines.append(f"| {fx} | {part} | {size} | {route} |")
+        lines.append("")
+
+    # --- Ошибки и предупреждения ---
+    if r.get("errors"):
+        lines.append("##### Ошибки")
+        lines.append("")
+        for e in r["errors"]:
+            lines.append(f"- {e}")
+        lines.append("")
+
+    if r.get("warnings"):
+        lines.append("##### Предупреждения")
+        lines.append("")
+        for w in r["warnings"]:
+            lines.append(f"- {w}")
+        lines.append("")
+
+    return "\n".join(lines)
 
 
 def _md_summary(res):
