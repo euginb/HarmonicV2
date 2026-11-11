@@ -77,12 +77,13 @@ def out_flange(M, oo, bears, b10, o, D_max):
                 fl = {"screw": ks, "n": n, "r": r, "d_tap": s["d_tap"], "depth": dep, "T_fric": round(Tf, 1),
                       "n_p": n_p, "pin_d": pd if n_p else 0.0, "pin_depth": round(min(2 * pd, hl), 1)}
                 txt = f"{n}×{ks} r {r:g}" + (f" + {n_p}×Ø{pd:g} шт." if n_p else "") + f", трение {Tf:.0f} Н·м"
+                ext = {**(vp.get("rings_ext") or {}).get(f"{d9:g}"), "std": "ГОСТ 13942-86"}       # 2b-3: наружные
+                int_ = {**(vp.get("rings_int") or {}).get(f"{b['D']:g}"), "std": "ГОСТ 13943-86"}  # внутренние
                 return {"link": "flange", "d": float(oo.get("d") or 0.0), "key": None, "l_key": 0.0,
                         "tau": round(tau, 1), "tau_allow": o["tau_allow"], "sigma_allow": 0.0,
                         "c09": [({"id": k9, **b}, tau)], "hub_l": round(hl, 2), "hub_by": "фланец/корпус",
                         "flush": True, "lip_B": round(lb, 2), "flange": fl, "fl_txt": txt,
-                        "grooves": {"ext": (vp.get("rings_ext") or {}).get(f"{d9:g}"),       # 2b-3: канавки
-                                    "int": (vp.get("rings_int") or {}).get(f"{b['D']:g}")}}, ""
+                        "grooves": {"ext": ext, "int": int_}}, ""
     return None, (f"нет .09 с фланцем на торце ступицы под M {M:g} Н·м (винты screws, штифты pins, "
                   f"D ≤ {D_max:.1f}) — Д-104")
 HEAD = ("| Проработка | Конструктив | Детали | .09 d×D×B | τ ступицы / [τ], МПа | .10 d×D×B | "
@@ -442,6 +443,15 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
     if isinstance(d.get("output"), dict):                    # CP-90, Д-102: вал со шпонкой в ступице
         out, why = (out_flange(M, d["output"], bears, b10, o, D_max) if d["output"].get("link") == "flange"
                     else out_shaft(M, d["output"], d.get("_keys") or [], bears, b10, o, D_max))   # Д-104
+        if out is not None:                                   # CP-90 2b-3: добавить grooves если нет
+            vp = _vp()
+            if "grooves" not in out and b09:
+                d9 = b09.get("d", 0.0)
+                D9 = b09.get("D", 0.0)
+                out["grooves"] = {"ext": {**(vp.get("rings_ext") or {}).get(f"{d9:g}"),
+                                            "std": "ГОСТ 13942-86"},
+                                "int": {**(vp.get("rings_int") or {}).get(f"{D9:g}"),
+                                        "std": "ГОСТ 13943-86"}}
         if out is None:
             err.append(f"выход: {why}")
         else:
