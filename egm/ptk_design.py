@@ -327,6 +327,30 @@ def _md_workpiece(r):
                     lines.append(txt)
             lines.append("")
 
+            # --- Стопорные кольца ГОСТ 13942 / 13943 ---
+            grooves = (lay.get("output") or {}).get("grooves")
+            if grooves:
+                ext = grooves.get("ext")
+                int_ = grooves.get("int")
+                if ext or int_:
+                    lines.append("**Стопорные кольца .09 (ГОСТ 13942 / 13943):**")
+                    if ext:
+                        std = ext.get("std", "ГОСТ 13942-86")
+                        s = ext.get("s", "—")
+                        m = ext.get("m", "—")
+                        d2 = ext.get("d2", "—")
+                        d9 = b09.get("d", "—") if b09 else "—"
+                        lines.append(f"- rings_ext (вал): d = {d9} → {std}, s = {s} мм, m = {m} мм, d2 = {d2} мм")
+                    if int_:
+                        std = int_.get("std", "ГОСТ 13943-86")
+                        s = int_.get("s", "—")
+                        m = int_.get("m", "—")
+                        d2 = int_.get("d2", "—")
+                        D9 = b09.get("D", "—") if b09 else "—"
+                        lines.append(f"- rings_int (корпус): D = {D9} → {std}, s = {s} мм, m = {m} мм, d2 = {d2} мм")
+                    # Кольцо .11 уже выведено выше
+            lines.append("")
+
     # --- Соединение .02–.12 ---
     if lay and lay.get("join"):
         join = lay["join"]

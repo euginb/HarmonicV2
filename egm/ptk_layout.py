@@ -443,15 +443,6 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
     if isinstance(d.get("output"), dict):                    # CP-90, Д-102: вал со шпонкой в ступице
         out, why = (out_flange(M, d["output"], bears, b10, o, D_max) if d["output"].get("link") == "flange"
                     else out_shaft(M, d["output"], d.get("_keys") or [], bears, b10, o, D_max))   # Д-104
-        if out is not None:                                   # CP-90 2b-3: добавить grooves если нет
-            vp = _vp()
-            if "grooves" not in out and b09:
-                d9 = b09.get("d", 0.0)
-                D9 = b09.get("D", 0.0)
-                out["grooves"] = {"ext": {**(vp.get("rings_ext") or {}).get(f"{d9:g}"),
-                                            "std": "ГОСТ 13942-86"},
-                                "int": {**(vp.get("rings_int") or {}).get(f"{D9:g}"),
-                                        "std": "ГОСТ 13943-86"}}
         if out is None:
             err.append(f"выход: {why}")
         else:
@@ -583,6 +574,14 @@ def _one(cfg, d, code, ecc, shaft_d, row_gap, prods=None, bears=None, stock=None
            "r11": r11, "covers": ax["covers"], "cup": ax["cup"], "length": ax["length"],
            "blank": bl, "join": jn}
     rec["output"] = out                                          # CP-90, Д-102
+    # CP-90 2b-3: добавить grooves по b09 подшипника (исправляет out_shaft без output.grooves)
+    if out is not None and b09:
+        vp = _vp()
+        if "grooves" not in out:
+            out["grooves"] = {"ext": {**(vp.get("rings_ext") or {}).get(f"{b09['d']:g}"),
+                                       "std": "ГОСТ 13942-86"},
+                            "int": {**(vp.get("rings_int") or {}).get(f"{b09['D']:g}"),
+                                    "std": "ГОСТ 13943-86"}}
     rec["var"] = {nn: variant_letter(prods, nn, pr[nn]) for nn in ("02", "12") if pr.get(nn)}
     rec["var_name"] = {nn: variant_name(prods, nn, pr[nn]) for nn in rec["var"]}
     rec["tooling"] = tooling(rec, cfg, r_in, r_out)
