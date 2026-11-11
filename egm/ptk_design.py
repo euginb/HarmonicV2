@@ -290,7 +290,7 @@ def _md_workpiece(r):
         b09 = lay.get("b09")
         b10 = lay.get("b10")
         if b09 or b10:
-            lines.append("#### Подшипники и опоры")
+            lines.append("#### Подшипники и опоры (.09 — подшипник выхода, .10 — подшипник генератора)")
             lines.append("")
             lines.append("| Подшипник | Обозначение | d×D×B, мм | C, кН | da, мм |")
             lines.append("|---|---|---|---|---|")
@@ -304,7 +304,7 @@ def _md_workpiece(r):
             tau_hub = lay.get("tau_hub")
             if tau_hub is not None:
                 tau_allow = lay.get("tau_allow", 25)
-                lines.append(f"**τ ступицы:** {tau_hub:g} / [{tau_allow}] МПа")
+                lines.append(f"**τ ступицы:** {tau_hub:g} / [{tau_allow}] МПа — касательное напряжение кручения ступицы")
             r11 = lay.get("r11")
             if r11:
                 lines.append(f"**Кольцо .11:** {r11.get('n', 0)} × {r11.get('h', 0):g} мм")
@@ -313,7 +313,7 @@ def _md_workpiece(r):
                 tA = covers.get("tA")
                 tB = covers.get("tB")
                 if tA is not None and tB is not None:
-                    lines.append(f"**Крышки:** .07A = {tA:g} мм, .07B = {tB:g} мм")
+                    lines.append(f"**Крышки:** .07A (вход) = {tA:g} мм, .07B (выход) = {tB:g} мм")
             cup = lay.get("cup")
             if cup:
                 z_in = cup.get("z_in")
@@ -332,7 +332,7 @@ def _md_workpiece(r):
         join = lay["join"]
         pick = join.get("pick")
         if pick:
-            lines.append("#### Соединение .02–.12")
+            lines.append("#### Соединение .02–.12 (Сепаратор — Ступица выхода)")
             lines.append("")
             scheme = pick.get("scheme", "—")
             lines.append(f"**Схема:** {scheme}")
@@ -349,13 +349,13 @@ def _md_workpiece(r):
                 des = pins.get("des", "")
                 lines.append(f"**Штифты:** {n} × Ø{d:g} × {l:g} мм — {des}")
                 if tau is not None:
-                    lines.append(f"  - τ среза штифта: {tau:g} МПа")
+                    lines.append(f"  - τ среза штифта: {tau:g} МПа — касательное напряжение среза штифта")
                 if sig_wall is not None:
-                    lines.append(f"  - σсм стенки .02: {sig_wall:g} МПа")
+                    lines.append(f"  - σсм стенки .02: {sig_wall:g} МПа — смятие стенки сепаратора под штифтом")
                 if sig_hub is not None:
-                    lines.append(f"  - σсм ступицы .12: {sig_hub:g} МПа")
+                    lines.append(f"  - σсм ступицы .12: {sig_hub:g} МПа — смятие ступицы под штифтом")
                 if tau_edge is not None:
-                    lines.append(f"  - τ среза к торцу: {tau_edge:g} МПа")
+                    lines.append(f"  - τ среза к торцу: {tau_edge:g} МПа — срез перемычки от штифта до торца")
             lines.append("")
 
     # --- Выход: вал в ступице ---
