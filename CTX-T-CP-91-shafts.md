@@ -1,7 +1,7 @@
 # CTX-T — CP-91: номенклатура входных валов как продукт SH
 
-**base:** `aa885926697f3853c16d7c5cb562e222c5622edc` · **ref:** `rev13.2` · **режим:** CTX-T (задача, INS-91B §4)
-**Сформирован:** 2026-11-12 · **источник решений:** Д-107, Д-108, CP-91
+**base:** `f962de160076ff3223e770f16c8bac827fb97125` · **ref:** `rev13.2` · **режим:** CTX-T (задача, INS-91B §4)
+**Сформирован:** 2026-11-12 · **источник решений:** Д-107, Д-108, Д-109, CP-91
 
 ---
 
@@ -46,7 +46,10 @@ sigma_crush, wall_min). Две проработки (K8, K10) различают
 (Ø20) потребовала бы третьей копии блока.
 
 Параметры вала читает `egm/ptk_design.py`: `design()` берёт `d["shaft"]` напрямую,
-считает τ, шпонку по `keys.table`, стенки эксцентрика, массу/инерцию пакета.
+считает τ, шпонку по `keys.table` (таблица уже перенесена в `specs/shafts.yaml` —
+Д-109, OQ-35 решён), стенки эксцентрика, массу/инерцию пакета. Таблицу шпонок
+из входа проработки `ptk_design.run()` больше не берёт: `keys` во входе — `ValueError`,
+штатное чтение — `keys_table()` через `products.SH.configs.shafts` (Д-79).
 Валидация блока — только `link in LINKS` в `run()`; остальные поля берутся с
 `.get(..., умолчание)`.
 
@@ -87,8 +90,7 @@ sigma_crush, wall_min). Две проработки (K8, K10) различают
 ### specs/ptk_design_input.yaml (после CP-91)
 
 ```yaml
-keys:                      # ОСТАЁТСЯ здесь (общая таблица ГОСТ 23360 для входа и выхода, OQ-35)
-  table: [ ... ]
+# keys нет (Д-109): таблица шпонок — specs/shafts.yaml → keys.table, одна на вход и выход
 designs:
   - id: PTK-063-R3X8-22M6P2
     bearing: "61819"
@@ -110,15 +112,17 @@ designs:
 
 ### Состав SPEC-12_SHAFTS.md (целевой)
 
-1. **Реестр конфигураций** — таблица: ID, наименование, d, bore, link,
+1. **Шпонки** — таблица `keys.table` из `specs/shafts.yaml` (d_max, b, h, t1, t2;
+   DIN 6885 / ГОСТ 23360), одна для входного вала и выхода в ступице (Д-109).
+2. **Реестр конфигураций** — таблица: ID, наименование, d, bore, link,
    tau_allow, sigma_crush, wall_min, примечание.
-2. **Применимость** — по каждой конфигурации: продукт, проработки (K8/K10/K20),
+3. **Применимость** — по каждой конфигурации: продукт, проработки (K8/K10/K20),
    исполнения ПТК, к которым они привязаны.
-3. **Проверки по применяющим проработкам** — τ вала против [τ], d_req, шпонка
+4. **Проверки по применяющим проработкам** — τ вала против [τ], d_req, шпонка
    (b×h, σсм), стенка полого вала, стенки эксцентрика; статус ok/ошибка.
-4. **Производные** — ключ `vendor_prices`/`keys.table`, выбранная шпонка,
-   присоединительные размеры для `.03` (отверстие) и `.10` (шейка).
-5. **Ссылки** — `specs/shafts.yaml` (вход), `ptk_designs.yaml` (результаты),
+5. **Производные** — выбранная шпонка по каждой конфигурации, присоединительные
+   размеры для `.03` (отверстие) и `.10` (шейка).
+6. **Ссылки** — `specs/shafts.yaml` (вход), `ptk_designs.yaml` (результаты),
    INS-40 (инструкция).
 
 ### Результат проработки (ptk_designs.yaml)
@@ -139,6 +143,8 @@ designs:
 2. **Один источник истины.** Параметры вала живут только в `specs/shafts.yaml`;
    в `ptk_design_input.yaml` — только ID. Никакого дублирования умолчаний в коде,
    кроме словаря `DEFAULTS` в `egm/shafts.py` (и он же — документация умолчаний).
+   Таблица шпонок — тоже один источник: `specs/shafts.yaml` → `keys.table` (Д-109);
+   ключ `keys` во входе проработки — `ValueError`, а не тихое игнорирование.
 3. **ID стабилен.** `SH-<d>-<link>`; разбор ID — регуляркой, ошибка формата —
    `ValueError` с путём и допустимым примером. Неизвестный ID — ошибка прогона
    (в `checks.md`), не молчаливый пропуск.
@@ -255,8 +261,8 @@ egm.catalog_doc (237 строк)
   imported by: main
 egm.config (92 строк)
   imports: -
-  imported by: egm.cad.__main__, egm.cad.assy, egm.materials, egm.ptk_layout, main
-egm.design_doc (535 строк)
+  imported by: egm.cad.__main__, egm.cad.assy, egm.materials, egm.ptk_design, egm.ptk_layout, main
+egm.design_doc (536 строк)
   imports: egm, egm.doc_yaml
   imported by: egm.cad.__main__, main
 egm.doc_yaml (224 строк)
@@ -274,8 +280,8 @@ egm.products (64 строк)
 egm.ptk (624 строк)
   imports: egm, egm.ptk_force, egm.ptk_parts, egm.ptk_profile
   imported by: egm.cad.__main__, egm.cad.ptk_ring, main
-egm.ptk_design (609 строк)
-  imports: egm, egm.ptk_layout, egm.ptk_parts
+egm.ptk_design (638 строк)
+  imports: egm, egm.config, egm.ptk_layout, egm.ptk_parts
   imported by: egm.cad.__main__, main
 egm.ptk_doc (285 строк)
   imports: egm, egm.doc_yaml
@@ -338,7 +344,7 @@ tools.upd_apply (289 строк)
 
 ### Входные конфиги
 
-===== FILE: specs/shafts.yaml (строки 1–80) =====
+===== FILE: specs/shafts.yaml (строки 1–97) =====
 # ============================================================================
 # shafts.yaml — НОМЕНКЛАТУРА входных валов редуктора (продукт SH, Д-107).
 #
@@ -375,10 +381,27 @@ tools.upd_apply (289 строк)
 #   applies_to  — продукты, где конфигурация применяется (справочно, для SPEC-12);
 #   note        — примечание: откуда взята, что подтвердить.
 #
-# Шпонки — общая таблица specs/ptk_design_input.yaml → keys.table (DIN 6885 /
-# ГОСТ 23360), одна для входного вала и для выходного вала в ступице (CP-90).
-# Переносить ли её сюда — OQ-35.
+# Шпонки — общая таблица keys.table ниже (DIN 6885 / ГОСТ 23360), одна для входного
+# вала и для выходного вала в ступице (CP-90). Живёт здесь, в номенклатуре валов,
+# а не во входе проработки (Д-109, OQ-35 решён): паз — свойство сечения вала.
 # ============================================================================
+
+# --- Таблица шпонок (Д-109, OQ-35 решён) -------------------------------------
+# Призматические шпонки исп. A (DIN 6885 / ГОСТ 23360): берётся первая строка с
+# d ≤ d_max — b × h, глубина паза вала t1 и ступицы t2, мм; d_max — верхняя
+# граница Ø вала, мм. Значения сверить со справочником. Одна таблица на входной
+# вал и на выходной вал в ступице (CP-90): читает egm/ptk_design.keys_table()
+# через products.SH.configs.shafts (Д-79); SPEC-12 печатает её разделом «Шпонки».
+keys:
+  table:
+    - {d_max: 8, b: 2, h: 2, t1: 1.2, t2: 1.0}
+    - {d_max: 10, b: 3, h: 3, t1: 1.8, t2: 1.4}
+    - {d_max: 12, b: 4, h: 4, t1: 2.5, t2: 1.8}
+    - {d_max: 17, b: 5, h: 5, t1: 3.0, t2: 2.3}
+    - {d_max: 22, b: 6, h: 6, t1: 3.5, t2: 2.8}
+    - {d_max: 30, b: 8, h: 7, t1: 4.0, t2: 3.3}
+    - {d_max: 38, b: 10, h: 8, t1: 5.0, t2: 3.3}
+    - {d_max: 44, b: 12, h: 8, t1: 5.0, t2: 3.3}
 
 shafts:
   # --- Ø8: проработка K8 (перенесено из ptk_design_input.yaml, rev13.2) -----
@@ -421,7 +444,7 @@ shafts:
     note: "Новая конфигурация rev13.2: Ø20 под увеличенный редуктор (rev13.1). bore/link/tau_allow/sigma_crush/wall_min — по умолчанию, подтвердить прогоном; полый вариант (bore > 0) — при необходимости отдельной записью SH-20-KEY-B<bore>"
 ===== END FILE =====
 
-===== FILE: specs/ptk_design_input.yaml (строки 1–95) =====
+===== FILE: specs/ptk_design_input.yaml (строки 1–84) =====
 # Шаг 2 «Проработка» выбранных исполнений (Д-48, CP-38). Формат — YAML (Д-79).
 #
 # Связь шагов (Д-79): вход — ОПУБЛИКОВАННЫЙ результат шага 1 specs/ptk_configs.yaml;
@@ -436,19 +459,8 @@ shafts:
 # id — полный ID из SPEC-10 или префикс без хэша (Д-51): префикс переживает смену
 # хэша шага 1 (правка параметров шага 1 меняет ID, проработка остаётся).
 
-# Шпонки призматические исп. A (DIN 6885 / ГОСТ 23360): берётся первая строка
-# с d ≤ d_max — b × h, глубина паза вала t1 и ступицы t2, мм.
-# Значения сверить со справочником.
-keys:
-  table:
-    - {d_max: 8, b: 2, h: 2, t1: 1.2, t2: 1.0}
-    - {d_max: 10, b: 3, h: 3, t1: 1.8, t2: 1.4}
-    - {d_max: 12, b: 4, h: 4, t1: 2.5, t2: 1.8}
-    - {d_max: 17, b: 5, h: 5, t1: 3.0, t2: 2.3}
-    - {d_max: 22, b: 6, h: 6, t1: 3.5, t2: 2.8}
-    - {d_max: 30, b: 8, h: 7, t1: 4.0, t2: 3.3}
-    - {d_max: 38, b: 10, h: 8, t1: 5.0, t2: 3.3}
-    - {d_max: 44, b: 12, h: 8, t1: 5.0, t2: 3.3}
+# Шпонки — specs/shafts.yaml → keys.table (Д-109): таблица одна для входного вала
+# и для выходного вала в ступице (CP-90), поэтому живёт в номенклатуре валов.
 
 # Проработки (Д-48). Несколько записей с одним id и разными name — сравнение
 # вариантов вала (SPEC-11, таблица проработок).
@@ -816,7 +828,7 @@ cad:                        # механизм построения чертеж
 
 ### Код расчёта
 
-===== FILE: egm/ptk_design.py (строки 1–609) =====
+===== FILE: egm/ptk_design.py (строки 1–638) =====
 """Шаг 2 — проработка выбранного исполнения ПТК (Д-48, CP-38).
 
 Вход: specs/ptk_design_input.yaml → designs[]; исполнение шага 1 — ptk_configs.yaml.
@@ -831,7 +843,7 @@ import math
 import re
 from types import SimpleNamespace
 
-from egm import ptk_layout, ptk_parts
+from egm import config, ptk_layout, ptk_parts
 
 LINKS = ("key", "flat", "integral", "spline", "press")
 CALC = ("key", "flat", "integral")             # spline, press — только кручение вала
@@ -843,7 +855,8 @@ THEORY = (
     "Кручение вала: τ = 16·T_вх/(π·d_t³·(1 − β⁴)), d_t = d − t1 при шпонке (ослабление пазом), "
     "β = d_отв/d_t; d_req — диаметр, при котором τ = [τ]. Изгиб не считается, его покрывает "
     "заниженное [τ] (сталь 45 на предварительном этапе — 15…30 МПа).\n\n"
-    "Шпонка призматическая, исп. A (DIN 6885 / ГОСТ 23360, таблица keys во входе): "
+    "Шпонка призматическая, исп. A (DIN 6885 / ГОСТ 23360, keys.table в specs/shafts.yaml, "
+    "Д-109): "
     "σ_см = 2·T_э/(d·(h − t1)·l_p), l_p = t − b, t — толщина эксцентрика.\n\n"
     "Стенки эксцентрика: у паза — Y(key_angle) − d/2 − t2, напротив эксцентриситета — "
     "D_э/2 − a_ω − d/2; обе ≥ ecc_wall_min.\n\n"
@@ -959,9 +972,31 @@ def design(cfg, d, lim, keys, extra=None):
             "parts": parts}
 
 
-def run(inp, configs, lim, extra=None):
-    """ptk_design_input.yaml -> [запись]; ошибка входа — ValueError (в checks.md)."""
-    keys = sorted(inp.get("keys", {}).get("table", []), key=lambda k: k["d_max"])
+def keys_table(app=None):
+    """Таблица шпонок из номенклатуры валов (Д-109, OQ-35 решён).
+
+    Источник — products.SH.configs.shafts (configs/application.yaml → specs/shafts.yaml)
+    → keys.table. Одна таблица на входной вал и на выходной вал в ступице (CP-90);
+    во входе проработки её нет: паз — свойство сечения вала, а не проработки.
+    """
+    app = config.load_app() if app is None else app
+    rel = config.cfg_file(app, "products.SH.configs.shafts")
+    tbl = ((config.load(rel) or {}).get("keys") or {}).get("table")
+    if not tbl:
+        raise ValueError(f"{rel.relative_to(config.ROOT)}: нет keys.table — таблица "
+                         f"шпонок живёт в номенклатуре валов (Д-109)")
+    return tbl
+
+
+def run(inp, configs, lim, extra=None, keys=None):
+    """ptk_design_input.yaml -> [запись]; ошибка входа — ValueError (в checks.md).
+
+    keys — таблица шпонок; None — читается из номенклатуры валов (Д-109).
+    """
+    if inp.get("keys"):
+        raise ValueError("ptk_design_input: ключ keys перенесён в specs/shafts.yaml → "
+                         "keys.table (Д-109) — во входе проработки его быть не должно")
+    keys = sorted(keys if keys is not None else keys_table(), key=lambda k: k["d_max"])
     out, names = [], set()
     for d in inp.get("designs", []):
         name = str(d.get("name", ""))
@@ -1396,11 +1431,11 @@ def self_test():
             {"d_max": 10, "b": 3, "h": 3, "t1": 1.8, "t2": 1.4}]
     sh = {"link": "key", "tau_allow": 25.0, "sigma_crush": 100.0}
     dr = {"drills": [3.0, 4.0, 5.0]}
-    inp = {"keys": {"table": keys}, "designs": [
+    inp = {"designs": [
         {"id": "PTK-T-X", "bearing": "61810", "name": "K8", "shaft": {**sh, "d": 8.0}, "balance": dr},
         {"id": "PTK-T-X", "gen": "bearing", "name": "K10", "shaft": {**sh, "d": 10.0}, "balance": dr},
         {"id": "PTK-T-X", "name": "AMB", "shaft": {**sh, "d": 10.0}}]}
-    r8, r10, amb = run(inp, cfgs, lim)
+    r8, r10, amb = run(inp, cfgs, lim, keys=keys)
     assert not r8["ok"] and any("τ" in e for e in r8["errors"]), r8["errors"]
     assert r10["ok"], r10["errors"]
     assert abs(r10["shaft"]["tau"] - 23.1) < 0.2, r10["shaft"]
@@ -1420,10 +1455,16 @@ def self_test():
     assert ri["ok"] and ri["link"]["sigma"] is None and ri["ecc"]["key_b"] == 0.0, ri["errors"]
     assert "K10" in md([r8, r10, amb])["summary"]
     try:
-        run({"designs": [{"id": "x", "name": "K-8", "shaft": {"d": 8.0}}]}, cfgs, lim)
+        run({"designs": [{"id": "x", "name": "K-8", "shaft": {"d": 8.0}}]}, cfgs, lim, keys=keys)
         raise AssertionError("имя с «-» принято")
     except ValueError:
         pass
+    try:                      # Д-109: keys во входе — ошибка, а не тихое игнорирование
+        run({"keys": {"table": keys}, "designs": []}, cfgs, lim)
+        raise AssertionError("keys.table во входе принята")
+    except ValueError as e:
+        assert "Д-109" in str(e), e
+    assert keys_table(), "keys.table пуста (Д-109)"
     assert ptk_layout.self_test()
     return True
 ===== END FILE =====
@@ -2031,6 +2072,18 @@ def self_test():
     return True
 ===== END FILE =====
 
+### Комментарии-глоссарий результирующего YAML (куда добавить input.shaft_id)
+
+===== FILE: egm/design_doc.py (строки 312–318) =====
+    "keys": "Таблица шпонок призматических (specs/shafts.yaml → keys.table, Д-109): первая "
+            "строка с d ≤ d_max; одна для входа и выхода в ступице (CP-90).",
+    "keys[].d_max": "Верхняя граница Ø вала для шпонки, мм.",
+    "keys[].b": "Ширина шпонки b, мм.",
+    "keys[].h": "Высота шпонки h, мм.",
+    "keys[].t1": "Глубина паза вала t1, мм.",
+    "keys[].t2": "Глубина паза ступицы t2, мм.",
+===== END FILE =====
+
 ===== FILE: templates/SPEC-11_PTK_DESIGN.md.tmpl (строки 1–30) =====
 # SPEC-11 — проработка исполнений ПТК (шаг 2, Д-48)
 
@@ -2283,9 +2336,10 @@ if __name__ == "__main__":
 
 ### Регистры и инструкции
 
-===== FILE: specs/DECISIONS.md (строки 126–165) =====
+===== FILE: specs/DECISIONS.md (строки 126–166) =====
 - Д-107: (2026-11-12; CP-91) входной вал — ПРОДУКТ с номенклатурой, а не блок параметров в проработке: номенклатура — specs/shafts.yaml → shafts: {SH-<d>-<link>: {name, d, bore, link, tau_allow, sigma_crush, wall_min, length, applies_to, note}}; продукт SH зарегистрирован в specs/products.yaml (source: shafts.yaml, spec: SPEC-12_SHAFTS.md, cad: ptk_shaft) и в configs/application.yaml → products.SH; деталь ПТК .15 получает product: SH, а designs[].shaft задаётся ссылкой {id: SH-10-KEY} (полный блок — переходный формат с предупреждением). Одна конфигурация переиспользуется всеми проработками и продуктами (ПТК, ГК). Разрешение записи — egm/shafts.py: приоритет «переопределение проработки > поле номенклатуры > умолчание кода», результат — тот же словарь shaft, что ждёт ptk_design.design(). ID стабилен и разбирается регуляркой; неизвестный ID — ошибка прогона. Code-first представление — SPEC-12_SHAFTS.md (генератор egm/shaft_doc.py на общем эмиттере doc_yaml: реестр конфигураций, применимость, проверки по применяющим проработкам, производные для .03/.10). Номенклатура заведена сразу на три конфигурации: SH-08-KEY (K8), SH-10-KEY (K10), SH-20-KEY (Ø20, под увеличенный редуктор rev13.1). Согласованность полей с egm/ptk_design.py: tau_allow/sigma_crush/wall_min/bore/link переходят как есть.
 - Д-108: (2026-11-12; CP-91 этап 5) организация инструкций: у каждой code-first спецификации есть отдельная инструкция в instructions/, и каждая инструкция ссылается на свою спецификацию — соответствие ведётся таблицей в instructions/README.md §3 («Инструкция → спецификация / БД → входные файлы»). Новая инструкция INS-40_SHAFTS.md (номенклатура валов: как добавить конфигурацию, что означает каждый параметр, как читать SPEC-12, порядок прогона, связь с проработками и CAD .15); ссылки на неё обязательны из instructions/README.md §3, INS-10_PTK_CALC.md §2 (шаг 2: shaft по ID) и INS-30_CAD.md (генератор .15). Обратные ссылки из инструкции на соответствующие §-и и на specs/shafts.yaml — обязательны. Правило распространяется на все последующие спецификации: спецификация без инструкции и без обратной ссылки считается незавершённой.
+- Д-109: (2026-11-12; CP-91 этап 1, OQ-35 решён) таблица шпонок keys.table живёт в номенклатуре валов specs/shafts.yaml (ключ keys → table), а не во входе проработки: перенесена из specs/ptk_design_input.yaml без изменения значений (8 строк, d_max 8…44). Основание: паз — свойство сечения вала, а не проработки; таблица одна для входного вала и для выходного вала в ступице (CP-90), значит её место там, где задаётся сечение. Чтение — egm/ptk_design.keys_table(): путь products.SH.configs.shafts из configs/application.yaml (Д-79); пустая или отсутствующая таблица — ValueError. Ключ keys во входе проработки — ValueError со ссылкой на это решение (тихого игнорирования нет). SPEC-12_SHAFTS.md печатает таблицу разделом «Шпонки»; правка таблицы — правка номенклатуры, перепрогон main.py design --publish пересчитывает шпонки всех проработок.
 #### Д-89 — ПТК — CAD и чертежи
 
 Действующий набор принципов (тексты и разбивка членов — в [archive/DECISIONS-2026-10.md](archive/DECISIONS-2026-10.md)):
@@ -2326,13 +2380,13 @@ if __name__ == "__main__":
 
 ===== END FILE =====
 
-===== FILE: specs/DECISIONS.md (строки 195–196) =====
+===== FILE: specs/DECISIONS.md (строки 196–197) =====
 | OQ-34 | Опорный обод .12A в отверстии бурта/кольца (Д-102 п. 2, редакция 2026-11-07): посадка seat_fit H7/js6 и w кольца .14 = max(t_tech, k_fit·d) — предварительно (прогон 2026-11-07: сборка L4 — 19 деталей, STEP OK, кольцо .14 Ø66.12/Ø60.12×9, .12A обод Ø60.12×9, 10×Ø3, гнездо 5.0; .07B с канавкой 13943; .13 и осевых отверстий нет); проверить смятие кольца под штифтом и сборку «обечайка + кольцо + обод» со сверловкой в сборе (SM-1, ось C); извлечение штифтов — OQ-29; da .09 для 61813+ и граница s_об — OQ-31 | открыт |
-| OQ-35 | Где хранить таблицу шпонок keys.table (DIN 6885 / ГОСТ 23360): в specs/ptk_design_input.yaml (как сейчас — одна таблица на входной и выходной вал, CP-90) или перенести в specs/shafts.yaml как «номенклатуру сечения вала»? Влияет на то, чем задаётся паз: конфигурацией вала (шаг 2) или общей таблицей. До решения таблица остаётся в ptk_design_input.yaml (CP-91 не трогает) | открыт |
+| OQ-35 | Где хранить таблицу шпонок keys.table (DIN 6885 / ГОСТ 23360): в specs/ptk_design_input.yaml (как сейчас — одна таблица на входной и выходной вал, CP-90) или перенести в specs/shafts.yaml как «номенклатуру сечения вала»? Влияет на то, чем задаётся паз: конфигурацией вала (шаг 2) или общей таблицей. Решение — Д-109: таблица перенесена в specs/shafts.yaml (паз — свойство сечения вала), вход проработки её не содержит, читает egm/ptk_design.keys_table() | решён (Д-109) |
 ===== END FILE =====
 
 ===== FILE: specs/CODE_PLAN.md (строки 81–81) =====
-| CP-91 | Д-107/Д-108: номенклатура входных валов как продукт SH. Этап 1 — egm/shafts.py: чтение specs/shafts.yaml, проверка ID `SH-<d>-<link>` (регулярка, неизвестный ID — ошибка прогона), слияние «переопределение проработки > поле номенклатуры > умолчание кода(DEFAULTS)» в словарь shaft для ptk_design.design(); products.yaml → SH + product: SH у .15, configs/application.yaml → products.SH. Этап 2 — ptk_design_input.yaml: designs[].shaft = {id: SH-08-KEY}; полный блок принимается как переходный формат с предупреждением (обратная совместимость). Этап 3 — SPEC-12_SHAFTS.md: egm/shaft_doc.py (наследник doc_yaml.Doc: GLOSSARY/PATTERNS/GENERIC, 100% комментариев) + templates/SPEC-12_SHAFTS.md.tmpl; разделы: реестр конфигураций, применимость по продуктам и проработкам, проверки (τ, d_req, шпонка σсм, стенки эксцентрика, стенка полого вала), производные для .03/.10; новый ключ input.shaft_id в ptk_designs.yaml + комментарий в design_doc.GLOSSARY. Этап 4 — egm/cad/ptk_shaft.py: генератор .15 по конфигурации (Ø, паз keys.table, шейки .03/.10, длина по пакету), cad: ptk_shaft. Этап 5 — INS-40_SHAFTS.md + ссылки из README §3, INS-10 §2, INS-30 (Д-108). Этап 6 — проработка K20 на PTK-063 (rev13.1) с SH-20-KEY: прогон, проверка стенок эксцентрика и шпонки под Ø20. Критерий приёмки: main.py --publish rc=0; числа K8/K10 в ptk_designs.yaml не изменились, кроме input.shaft_id | specs/shafts.yaml, specs/products.yaml, configs/application.yaml, specs/ptk_design_input.yaml, egm/shafts.py, egm/ptk_design.py, egm/shaft_doc.py, egm/design_doc.py, egm/doc_yaml.py, templates/SPEC-12_SHAFTS.md.tmpl, egm/cad/ptk_shaft.py, instructions/INS-40_SHAFTS.md, instructions/README.md, instructions/INS-10_PTK_CALC.md, instructions/INS-30_CAD.md, main.py | Д-107, Д-108, Д-79, Д-105, Д-106, Д-48, OQ-32, OQ-35 | CP-90 | открыт (этапы 1–2 — код; этап 3 — SPEC-12; этап 4 — CAD .15; этап 5 — инструкции; этап 6 — K20/Ø20) |
+| CP-91 | Д-107/Д-108: номенклатура входных валов как продукт SH. Этап 1 — egm/shafts.py: чтение specs/shafts.yaml, проверка ID `SH-<d>-<link>` (регулярка, неизвестный ID — ошибка прогона), слияние «переопределение проработки > поле номенклатуры > умолчание кода(DEFAULTS)» в словарь shaft для ptk_design.design(); таблица шпонок keys.table читается оттуда же — Д-109: перенесена из ptk_design_input.yaml, вход проработки ключ keys не принимает; products.yaml → SH + product: SH у .15, configs/application.yaml → products.SH. Этап 2 — ptk_design_input.yaml: designs[].shaft = {id: SH-08-KEY}; полный блок принимается как переходный формат с предупреждением (обратная совместимость). Этап 3 — SPEC-12_SHAFTS.md: egm/shaft_doc.py (наследник doc_yaml.Doc: GLOSSARY/PATTERNS/GENERIC, 100% комментариев) + templates/SPEC-12_SHAFTS.md.tmpl; разделы: таблица шпонок (Д-109), реестр конфигураций, применимость по продуктам и проработкам, проверки (τ, d_req, шпонка σсм, стенки эксцентрика, стенка полого вала), производные для .03/.10; новый ключ input.shaft_id в ptk_designs.yaml + комментарий в design_doc.GLOSSARY. Этап 4 — egm/cad/ptk_shaft.py: генератор .15 по конфигурации (Ø, паз keys.table, шейки .03/.10, длина по пакету), cad: ptk_shaft. Этап 5 — INS-40_SHAFTS.md + ссылки из README §3, INS-10 §2, INS-30 (Д-108). Этап 6 — проработка K20 на PTK-063 (rev13.1) с SH-20-KEY: прогон, проверка стенок эксцентрика и шпонки под Ø20. Критерий приёмки: main.py --publish rc=0; числа K8/K10 в ptk_designs.yaml не изменились, кроме input.shaft_id | specs/shafts.yaml, specs/products.yaml, configs/application.yaml, specs/ptk_design_input.yaml, egm/shafts.py, egm/ptk_design.py, egm/shaft_doc.py, egm/design_doc.py, egm/doc_yaml.py, templates/SPEC-12_SHAFTS.md.tmpl, egm/cad/ptk_shaft.py, instructions/INS-40_SHAFTS.md, instructions/README.md, instructions/INS-10_PTK_CALC.md, instructions/INS-30_CAD.md, main.py | Д-107, Д-108, Д-79, Д-105, Д-106, Д-48, OQ-32, OQ-35 (решён, Д-109) | CP-90 | открыт (этапы 1–2 — код; этап 3 — SPEC-12; этап 4 — CAD .15; этап 5 — инструкции; этап 6 — K20/Ø20) |
 ===== END FILE =====
 
 ===== FILE: instructions/README.md (строки 138–160) =====
