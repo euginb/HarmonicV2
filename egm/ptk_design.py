@@ -12,7 +12,7 @@ import math
 import re
 from types import SimpleNamespace
 
-from egm import config, ptk_layout, ptk_parts
+from egm import config, ptk_layout, ptk_parts, shafts
 
 LINKS = ("key", "flat", "integral", "spline", "press")
 CALC = ("key", "flat", "integral")             # spline, press — только кручение вала
@@ -23,7 +23,8 @@ THEORY = (
     "ряды сдвинуты по фазе, нагрузка между ними распределена неравномерно (OQ-15).\n\n"
     "Кручение вала: τ = 16·T_вх/(π·d_t³·(1 − β⁴)), d_t = d − t1 при шпонке (ослабление пазом), "
     "β = d_отв/d_t; d_req — диаметр, при котором τ = [τ]. Изгиб не считается, его покрывает "
-    "заниженное [τ] (сталь 45 на предварительном этапе — 15…30 МПа).\n\n"
+    "запас S в [τ] = min(τ₋₁/(K_τ·S), 0.58·σт/S_т); [σсм] = min(σт вала, .03, шпонки)/S_см; "
+    "марка .15 — первая проходящая из products.15.material (Д-110, egm/shafts.py, SPEC-12).\n\n"
     "Шпонка призматическая, исп. A (DIN 6885 / ГОСТ 23360, keys.table в specs/shafts.yaml, "
     "Д-109): "
     "σ_см = 2·T_э/(d·(h − t1)·l_p), l_p = t − b, t — толщина эксцентрика.\n\n"
@@ -66,8 +67,11 @@ def _mass(cfg, ecc, dsh, bore, rho, rows):
             "J_out": float(f"{J * 1e-9 * int(cfg['u']) ** 2:.3e}")}
 
 
-def design(cfg, d, lim, keys, extra=None):
-    """Проработка одного исполнения -> запись ptk_designs.json."""
+def design(cfg, d, lim, keys, extra=None, mat_src=None):
+    """Проработка одного исполнения -> запись ptk_designs.json.
+
+    d["shaft"] — разрешённый словарь вала (shafts.resolve); mat_src — (materials, products,
+    stock) для подбора марки .15 и допусков (Д-110); None — допуски DEFAULTS."""
     name, sh, bal = d["name"], d["shaft"], d.get("balance", {})
     err, warn = [], []
     u, M = int(cfg["u"]), float(cfg.get("M") or 0.0)
@@ -93,11 +97,8 @@ def design(cfg, d, lim, keys, extra=None):
         err.append(f"вал: стенка {wall:.2f} < wall_min {wmin:g} мм "
                    f"(Ø{dsh:g}, отв. {bore:g}, t1 {t1:g})")
     k4 = max(1.0 - (bore / d_t) ** 4, 1e-6)
-    ta = float(sh.get("tau_allow", 25.0))
     tau = 16 * T_in * 1e3 / (math.pi * d_t ** 3 * k4)
-    d_req = (16 * T_in * 1e3 / (math.pi * ta * k4)) ** (1 / 3) + t1
-    if tau > ta + 1e-9:
-        err.append(f"вал Ø{dsh:g}: τ = {tau:.1f} > [τ] = {ta:g} МПа — нужен d ≥ {d_req:.1f} мм")
+    i_tau = len(err)          # ошибка τ — на прежнем месте списка; [τ] известен после σсм (Д-110)
     over = {"shaft_d_min": dsh, "shaft_key_b": key["b"] if key else 0.0,
             "shaft_key_t2": key["t2"] if key else 0.0,
             "key_angle": float(d.get("key_angle", lim.key_angle)),
@@ -113,11 +114,20 @@ def design(cfg, d, lim, keys, extra=None):
     if min(wb, kw) < lim.ecc_wall_min - 1e-9:
         err.append(f"эксцентрик: стенка {min(wb, kw):.2f} < ecc_wall_min {lim.ecc_wall_min:g} мм "
                    f"(напротив эксцентриситета {wb:.2f}, у паза {kw:.2f})")
-    lk = {"type": link, "sigma": None}
+    lk, sig = {"type": link, "sigma": None}, None
     if key:
         lp, kh = ecc["t"] - key["b"], key["h"] - key["t1"]
         sig = 2 * T_e * 1e3 / (dsh * kh * lp) if lp > 0 else 1e9
-        sa = float(sh.get("sigma_crush", 100.0))
+    mats, prods, stock = mat_src or (None, None, None)
+    mat = shafts.pick(sh, tau, sig, mats, prods, stock)    # Д-110: марка .15 и допуски из материала
+    ta, sa = mat["tau_allow"], mat["sigma_crush"]
+    d_req = (16 * T_in * 1e3 / (math.pi * ta * k4)) ** (1 / 3) + t1
+    if tau > ta + 1e-9:
+        err.insert(i_tau, f"вал Ø{dsh:g}: τ = {tau:.1f} > [τ] = {ta:g} МПа "
+                          f"({mat['tau_basis']}, {mat['grade'] or 'без марки'}) — нужен d ≥ {d_req:.1f} мм")
+    err += mat["errors"]
+    warn += mat["warnings"]
+    if key:
         lk.update(b=key["b"], h=key["h"], t1=key["t1"], t2=key["t2"], lp=lp,
                   sigma=round(sig, 1), sigma_allow=sa)
         if sig > sa + 1e-9:
@@ -135,7 +145,12 @@ def design(cfg, d, lim, keys, extra=None):
             "input": d, "layout": lay, "keys": keys,       # CP-90: шпонки выхода — для egm.cad
             "shaft": {"d": dsh, "bore": bore, "link": link, "eta": eta, "ecc_share": share, "M": M,
                       "T_in": round(T_in, 3), "T_e": round(T_e, 3), "tau": round(tau, 1),
-                      "tau_allow": ta, "d_req": round(d_req, 2)},
+                      "tau_allow": ta, "d_req": round(d_req, 2),
+                      "tau_basis": mat["tau_basis"], "sigma_crush": sa,
+                      "crush_basis": mat["crush_basis"], "grade": mat["grade"],
+                      "state": mat["state"], "props": mat["props"], "blank": mat["blank"],
+                      "bore_max": shafts.bore_max(dsh, t1, T_in, ta, wmin),
+                      "rejected": mat["rejected"]},
             "link": lk, "ecc": ecc, "mass": _mass(cfg, ecc, dsh, bore, L.rho * 1e-6,
                                                   len(cfg["phasing"])),
             "parts": parts}
@@ -157,26 +172,58 @@ def keys_table(app=None):
     return tbl
 
 
-def run(inp, configs, lim, extra=None, keys=None):
+def _mats():
+    """specs/materials.yaml через configs.materials (Д-79) или None — допуски DEFAULTS."""
+    try:
+        p = config.cfg_file(config.load_app(), "configs.materials")
+    except (KeyError, OSError, ValueError):
+        return None
+    return config.load(p) if p.exists() else None
+
+
+def run(inp, configs, lim, extra=None, keys=None, nomen=None, mats=None):
     """ptk_design_input.yaml -> [запись]; ошибка входа — ValueError (в checks.md).
 
     keys — таблица шпонок; None — читается из номенклатуры валов (Д-109).
+    nomen — specs/shafts.yaml; None — читается, если вал задан ID (Д-107).
+    mats — specs/materials.yaml; None при extra — читается (подбор .15, Д-110).
     """
     if inp.get("keys"):
         raise ValueError("ptk_design_input: ключ keys перенесён в specs/shafts.yaml → "
                          "keys.table (Д-109) — во входе проработки его быть не должно")
     keys = sorted(keys if keys is not None else keys_table(), key=lambda k: k["d_max"])
+    if mats is None and extra is not None:
+        mats = _mats()
+    src = (mats, (extra or {}).get("prods"), (extra or {}).get("stock"))
     out, names = [], set()
     for d in inp.get("designs", []):
         name = str(d.get("name", ""))
         if not NAME_RE.match(name) or name in names:
             raise ValueError(f"designs: имя «{name}» — латиница, цифры, _, без «-», уникальное (Д-48)")
-        if d["shaft"].get("link", "key") not in LINKS:
-            raise ValueError(f"designs.{name}.shaft.link: {d['shaft'].get('link')} — допустимы {LINKS}")
+        sp = d.get("shaft") or {}
+        if "id" in sp and nomen is None:
+            nomen = shafts.load()
+        cands, sw = shafts.resolve(sp, nomen, f"designs.{name}")
+        for _, sh in cands:
+            if sh.get("link", "key") not in LINKS:
+                raise ValueError(f"designs.{name}.shaft.link: {sh.get('link')} — допустимы {LINKS}")
         names.add(name)
         cfg, why = select(configs, d)
-        out.append(design(cfg, d, lim, keys, extra) if cfg else
-                   {"id": d["id"], "name": name, "ok": False, "errors": [why], "warnings": [], "input": d})
+        if not cfg:
+            out.append({"id": d["id"], "name": name, "ok": False, "errors": [why],
+                        "warnings": sw, "input": d})
+            continue
+        r = None
+        for sid, sh in cands:          # Д-110: список ID — наименьшая проходящая (как layout, Д-100)
+            r = design(cfg, {**d, "shaft": sh}, lim, keys, extra, src)
+            r["input"] = {**d, "shaft_id": sid or ""}
+            if r["ok"]:
+                break
+        if len(cands) > 1:
+            sw.append(f"shaft.id: перебраны {[s for s, _ in cands]}, взят {r['input']['shaft_id']}"
+                      + ("" if r["ok"] else " — не прошёл ни один, показан наибольший"))
+        r["warnings"] = sw + r["warnings"]
+        out.append(r)
     return out
 
 
@@ -622,6 +669,19 @@ def self_test():
     assert sorted(p["id"] for p in c["parts"] if ".03" in p["id"])[0].endswith("-K10")
     ri = design(cfgs[0], {"name": "I", "shaft": {"d": 10.0, "link": "integral"}}, lim, keys)
     assert ri["ok"] and ri["link"]["sigma"] is None and ri["ecc"]["key_b"] == 0.0, ri["errors"]
+    # Д-110: допуски из материала — 45 без прутка отклонена, 40Х (σв 785) → [τ] 39.2, усталость
+    mats = {"materials": {"40Х": {"sigma_v": 785, "sigma_t": 640, "state": "улучшение",
+                                  "d_range": [0, 100]},
+                          "45": {"sigma_v": 600, "sigma_t": 355}}}
+    prods = {"PTK": {"parts": {"15": {"material": ["45", "40Х"]}, "03": {"material": ["40Х"]}}}}
+    stock = {"materials": {"40Х": {"bars": [12, 14]}}}
+    rm = design(cfgs[0], {"name": "M", "shaft": {"d": 10.0, "link": "key", "wall_min": 1.5}},
+                lim, keys, mat_src=(mats, prods, stock))
+    sm = rm["shaft"]
+    assert rm["ok"] and sm["grade"] == "40Х" and sm["tau_basis"] == "fatigue", (rm["errors"], sm)
+    assert abs(sm["tau_allow"] - 39.2) < 0.05 and sm["crush_basis"] == "key", sm
+    assert abs(sm["sigma_crush"] - 101.4) < 0.05 and "прутка" in sm["rejected"][0]["why"], sm
+    assert sm["blank"].startswith("пруток Ø12"), sm
     assert "K10" in md([r8, r10, amb])["summary"]
     try:
         run({"designs": [{"id": "x", "name": "K-8", "shaft": {"d": 8.0}}]}, cfgs, lim, keys=keys)

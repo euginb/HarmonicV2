@@ -1,0 +1,51 @@
+# SPEC-12 — номенклатура входных валов (продукт SH, Д-107)
+
+> Code-first: `python main.py design --publish` из `specs/shafts.yaml`, `specs/ptk_design_input.yaml`,
+> `specs/materials.yaml`, `specs/stock.yaml`; код `egm/shafts.py`, `egm/shaft_doc.py`.
+> НЕ ПРАВИТЬ РУКАМИ — правится вход ([INS-40](../instructions/INS-40_SHAFTS.md)).
+
+Конфигураций: {n_cfg}, применяющих проработок: {n_des}.
+
+## 1. Шпонки (Д-109)
+
+Призматические, исп. A (DIN 6885 / ГОСТ 23360) — `specs/shafts.yaml → keys.table`; берётся
+первая строка с d ≤ d_max; одна таблица на входной вал и выходной вал в ступице (CP-90).
+
+{keys}
+
+## 2. Реестр конфигураций
+
+{registry}
+
+## 3. Применимость
+
+{apply}
+
+## 4. Проверки
+
+{checks}
+
+## 5. Материал и заготовка (Д-110)
+
+{material}
+
+Умолчания расчёта — `DEFAULTS` в `egm/shafts.py`; значения предварительные, сверить (OQ-36):
+
+{defaults}
+
+## 6. Производные для .03 / .10
+
+{derived}
+
+## 7. Реестр — машинный вид
+
+```yaml
+{yaml}
+```
+
+## 8. Расчёт допусков
+
+{theory}
+
+Ссылки: `specs/shafts.yaml`, `specs/materials.yaml`, `specs/ptk_designs.yaml` → `shaft`,
+[INS-40](../instructions/INS-40_SHAFTS.md), Д-107…Д-110, OQ-36.

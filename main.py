@@ -19,7 +19,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from egm import doc_yaml, ptk_doc, catalog_doc, design_doc, catalog, config, naming, products, ptk, ptk_design, ptk_force, ptk_parts, ptk_profile
+from egm import doc_yaml, ptk_doc, catalog_doc, design_doc, catalog, config, naming, products, ptk, ptk_design, ptk_force, ptk_parts, ptk_profile, shaft_doc, shafts
 from egm.cad import (assy as cad_assy, freecad as cad_freecad, ptk_ring, ptk_sep, ptk_spacer,
                      step as cad_step, techdraw as cad_techdraw)
 
@@ -174,7 +174,11 @@ def run_design(cfg_rows, require=False):
     tpl = (TPL / "SPEC-11_PTK_DESIGN.md.tmpl").read_text(encoding="utf-8")
     text, missing = fill(tpl, **ptk_design.md(res))
     write("specs", "SPEC-11_PTK_DESIGN.md", text)
-    return [f"SPEC-11: в шаблоне нет полей {missing}"] if missing else []
+    tpl12 = (TPL / "SPEC-12_SHAFTS.md.tmpl").read_text(encoding="utf-8")   # CP-91 этап 3, Д-107
+    text12, miss12 = fill(tpl12, **shaft_doc.md(res))
+    write("specs", "SPEC-12_SHAFTS.md", text12)
+    fails = [f"SPEC-11: в шаблоне нет полей {missing}"] if missing else []
+    return fails + ([f"SPEC-12: в шаблоне нет полей {miss12}"] if miss12 else [])
 
 
 def main(argv):
@@ -205,6 +209,9 @@ def main(argv):
                            ("materials_cfg", __import__("egm.materials", fromlist=["check_repo"]).check_repo),
                            ("srccheck", __import__("egm.srccheck", fromlist=["self_test"]).self_test),
                            ("join", __import__("egm.ptk_join", fromlist=["self_test"]).self_test),
+                           ("shafts", shafts.self_test),
+                           ("shafts_cfg", shafts.check_repo),
+                           ("shaft_doc", shaft_doc.self_test),
                            ("design", ptk_design.self_test)):
             try:
                 test()

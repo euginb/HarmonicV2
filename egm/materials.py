@@ -40,6 +40,17 @@ def part_materials(prods, code, nn):
     return [str(m) for m in (it.get("material") or [])]
 
 
+def props(mats, grade):
+    """Механические свойства марки (Д-110, OQ-36) -> {sigma_v, sigma_t, sigma_m1, state,
+    d_range} | None — марки нет в справочнике. Отсутствующие поля — None (не ошибка)."""
+    if grade is None:
+        return None
+    g = grades(mats)
+    if str(grade) not in g:
+        return None
+    return {k: g[str(grade)].get(k) for k in ("sigma_v", "sigma_t", "sigma_m1", "state", "d_range")}
+
+
 def check(mats, prods, stock):
     """Ошибки: марки products.yaml и stock.yaml, которых нет в materials.yaml; трубы без D, s."""
     fails, known = [], set(grades(mats))
@@ -96,4 +107,6 @@ def self_test():
     assert stock_by_material(stock)["40Х"] == {"tubes": [], "sheets": [], "bars": [70.0]}
     assert part_materials(prods, "PTK", "02") == ["40Х", "38Х2МЮА"]
     assert part_materials(prods, "PTK", "09") == [] and part_materials(prods, "HD", "01") == []
+    assert props(mats, "40Х")["sigma_v"] is None and props(mats, 45)["state"] is None
+    assert props(mats, "Х") is None and props(mats, None) is None
     return True
