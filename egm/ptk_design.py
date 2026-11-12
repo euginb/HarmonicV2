@@ -679,7 +679,8 @@ def self_test():
                 lim, keys, mat_src=(mats, prods, stock))
     sm = rm["shaft"]
     assert rm["ok"] and sm["grade"] == "40Х" and sm["tau_basis"] == "fatigue", (rm["errors"], sm)
-    assert abs(sm["tau_allow"] - 39.2) < 0.05 and sm["crush_basis"] == "key", sm
+    # фикстура без sigma_m1 — σ₋₁ оценивается как 0.43·σв (Д-112), [τ] ≈ 35 МПа
+    assert abs(sm["tau_allow"] - 35.0) < 0.1 and sm["crush_basis"] == "key", sm
     assert abs(sm["sigma_crush"] - 101.4) < 0.05 and "прутка" in sm["rejected"][0]["why"], sm
     assert sm["blank"].startswith("пруток Ø12"), sm
     assert "K10" in md([r8, r10, amb])["summary"]
