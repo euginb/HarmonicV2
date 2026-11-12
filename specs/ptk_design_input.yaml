@@ -1,7 +1,7 @@
 # Шаг 2 «Проработка» выбранных исполнений (Д-48, CP-38). Формат — YAML (Д-79).
 #
-# Связь шагов (Д-79): вход — ОПУБЛИКОВАННЫЙ результат шага 1 specs/ptk_configs.json;
-# выход — specs/ptk_designs.json и specs/SPEC-11_PTK_DESIGN.md (их пишет машина).
+# Связь шагов (Д-79): вход — ОПУБЛИКОВАННЫЙ результат шага 1 specs/ptk_configs.yaml;
+# выход — specs/ptk_designs.yaml и specs/SPEC-11_PTK_DESIGN.md (их пишет машина, Д-105/Д-106).
 #
 # Порядок работы:
 #   1) прогнать шаг 1: python main.py calc --publish;
@@ -41,6 +41,9 @@ designs:
     ecc_share: 0.5    # доля T_вх на один эксцентрик — смятие шпонки (OQ-15)
     key_angle: 45.0   # паз ряда 1 от эксцентриситета, град; ряд k — key_angle − φk
     shaft:            # вал в эксцентрике
+      # Д-107 (CP-91): целевой формат — {id: SH-08-KEY} — ссылка на номенклатуру
+      # specs/shafts.yaml. Полный блок ниже — переходный формат: работает, но выдаёт
+      # предупреждение «устарел (Д-107)».
       d: 8.0          # Ø вала, мм — кручение, шпонка, стенки эксцентрика; Ø отверстия .03 и вала REF на чертежах
       bore: 0.0       # отверстие полого вала, мм; 0 — сплошной; τ растёт как 1/(1−β⁴), стенка ≥ wall_min
       link: key       # соединение эксцентрик–вал: key | flat | integral | spline | press;
@@ -85,7 +88,7 @@ designs:
     eta: 0.8
     ecc_share: 0.5
     key_angle: 45.0
-    shaft: {d: 10.0, bore: 0.0, link: key, tau_allow: 25.0, sigma_crush: 100.0, wall_min: 1.5}
+    shaft: {d: 10.0, bore: 0.0, link: key, tau_allow: 25.0, sigma_crush: 100.0, wall_min: 1.5}   # Д-107: → {id: SH-10-KEY}
     balance: {n_max: 3, wall: 1.0, drills: [3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]}
     lighten: none
     output: {link: flange, d: 0.0, tau_allow: 25.0, sigma_crush: 130.0}   # Д-103/Д-104: момент — фланец на торце ступицы, шпонка — в гайке-опции

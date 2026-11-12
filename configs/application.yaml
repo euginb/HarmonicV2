@@ -31,6 +31,10 @@ products:                   # по продукту из реестра configs.
     configs:                # входные конфиги продукта — шаги 1 и 2 (Д-79)
       input: specs/ptk_input.yaml                # шаг 1 «Расчёт» (SPEC-10)
       design_input: specs/ptk_design_input.yaml  # шаг 2 «Проработка» (SPEC-11)
+  SH:
+    enabled: true           # Д-107: номенклатура входных валов (specs/shafts.yaml); расчёт — в проработках ПТК
+    configs:
+      shafts: specs/shafts.yaml   # конфигурации валов SH-<d>-<link> (вход egm/shafts.py)
   HD:
     enabled: false          # заготовка: номенклатура в products.yaml пуста (TODO(CP-09))
     configs: {}             # входные конфиги ГК — по мере проработки
