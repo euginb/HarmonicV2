@@ -12,7 +12,7 @@ import math
 import re
 from types import SimpleNamespace
 
-from egm import ptk_layout, ptk_parts
+from egm import config, ptk_layout, ptk_parts
 
 LINKS = ("key", "flat", "integral", "spline", "press")
 CALC = ("key", "flat", "integral")             # spline, press — только кручение вала
@@ -24,7 +24,8 @@ THEORY = (
     "Кручение вала: τ = 16·T_вх/(π·d_t³·(1 − β⁴)), d_t = d − t1 при шпонке (ослабление пазом), "
     "β = d_отв/d_t; d_req — диаметр, при котором τ = [τ]. Изгиб не считается, его покрывает "
     "заниженное [τ] (сталь 45 на предварительном этапе — 15…30 МПа).\n\n"
-    "Шпонка призматическая, исп. A (DIN 6885 / ГОСТ 23360, таблица keys во входе): "
+    "Шпонка призматическая, исп. A (DIN 6885 / ГОСТ 23360, keys.table в specs/shafts.yaml, "
+    "Д-109): "
     "σ_см = 2·T_э/(d·(h − t1)·l_p), l_p = t − b, t — толщина эксцентрика.\n\n"
     "Стенки эксцентрика: у паза — Y(key_angle) − d/2 − t2, напротив эксцентриситета — "
     "D_э/2 − a_ω − d/2; обе ≥ ecc_wall_min.\n\n"
@@ -140,9 +141,31 @@ def design(cfg, d, lim, keys, extra=None):
             "parts": parts}
 
 
-def run(inp, configs, lim, extra=None):
-    """ptk_design_input.yaml -> [запись]; ошибка входа — ValueError (в checks.md)."""
-    keys = sorted(inp.get("keys", {}).get("table", []), key=lambda k: k["d_max"])
+def keys_table(app=None):
+    """Таблица шпонок из номенклатуры валов (Д-109, OQ-35 решён).
+
+    Источник — products.SH.configs.shafts (configs/application.yaml → specs/shafts.yaml)
+    → keys.table. Одна таблица на входной вал и на выходной вал в ступице (CP-90);
+    во входе проработки её нет: паз — свойство сечения вала, а не проработки.
+    """
+    app = config.load_app() if app is None else app
+    rel = config.cfg_file(app, "products.SH.configs.shafts")
+    tbl = ((config.load(rel) or {}).get("keys") or {}).get("table")
+    if not tbl:
+        raise ValueError(f"{rel.relative_to(config.ROOT)}: нет keys.table — таблица "
+                         f"шпонок живёт в номенклатуре валов (Д-109)")
+    return tbl
+
+
+def run(inp, configs, lim, extra=None, keys=None):
+    """ptk_design_input.yaml -> [запись]; ошибка входа — ValueError (в checks.md).
+
+    keys — таблица шпонок; None — читается из номенклатуры валов (Д-109).
+    """
+    if inp.get("keys"):
+        raise ValueError("ptk_design_input: ключ keys перенесён в specs/shafts.yaml → "
+                         "keys.table (Д-109) — во входе проработки его быть не должно")
+    keys = sorted(keys if keys is not None else keys_table(), key=lambda k: k["d_max"])
     out, names = [], set()
     for d in inp.get("designs", []):
         name = str(d.get("name", ""))
@@ -577,11 +600,11 @@ def self_test():
             {"d_max": 10, "b": 3, "h": 3, "t1": 1.8, "t2": 1.4}]
     sh = {"link": "key", "tau_allow": 25.0, "sigma_crush": 100.0}
     dr = {"drills": [3.0, 4.0, 5.0]}
-    inp = {"keys": {"table": keys}, "designs": [
+    inp = {"designs": [
         {"id": "PTK-T-X", "bearing": "61810", "name": "K8", "shaft": {**sh, "d": 8.0}, "balance": dr},
         {"id": "PTK-T-X", "gen": "bearing", "name": "K10", "shaft": {**sh, "d": 10.0}, "balance": dr},
         {"id": "PTK-T-X", "name": "AMB", "shaft": {**sh, "d": 10.0}}]}
-    r8, r10, amb = run(inp, cfgs, lim)
+    r8, r10, amb = run(inp, cfgs, lim, keys=keys)
     assert not r8["ok"] and any("τ" in e for e in r8["errors"]), r8["errors"]
     assert r10["ok"], r10["errors"]
     assert abs(r10["shaft"]["tau"] - 23.1) < 0.2, r10["shaft"]
@@ -601,9 +624,15 @@ def self_test():
     assert ri["ok"] and ri["link"]["sigma"] is None and ri["ecc"]["key_b"] == 0.0, ri["errors"]
     assert "K10" in md([r8, r10, amb])["summary"]
     try:
-        run({"designs": [{"id": "x", "name": "K-8", "shaft": {"d": 8.0}}]}, cfgs, lim)
+        run({"designs": [{"id": "x", "name": "K-8", "shaft": {"d": 8.0}}]}, cfgs, lim, keys=keys)
         raise AssertionError("имя с «-» принято")
     except ValueError:
         pass
+    try:                      # Д-109: keys во входе — ошибка, а не тихое игнорирование
+        run({"keys": {"table": keys}, "designs": []}, cfgs, lim)
+        raise AssertionError("keys.table во входе принята")
+    except ValueError as e:
+        assert "Д-109" in str(e), e
+    assert keys_table(), "keys.table пуста (Д-109)"
     assert ptk_layout.self_test()
     return True
