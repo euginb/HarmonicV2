@@ -29,7 +29,8 @@ def solid(m, mode="spline"):
     import cadquery as cq
     V, nz = cq.Vector, cq.Vector(0, 0, 1)
     outer = cq.Wire.makeCircle(m.d_out / 2, V(m.cx[0], m.cx[1], 0), nz)
-    inner = [_inner(cq, [V(x, y, 0) for x, y in m.cut.pts], m.cut_mode or mode)]
+    inner = ([_inner(cq, [V(x, y, 0) for x, y in m.cut.pts], m.cut_mode or mode)]
+             if m.cut.pts else [])                 # CP-91: сплошной вал .15 — без внутреннего контура
     inner += [cq.Wire.makeCircle(h.d / 2, V(h.x, h.y, 0), nz) for h in m.holes]
     body = cq.Solid.extrudeLinear(outer, inner, V(0, 0, m.thick))
     for b in m.bands:                  # CP-45: ступени вращения (дно и ступица стакана, гнёзда)

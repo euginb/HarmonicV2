@@ -26,7 +26,7 @@ from pathlib import Path
 
 from egm import ptk_doc, config, products, ptk, ptk_design, ptk_layout
 from egm.cad import (assy, freecad, ptk_collar, ptk_cover, ptk_ecc, ptk_hub, ptk_ring, ptk_sep,
-                     ptk_spacer, step, svg)
+                     ptk_shaft, ptk_spacer, step, svg)
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = config.load_app()                     # общий конфиг приложения (Д-79)
@@ -44,7 +44,8 @@ FC_CMD = _FC.get("command") or freecad.DEFAULT_COMMAND
 GENERATORS = {"ptk_ring": ptk_ring.build, "ptk_sep": ptk_sep.build, "ptk_ecc": ptk_ecc.build,
               "ptk_spacer": ptk_spacer.build, "ptk_cover": ptk_cover.build,
               "ptk_hub": ptk_hub.build, "ptk_leaf": ptk_hub.build_leaf,
-              "ptk_collar": ptk_collar.build}                              # CP-81: кольцо-бурт .14
+              "ptk_collar": ptk_collar.build,                              # CP-81: кольцо-бурт .14
+              "ptk_shaft": ptk_shaft.build}                                # CP-91 этап 4: входной вал .15
 
 
 def _rel(p):
@@ -356,9 +357,12 @@ def _layout_des(cfg, des, code, prods, bears, pins, stock, rep):
         return None
     p03 = [{"base": p["id"], "id": p["id"], **p}
            for p in cfg["parts"] if p["id"].split(".", 1)[1][:2] == "03"]
+    sel = ({"shaft": inp.get("shaft"), "shaft_id": inp.get("shaft_id", "")} if des else {})
     return {"name": code, "id": cfg["id"], "layout": lay, "ecc": ecc, "ok": True,
-            "errors": [], "warnings": warns, "input": d, "mass": (des or {}).get("mass"),
-            "shaft": {"d": shaft_d, "bore": (des or {}).get("shaft", {}).get("bore", 0.0)},
+            "errors": [], "warnings": warns, "input": {**d, **sel},   # CP-91: выбор вала — для .15
+            "mass": (des or {}).get("mass"), "keys": (des or {}).get("keys"),
+            "shaft": (dict(des["shaft"]) if des
+                      else {"d": shaft_d, "bore": 0.0}),
             "link": (des or {}).get("link") or "предварительный (шаг 1)",
             "parts": des["parts"] if des else p03}
 

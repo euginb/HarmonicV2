@@ -66,8 +66,9 @@ def render(m):
     h = ly + 4.5 * (len(m.legend) + 1) + 4 - y0
     o = [f'<line x1="{-R - 4:g}" y1="0" x2="{R + 4:g}" y2="0" {ST["axis"]}/>',
          f'<line x1="0" y1="{-R - 4:g}" x2="0" y2="{R + 4:g}" {ST["axis"]}/>',
-         f'<circle cx="{m.cx[0]:g}" cy="{-m.cx[1]:g}" r="{R:g}" {ST["part"]}/>',
-         f'<path d="M{" L".join(_pt(*p) for p in m.cut.pts)} Z" {ST["part"]}/>']
+         f'<circle cx="{m.cx[0]:g}" cy="{-m.cx[1]:g}" r="{R:g}" {ST["part"]}/>']
+    if m.cut.pts:                              # CP-91: сплошной вал .15 — без внутреннего контура
+        o.append(f'<path d="M{" L".join(_pt(*p) for p in m.cut.pts)} Z" {ST["part"]}/>')
     for wn in m.windows:
         if m.row and wn.row != m.row:
             continue
