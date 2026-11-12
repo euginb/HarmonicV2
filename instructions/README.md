@@ -146,6 +146,7 @@ Code-first спецификация — результат прогона `main.
 |---|---|---|
 | [INS-10_PTK_CALC.md](INS-10_PTK_CALC.md) | `specs/SPEC-10_PTK_CALC.md`, `specs/SPEC-11_PTK_DESIGN.md`, `specs/ptk_configs.yaml`, `specs/ptk_designs.json` | `specs/ptk_input.yaml`, `specs/ptk_design_input.yaml`, `specs/vendor_prices.yaml` → `rollers`, `bearings` |
 | [INS-20_CATALOG.md](INS-20_CATALOG.md) | `specs/catalog_hiwin_hg.yaml`, `specs/catalog_hiwin_hg_pairs.json`, `reports/catalog_report.md` | `docs/HG-Series-Catalog_opt.md`, `specs/vendor_prices.json` |
+| [INS-40_SHAFTS.md](INS-40_SHAFTS.md) | `specs/SPEC-12_SHAFTS.md`, `specs/ptk_designs.yaml` → `shaft` | `specs/shafts.yaml`, `specs/materials.yaml`, `specs/stock.yaml`, `specs/products.yaml` → `PTK.parts.15.material` |
 
 1. Правите входной файл — ручной конфиг `specs/*.yaml` (`ptk_input`, `ptk_design_input`,
    `vendor_prices`, `products`, `stock`; Д-79).

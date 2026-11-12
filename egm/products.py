@@ -43,9 +43,12 @@ def check_app(app, prods):
             fails.append(f"application.yaml: products.{code}: раздел не словарь (Д-79)")
         elif code not in prods:
             fails.append(f"application.yaml: products.{code} отсутствует в products.yaml (Д-79)")
-        elif sec.get("enabled") and not (prods[code].get("parts") or {}):
+        elif (sec.get("enabled") and not (prods[code].get("parts") or {})
+              and not prods[code].get("source")):
+            # Д-107: номенклатура продукта может жить вне products.yaml — ключ source
+            # (SH → specs/shafts.yaml); parts тогда пуст намеренно.
             fails.append(f"application.yaml: products.{code}: enabled, но номенклатура "
-                         "в products.yaml пуста")
+                         "в products.yaml пуста (нет ни parts, ни source)")
     return fails
 
 
@@ -56,7 +59,8 @@ def self_test():
     assert not check(prods, [{"parts": [{"id": "PTK-1-X.01A"}]}])
     assert check(prods, [{"parts": [{"id": "PTK-1-X.09"}]}])
     assert check(prods, [{"parts": [{"id": "bad"}]}])
-    app_prods = {"PTK": {"parts": {"01": {}}}, "HD": {"parts": {}}}
+    app_prods = {"PTK": {"parts": {"01": {}}}, "HD": {"parts": {}},
+                 "SH": {"parts": {}, "source": "specs/shafts.yaml"}}
     assert not check_app({"products": {"PTK": {"enabled": True},
                                        "HD": {"enabled": False}}}, app_prods)
     assert check_app({"products": {"XX": {"enabled": True}}}, app_prods)
