@@ -205,6 +205,7 @@ def main(argv):
                            ("techdraw", cad_techdraw.self_test),
                            ("techdraw_sheet", __import__("egm.cad.techdraw_sheet", fromlist=["self_test"]).self_test),
                            ("hub", __import__("egm.cad.ptk_hub", fromlist=["self_test"]).self_test),
+                           ("shaft_cad", __import__("egm.cad.ptk_shaft", fromlist=["self_test"]).self_test),
                            ("materials", __import__("egm.materials", fromlist=["self_test"]).self_test),
                            ("materials_cfg", __import__("egm.materials", fromlist=["check_repo"]).check_repo),
                            ("srccheck", __import__("egm.srccheck", fromlist=["self_test"]).self_test),

@@ -15,8 +15,8 @@ import time
 from pathlib import Path
 
 from egm import products, ptk_profile
-from egm.cad import (ptk_collar, ptk_cover, ptk_ecc, ptk_hub, ptk_ring, ptk_sep, ptk_spacer, step,
-                     techdraw)
+from egm.cad import (ptk_collar, ptk_cover, ptk_ecc, ptk_hub, ptk_ring, ptk_sep, ptk_shaft,
+                     ptk_spacer, step, techdraw)
 
 LAYERS = {"01": ("01_RING", "венец"), "02": ("02_CAGE", "сепаратор"),
           "03": ("03_ECC", "эксцентрик"), "04": ("04_BODIES", "тела качения"),
@@ -26,21 +26,21 @@ LAYERS = {"01": ("01_RING", "венец"), "02": ("02_CAGE", "сепаратор
           "11": ("11_DIST", "дистанционные кольца эксцентриков"), "12": ("12_HUB", "ступица выхода"),
           "13": ("13_LEAF", "дно-лист"),
           "14": ("14_COLLAR", "кольцо-бурт"),
-          "ref": ("REF", "примитивы: вал")}
+          "15": ("15_SHAFT", "входной вал (CP-91 этап 4)")}
 COLORS = {"01": (0.55, 0.57, 0.60), "02": (0.80, 0.60, 0.20), "03": (0.30, 0.50, 0.80),
           "04": (0.85, 0.20, 0.20), "05": (0.45, 0.47, 0.52), "08": (0.20, 0.65, 0.30),
           "07": (0.62, 0.64, 0.68), "09": (0.20, 0.55, 0.25), "10": (0.25, 0.60, 0.35),
           "11": (0.35, 0.55, 0.85), "12": (0.75, 0.50, 0.20), "13": (0.60, 0.45, 0.30),
           "14": (0.70, 0.55, 0.25),
-          "ref": (0.70, 0.70, 0.70)}
+          "15": (0.70, 0.70, 0.70)}
 VIEWS = [{"name": "ISO", "dir": [1, -1, 1], "layers": "все"},
          {"name": "по оси", "dir": [0, 0, 1], "layers": "все"},
          {"name": "сбоку", "dir": [1, 0, 0], "layers": "все"},
-         {"name": "без венцов и сепаратора", "dir": [1, -1, 1], "layers": "03, 04, 08, REF"}]
+         {"name": "без венцов и сепаратора", "dir": [1, -1, 1], "layers": "03, 04, 08, 15"}]
 SCHEMA = "AP242DIS"
 ALIAS = {"01": "RING", "02": "CAGE", "03": "ECC", "04": "BODY", "05": "SPACER",
          "07": "COVER", "08": "BEARING", "09": "BRG_OUT", "10": "BRG_IN", "11": "DIST",
-         "12": "HUB", "13": "LEAF", "14": "COLLAR", "ref": "SHAFT"}   # Д-52: имена узлов STEP — только латиница
+         "12": "HUB", "13": "LEAF", "14": "COLLAR", "15": "SHAFT"}   # Д-52: имена узлов STEP — только латиница
 _ENT = re.compile(r"#(\d+)\s*=\s*([A-Z0-9_]+)\s*\((.*?)\)\s*;", re.S)
 _TOK = re.compile(r"'EGM(\d+)'")
 
@@ -60,13 +60,9 @@ def _txt(v):
 
 
 def _shaft(cfg):
-    """Вал (REF) -> (z0, длина): с конструктивом шага 2 — от .07A до второй .10 в ступице."""
-    lay = cfg.get("layout") or {}
-    cov, cup, b10 = lay.get("covers"), lay.get("cup") or {}, lay.get("b10") or {}
-    if cov and cup.get("z_in"):
-        z0 = -cov["tA"] - 5.0
-        return z0, cup["z_in"] + b10.get("B", 0.0) - z0
-    return -5.0, cfg["sep"]["length"] + 10
+    """Вал .15 -> (z0, длина) по пакету (CP-91 этап 4: участки — egm/cad/ptk_shaft.stations)."""
+    st = ptk_shaft.stations(cfg)
+    return st["z0"], st["z1"] - st["z0"]
 
 
 def _layout_inst(cfg, rows):
@@ -147,9 +143,10 @@ def plan(cfg):
         root.append({"id": f"{cid}.05{x['variant']}", "nn": "05", "x": 0.0, "y": 0.0,
                      "z": x["z"], "ang": 0.0})
     root += _layout_inst(cfg, rows)
-    if g["limits"].get("shaft_d_min"):
-        root.append({"id": f"{cid}.REF-shaft", "nn": "ref", "x": 0.0, "y": 0.0,
-                     "z": _shaft(cfg)[0], "ang": 0.0})
+    if g["limits"].get("shaft_d_min") or cfg.get("shaft"):   # CP-91 этап 4: .15 — деталь, не REF
+        p15 = next((q["id"] for q in cfg["parts"] if _nn(q["id"]) == "15"), f"{cid}.15")
+        ptk_shaft.check(cfg, p15)                              # отказ подбора — до геометрии
+        root.append({"id": p15, "nn": "15", "x": 0.0, "y": 0.0, "z": _shaft(cfg)[0], "ang": 0.0})
     return {"rows": rows, "root": root, "B": sep["length"], "pitch": pitch}
 
 
@@ -220,6 +217,10 @@ def item_meta(cfg, prods, pid, nn):
         m.update(t=j.get("t_s"), crit=j.get("crit"), D=j.get("D"),
                  pins=f"{j.get('pin_n')}×Ø{j.get('pin_d') or 0:g}",
                  hub_pins=f"{h.get('n')}×Ø{h.get('d') or 0:g}")
+    elif nn == "15":                   # CP-91 этап 4: вал по проработке (SH, Д-107)
+        st, sh = ptk_shaft.stations(cfg), cfg.get("shaft") or {}
+        m.update(d=st["d"], d10=st["d10"], L=round(st["z1"] - st["z0"], 3),
+                 config=sh.get("id") or None, grade=sh.get("grade"), prelim=st["prelim"])
     else:
         m.update(d=g["limits"]["shaft_d_min"])
     return m
@@ -354,7 +355,8 @@ def manifest(cfg, prods, p):
 
 _GEN = {"01": ptk_ring.build, "02": ptk_sep.build, "03": ptk_ecc.build,
         "05": ptk_spacer.build, "07": ptk_cover.build, "11": ptk_cover.build,
-        "12": ptk_hub.build, "13": ptk_hub.build_leaf, "14": ptk_collar.build}
+        "12": ptk_hub.build, "13": ptk_hub.build_leaf, "14": ptk_collar.build,
+        "15": ptk_shaft.build}                                   # CP-91 этап 4
 
 
 def part_model(cfg, pid, nn):
@@ -363,6 +365,8 @@ def part_model(cfg, pid, nn):
     Детали конструктива — из layout.cad_parts (cup, join — CP-63), прочие — из cfg["parts"]."""
     lay = [q for q in (cfg.get("layout") or {}).get("cad_parts", []) if q["id"] == pid]
     part = lay[0] if lay else next((q for q in cfg["parts"] if q["id"] == pid), None)
+    if nn == "15":                     # CP-91 этап 4: без проработки — предварительный вал шага 1
+        return ptk_shaft.build(cfg, part or {"id": pid})
     if nn not in _GEN or part is None:
         return None
     if nn in ("01", "02"):

@@ -246,14 +246,25 @@ def pick(designs, arg, name=None):
 
 
 def apply(cfg, des):
-    """Исполнение шага 1 с эксцентриками и валом проработки (для egm.cad); cfg не меняется."""
+    """Исполнение шага 1 с эксцентриками и валом проработки (для egm.cad); cfg не меняется.
+
+    CP-91 этап 4: shaft — выбранная конфигурация вала (+ id, id_req, шпонка .03 из link),
+    keys — keys.table (Д-109), деталь .15-<имя> — для ptk_shaft (суффикс: кеш Д-84 по проработке)."""
     if des is None:
         return cfg
     g, lay = cfg["geom"], des.get("layout") or {}
     extra = lay.get("cad_parts") or []                 # CP-45: .02A|B, .07A/B, .11 конструктива
-    drop = {"03"} | {p["id"].split(".", 1)[1][:2] for p in extra}
+    drop = {"03", "15"} | {p["id"].split(".", 1)[1][:2] for p in extra}
     keep = [p for p in cfg["parts"] if p["id"].split(".", 1)[1][:2] not in drop]
-    return {**cfg, "ecc": des["ecc"], "parts": keep + des["parts"] + extra, "layout": lay or None,
+    sh, inp, lk = dict(des.get("shaft") or {}), des.get("input") or {}, des.get("link")
+    p15 = []
+    if sh:
+        sh.update(id=inp.get("shaft_id", ""), id_req="id" in (inp.get("shaft") or {}),
+                  key=lk if isinstance(lk, dict) and lk.get("b") else {})
+        p15 = [{"id": f"{cfg['id']}.15-{des['name']}", "base": f"{cfg['id']}.15",
+                "name": "входной вал", "variant": "", "rows": []}]
+    return {**cfg, "ecc": des["ecc"], "parts": keep + des["parts"] + extra + p15,
+            "layout": lay or None, "shaft": sh or None, "keys": des.get("keys"),
             "geom": {**g, "limits": {**g["limits"], "shaft_d_min": des["shaft"]["d"]}}}
 
 

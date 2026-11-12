@@ -74,3 +74,16 @@ designs:
     lighten: none
     output: {link: flange, d: 0.0, tau_allow: 25.0, sigma_crush: 130.0}   # Д-103/Д-104: момент — фланец на торце ступицы, шпонка — в гайке-опции
     layout: [L4, L3, L2]
+  # CP-91 этап 6: вал Ø20 (SH-20-KEY) на том же исполнении; оценка до прогона — τ ≈ 26 при [τ] 52.7,
+  # σсм ≈ 66 при [σсм] 101.4 (шпонка 6×6, l_p 7) — первый проходящий вал; .10 подбирается заново
+  - id: PTK-063-R3X8-22M6P2
+    bearing: "61819"
+    name: K20
+    eta: 0.8
+    ecc_share: 0.5
+    key_angle: 45.0
+    shaft: {id: SH-20-KEY}   # Д-107, Д-110
+    balance: {n_max: 3, wall: 1.0, drills: [3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]}
+    lighten: none
+    output: {link: flange, d: 0.0, tau_allow: 25.0, sigma_crush: 130.0}   # как K10 (Д-103/Д-104)
+    layout: [L4, L3, L2]

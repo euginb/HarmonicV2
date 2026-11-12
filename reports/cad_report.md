@@ -246,3 +246,53 @@ techdraw: 14 чертежей деталей в out\cad\PTK-050-R2X4_2-8M4P2-06A
 step: сборка строится (19 деталей, 229 экземпляров, spline)…
 step: out\cad\PTK-050-R2X4_2-8M4P2-06A797\PTK-050-R2X4_2-8M4P2-06A797-L4.step (22.4 с); метаданные в STEP: 27 узлов (PROPERTY_DEFINITION, Д-50); FreeCAD: макрос tools/freecad_meta.py
 отчёт: reports\cad_report.md
+
+---
+
+- Запуск: 2026-11-12 17:51:56
+- Команда: python -m egm.cad PTK-063-R3X8-22M6P2 --design K10 --assy
+
+ошибка: 'проработка K10 для PTK-063-R3X8-22M6P2 не найдена в specs/ptk_designs.yaml — проверить ptk_design_input.yaml, python main.py --publish (Д-48)'
+отчёт: reports/cad_report.md
+
+---
+
+- Запуск: 2026-11-12 17:51:57
+- Команда: python -m egm.cad PTK-063-R3X8-22M6P2 --design K8 --assy
+
+ошибка: 'проработка K8 для PTK-063-R3X8-22M6P2 не найдена в specs/ptk_designs.yaml — проверить ptk_design_input.yaml, python main.py --publish (Д-48)'
+отчёт: reports/cad_report.md
+
+---
+
+- Запуск: 2026-11-12 17:52:05
+- Команда: python -m egm.cad PTK-063-R3X8-22M6P2-BDBB72 --design K10 --assy
+
+### PTK-063-R3X8-22M6P2-BDBB72-K10 — сборка исполнения
+
+Сборка исполнения PTK-063-R3X8-22M6P2-BDBB72 одним STEP (Д-49): дерево рядов и деталей, слои, атрибуты CAx-IF; дубль дерева и метаданных — out/cad/PTK-063-R3X8-22M6P2-BDBB72/PTK-063-R3X8-22M6P2-BDBB72-K10.assy.json (Д-50). Эксцентрики и вал — проработка K10 (шаг 2, SPEC-11).
+
+assy: out/cad/PTK-063-R3X8-22M6P2-BDBB72/PTK-063-R3X8-22M6P2-BDBB72-K10.assy.json
+techdraw: 12 чертежей деталей в out/cad/PTK-063-R3X8-22M6P2-BDBB72/PTK-063-R3X8-22M6P2-BDBB72-K10.assy.json → drawings; листы и размеры по 3D — макрос tools/freecad_techdraw.py во FreeCAD (Д-65)
+вал Ø10, эксцентрики .03 — проработка K10 (SPEC-11, Д-48)
+конструктив L2: 02B-K10, 07A-K10, 07B-K10, 11-K10; .09 61813, .10 61800; длина 82 мм (CP-45)
+step: сборка строится (16 деталей, 279 экземпляров, spline)…
+step: out/cad/PTK-063-R3X8-22M6P2-BDBB72/PTK-063-R3X8-22M6P2-BDBB72-K10.step (26.5 с); метаданные в STEP: 24 узлов (PROPERTY_DEFINITION, Д-50); FreeCAD: макрос tools/freecad_meta.py
+отчёт: reports/cad_report.md
+
+---
+
+- Запуск: 2026-11-12 17:52:52
+- Команда: python -m egm.cad PTK-063-R3X8-22M6P2-BDBB72 --design K8 --assy
+
+### PTK-063-R3X8-22M6P2-BDBB72-K8 — сборка исполнения
+
+Сборка исполнения PTK-063-R3X8-22M6P2-BDBB72 одним STEP (Д-49): дерево рядов и деталей, слои, атрибуты CAx-IF; дубль дерева и метаданных — out/cad/PTK-063-R3X8-22M6P2-BDBB72/PTK-063-R3X8-22M6P2-BDBB72-K8.assy.json (Д-50). Эксцентрики и вал — проработка K8 (шаг 2, SPEC-11).
+
+assy: out/cad/PTK-063-R3X8-22M6P2-BDBB72/PTK-063-R3X8-22M6P2-BDBB72-K8.assy.json
+techdraw: 12 чертежей деталей в out/cad/PTK-063-R3X8-22M6P2-BDBB72/PTK-063-R3X8-22M6P2-BDBB72-K8.assy.json → drawings; листы и размеры по 3D — макрос tools/freecad_techdraw.py во FreeCAD (Д-65)
+вал Ø8, эксцентрики .03 — проработка K8 (SPEC-11, Д-48)
+конструктив L2: 02B-K8, 07A-K8, 07B-K8, 11-K8; .09 61813, .10 61800; длина 82 мм (CP-45)
+step: сборка строится (16 деталей, 279 экземпляров, spline)…
+step: out/cad/PTK-063-R3X8-22M6P2-BDBB72/PTK-063-R3X8-22M6P2-BDBB72-K8.step (23.6 с); метаданные в STEP: 24 узлов (PROPERTY_DEFINITION, Д-50); FreeCAD: макрос tools/freecad_meta.py
+отчёт: reports/cad_report.md

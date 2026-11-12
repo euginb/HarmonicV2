@@ -39,7 +39,13 @@ d_range, либо не проходят τ/σсм. Берётся первая �
 
 ## 6. CAD
 
-Генератор .15 — `egm/cad/ptk_shaft.py` (CP-91 этап 4); до него в сборке REF-примитив.
+Генератор .15 — `egm/cad/ptk_shaft.py` (CP-91 этап 4): хвостовик Ø min(d, d.10) с пазом
+keys.table, шейки .10 в .07A и в ступице, тело Ø d под .03 с пазом по пакету. Длина — по
+пакету и конструктиву (поле length номенклатуры не читается); константы — DEFAULTS
+(tail_l, key_run, slot_over — сверить). CAD не строится, если ID не разрешён или марка .15
+не подобрана; отказ τ/σсм вал не останавливает (статус — в SPEC-11/SPEC-12). Деталь —
+`<ID>.15-<проработка>`, слой `15_SHAFT`; без проработки — предварительный цилиндр шага 1.
+Регистрация генератора — [INS-30 §9](INS-30_CAD.md).
 
 Journal 'specs/CODE_PLAN.md': Входные валы — продукт SH
 | CP-91 | Д-107/Д-108/Д-109/Д-110: номенклатура входных валов как продукт SH. Этапы 1–3, 5 — патч rev13.3: egm/shafts.py (ID, resolve, DEFAULTS, подбор марки .15, допуски из материала, bore_max), egm/shaft_doc.py + templates/SPEC-12_SHAFTS.md.tmpl, ptk_design (shaft_id, список ID, поля shaft.*), materials.py props, materials.yaml σв/σт 40Х и 45 (предв., OQ-36), shafts.yaml без переходных полей, вход по ID, INS-40 + ссылки README §3/INS-10 §2/INS-30 §9. Этап 4 — CAD .15; этап 6 — K20/Ø20. Приёмка: (а) с переопределениями tau_allow 25 / sigma_crush 100 числа K8/K10 прежние; (б) штатно — изменения объяснены в SPEC-12, K8/K10 «нет» | egm/shafts.py, egm/shaft_doc.py, templates/SPEC-12_SHAFTS.md.tmpl, egm/ptk_design.py, egm/design_doc.py, egm/materials.py, main.py, specs/shafts.yaml, specs/ptk_design_input.yaml, specs/materials.yaml, instructions/INS-40_SHAFTS.md, instructions/README.md, instructions/INS-10_PTK_CALC.md, instructions/INS-30_CAD.md | Д-107, Д-108, Д-109, Д-110, OQ-36 | CP-90 | этапы 1–3, 5 — ждут прогона; этап 4, 6 — открыты |
