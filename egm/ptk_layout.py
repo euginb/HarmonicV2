@@ -14,7 +14,9 @@ from egm import ptk_join
 SUP = {"tau_allow": 25.0, "hub_wall": 2.0, "seat_wall": 2.0, "ring_w": 2.0,
        "lip": 1.0, "cup_t": 2.0, "ax_gap": 0.5, "nut_h": 4.0, "out_ext": 2.0, "pin_wall": 1.0,
        "hub_web": 2.0, "snap_h": 1.5,   # CP-90, Д-102: перемычка за гнездом .10; стопорное кольцо ГОСТ 13942
-       "snap_web": 1.0, "fl_mu": 0.12, "fl_safety": 1.5, "fl_web": 1.0, "fl_tau_pin": 80.0}  # Д-104: фланец
+       "snap_web": 1.0, "fl_mu": 0.12, "fl_safety": 1.5, "fl_web": 1.0, "fl_tau_pin": 80.0,
+       "fl_n_min": 3}   # Д-104: фланец; fl_web — перемычка между стенками отверстий, мм
+                        # Д-113: число отверстий не ограничено потолком — только геометрией
 
 _VP = None
 
@@ -37,16 +39,58 @@ def _lip_b(D09, o):
     return max(o["lip"], r["m"] + o["snap_web"]) if r else o["lip"]
 
 
+def holes_max(r, d_hole, web, lo=3):
+    """Наибольшее число отверстий Ø d_hole на окружности r при перемычке ≥ web (Д-113).
+
+    Ограничение — минимальное расстояние между отверстиями: шаг по хорде между осями
+    соседних отверстий 2·r·sin(π/n) ≥ d + web. Постоянного потолка числа отверстий нет:
+    при большом r их помещается больше, при малом — меньше, и это единственный предел.
+    """
+    if r <= 0:
+        return lo
+    s = (d_hole + web) / (2.0 * r)
+    if s >= 1.0:
+        return lo
+    return max(lo, int(math.floor(math.pi / math.asin(s) + 1e-9)))
+
+
 def out_flange(M, oo, bears, b10, o, D_max):
-    """CP-90 этап 2b-2, Д-104: момент — фланцем на торце ступицы (винты трением, иначе штифты срезом);
-    ступица вровень: hub_l = ax_gap + B.09 + lip_B. .09 по возрастанию D: d ≥ D.10 + 2·hub_wall,
-    D ≤ D_max, τ ступицы; первый .09 с проходящим фланцем. d_o без паза (паз — в гайке-опции)."""
+    """CP-90 этап 2b-2, Д-104 + Д-113: момент — фланцем на торце ступицы (винты трением,
+    иначе штифты срезом); ступица вровень: hub_l = ax_gap + B.09 + lip_B. .09 по возрастанию D:
+    d ≥ D.10 + 2·hub_wall, D ≤ D_max, τ ступицы; первый .09 с проходящим фланцем.
+
+    Д-113 (перепроектирование потолка числа отверстий): окружность крепления — наибольшая,
+    допустимая стенками ступицы (r = r_hi); число отверстий — наименьшее, при котором трение
+    винтов держит момент с запасом fl_safety, а предел числа задаёт только геометрия —
+    holes_max(r, d, fl_web). Если трение не держит даже при полном заполнении окружности,
+    добавляются штифты срезом: их число — из условия среза, отверстия — по кратности,
+    шаг между соседними винтом и штифтом ≥ (d винта + d штифта)/2 + fl_web, и не более
+    holes_max. Раньше число ограничивалось константой 12 — при больших Ø .09 это отбраковывало
+    фланец, который геометрически проходит. d_o без паза (паз — в гайке-опции)."""
     vp, T, sf = _vp(), M * 1e3, o["fl_safety"]
+
+    def ret(k9, b, tau, ks, s, hl, lb, r, n, n_p=0, pd=0.0):
+        """Словарь выхода фланца (Д-104) + поля Д-113: окружность, число, штифты."""
+        dep = round(1.5 * s["d"] + 1.0, 1)
+        Tf = round(n * s["F_M"] * o["fl_mu"] * r, 1)
+        fl = {"screw": ks, "n": n, "r": r, "d_tap": s["d_tap"], "depth": dep, "T_fric": Tf,
+              "n_p": n_p, "pin_d": pd if n_p else 0.0, "pin_depth": round(min(2 * pd, hl), 1) if n_p else 0.0}
+        txt = f"{n}×{ks} r {r:g}" + (f" + {n_p}×Ø{pd:g} шт." if n_p else "") + f", трение {Tf:.0f} Н·м"
+        ext = {**((vp.get("rings_ext") or {}).get(f"{d9:g}") or {}), "std": "ГОСТ 13942-86"}       # 2b-3: наружные
+        int_ = {**((vp.get("rings_int") or {}).get(f"{b['D']:g}") or {}), "std": "ГОСТ 13943-86"}      # внутренние
+        return {"link": "flange", "d": float(oo.get("d") or 0.0), "key": None, "l_key": 0.0,
+                "tau": round(tau, 1), "tau_allow": o["tau_allow"], "sigma_allow": 0.0,
+                "c09": [({"id": k9, **b}, tau)], "hub_l": round(hl, 2), "hub_by": "фланец/корпус",
+                "flush": True, "lip_B": round(lb, 2), "flange": fl, "fl_txt": txt,
+                "grooves": {"ext": ext, "int": int_}}
+
     scr, pins = vp.get("screws") or {}, vp.get("pins") or {}
     if not scr:
         return None, "нет таблицы screws в vendor_prices.yaml (Д-104)"
     D10 = (b10 or {}).get("D", 0.0)
-    for _, d9, k9 in _brgs(bears):
+    n_min = int(o.get("fl_n_min", 3))
+    cands = []
+    for _, d9, k9 in _brgs(bears):                        # .09 по возрастанию D
         b = bears[k9]
         if b["D"] > D_max + 1e-9 or d9 < D10 + 2 * o["hub_wall"] - 1e-9:
             continue
@@ -56,41 +100,45 @@ def out_flange(M, oo, bears, b10, o, D_max):
         lb = _lip_b(b["D"], o)
         hl = o["ax_gap"] + b["B"] + lb
         for ks, s in sorted(scr.items(), key=lambda x: x[1]["d"]):
-            dep = round(1.5 * s["d"] + 1.0, 1)
+            if round(1.5 * s["d"] + 1.0, 1) > hl + 1e-9:   # винт не сядет по глубине
+                continue
             r_lo = D10 / 2 + s["d"] / 2 + o["hub_wall"]
             r_hi = d9 / 2 - s["d"] / 2 - o["hub_wall"]
-            if dep > hl + 1e-9 or r_lo > r_hi + 1e-9:
+            if r_lo > r_hi + 1e-9:                         # кольца винтов нет
                 continue
-            r = round((r_lo + r_hi) / 2, 1)
-            pd = max((p["d"] for p in pins.values() if p["d"] <= s["d"]), default=0.0)
-            for n in range(3, 13):
-                if 2 * math.pi * r / n < s["d"] + o["fl_web"]:
-                    break
-                Tf = n * s["F_M"] * o["fl_mu"] * r            # кН·мм = Н·м
+            r = round(r_hi, 1)                             # наибольшая окружность (Д-113)
+            cands.append((k9, b, tau, ks, s, hl, lb, r, holes_max(r, s["d"], o["fl_web"], n_min)))
+    # Д-113: число отверстий подстраивается под требуемый момент. Для первой подходящей
+    # окружности .09 перебираются винты и сочетания «n винтов + n_p штифтов»: момент держат
+    # трение винтов и срез штифтов; берётся сочетание с наименьшим общим числом отверстий,
+    # у которого момент ≥ fl_safety·M, а шаг между любыми соседними отверстиями
+    # ≥ (d_винта + d_штифта)/2 + fl_web. Винтов не меньше fl_n_min — прилегание фланца.
+    best = None
+    for k9, b, tau, ks, s, hl, lb, r, n_geo in cands:
+        pd = max((p["d"] for p in pins.values() if p["d"] <= s["d"]), default=0.0)
+        q = r * math.pi * pd ** 2 / 4 * o["fl_tau_pin"] / 1e3 if pd else 0.0    # Н·м на штифт
+        for n_s in range(n_min, n_geo + 1):
+            Tf = n_s * s["F_M"] * o["fl_mu"] * r          # kN·мм = Н·м
+            need = sf * M - Tf                         # Н·м
+            if need <= 1e-6:
                 n_p = 0
-                if Tf / sf < M:
-                    if not pd or math.pi * r / n < (s["d"] + pd) / 2 + o["fl_web"]:
-                        continue
-                    n_p = math.ceil(sf * T / (r * math.pi * pd ** 2 / 4 * o["fl_tau_pin"]))
-                    if n_p > n or n % n_p:
-                        continue
-                fl = {"screw": ks, "n": n, "r": r, "d_tap": s["d_tap"], "depth": dep, "T_fric": round(Tf, 1),
-                      "n_p": n_p, "pin_d": pd if n_p else 0.0, "pin_depth": round(min(2 * pd, hl), 1)}
-                txt = f"{n}×{ks} r {r:g}" + (f" + {n_p}×Ø{pd:g} шт." if n_p else "") + f", трение {Tf:.0f} Н·м"
-                ext = {**(vp.get("rings_ext") or {}).get(f"{d9:g}"), "std": "ГОСТ 13942-86"}       # 2b-3: наружные
-                int_ = {**(vp.get("rings_int") or {}).get(f"{b['D']:g}"), "std": "ГОСТ 13943-86"}  # внутренние
-                return {"link": "flange", "d": float(oo.get("d") or 0.0), "key": None, "l_key": 0.0,
-                        "tau": round(tau, 1), "tau_allow": o["tau_allow"], "sigma_allow": 0.0,
-                        "c09": [({"id": k9, **b}, tau)], "hub_l": round(hl, 2), "hub_by": "фланец/корпус",
-                        "flush": True, "lip_B": round(lb, 2), "flange": fl, "fl_txt": txt,
-                        "grooves": {"ext": ext, "int": int_}}, ""
+            elif q > 0:
+                n_p = math.ceil(need / q)
+            else:
+                break                                                         # штифтов нет
+            tot = n_s + n_p
+            if n_p and 2 * r * math.sin(math.pi / tot) < (s["d"] + pd) / 2 + o["fl_web"] - 1e-9:
+                continue                                                      # шаг мал — больше винтов
+            if best is None or tot < best[0]:
+                best = (tot, k9, b, tau, ks, s, hl, lb, r, n_s, n_p, pd)
+            break
+        if best:
+            break
+    if best:
+        _, k9, b, tau, ks, s, hl, lb, r, n_s, n_p, pd = best
+        return ret(k9, b, tau, ks, s, hl, lb, r, n_s, n_p, pd), ""
     return None, (f"нет .09 с фланцем на торце ступицы под M {M:g} Н·м (винты screws, штифты pins, "
-                  f"D ≤ {D_max:.1f}) — Д-104")
-HEAD = ("| Проработка | Конструктив | Детали | .09 d×D×B | τ ступицы / [τ], МПа | .10 d×D×B | "
-        ".11 n × h, мм | Крышки tA / tB, мм | Дно .02 z / t, мм; ступица | Длина, мм | Заготовка .02: марка, формы |")
-RULE = "|---" * 11 + "|"
-TOOL_HEAD = "| Проработка | Оснастка (Д-81) | Деталь | Размер | Маршрут |"
-TOOL_RULE = "|---" * 5 + "|"
+                  f"D ≤ {D_max:.1f}) — Д-104, Д-113")
 
 
 def bolt_clear(cid):
@@ -903,6 +951,70 @@ def self_test():
     b6 = blanks(32.5, 34.0, st2, ["40Х", "40ХН2МА"])
     assert b6["alt_fit"] == {"40ХН2МА": [{"D": 73.0, "s": 14.0}, None, None]}, b6
     assert "61806" in md_row("K10", r)
+    # Д-113: предел числа отверстий — только шаг по хорде; потолка 12 нет
+    assert holes_max(34.2, 8.0, 1.0) == 23 and holes_max(46.5, 8.0, 1.0) == 32, \
+        (holes_max(34.2, 8.0, 1.0), holes_max(46.5, 8.0, 1.0))
+    assert holes_max(3.0, 8.0, 1.0) == 3, holes_max(3.0, 8.0, 1.0)     # окружность мала — минимум
+    assert holes_max(100.0, 8.0, 1.0) > 12, "потолок 12 вернулся"
+    vp = _vp() or {}
+    if vp.get("screws") and vp.get("bearings"):
+        b10t = pick_brg(vp["bearings"], 20.0)           # K20: .10 61804, M 1160.5 Н·м
+        out, why = out_flange(1160.5, {}, vp["bearings"], b10t, SUP, 131.1)
+        assert out and not why, why
+        fl = out["flange"]
+        n, n_p, r = fl["n"], fl["n_p"], fl["r"]
+        fm, d_s = vp["screws"][fl["screw"]]["F_M"], vp["screws"][fl["screw"]]["d"]
+        per_p = r * math.pi * fl["pin_d"] ** 2 / 4 * SUP["fl_tau_pin"] / 1e3 if n_p else 0.0
+        cap = n * fm * SUP["fl_mu"] * r + n_p * per_p
+        need = 1160.5 * SUP["fl_safety"]
+        assert cap >= need - 1e-6, fl                                    # момент с запасом
+        assert n >= SUP["fl_n_min"], fl                                  # прилегание фланца
+        assert 2 * r * math.sin(math.pi / (n + n_p)) >= max(d_s, fl["pin_d"]) + SUP["fl_web"] - 1e-6, fl
+        # минимальность: убрать любое отверстие — момент уже не держится (винтов не меньше fl_n_min)
+        if n - 1 >= SUP["fl_n_min"]:
+            assert (n - 1) * fm * SUP["fl_mu"] * r + n_p * per_p < need + 1e-6, fl
+        assert (n_p == 0) or n * fm * SUP["fl_mu"] * r + (n_p - 1) * per_p < need + 1e-6, fl
+    assert [t["fx"] for t in r["tooling"]] == ["разжимная оправка", "пакетная оправка венцов"], \
+        r["tooling"]
+    assert "пакетом в сборе" in r["tooling"][-1]["route"] and len(md_tool("K10", r)) == 2
+    b = r["blank"]
+    assert b["bar"] == 70.0 and (b["tube"] == {"D": 70.0, "s": 2.5}) == ("tubes" in b["forms"]) \
+        and (b["sheet"] == 1.5) == ("sheets" in b["forms"]), b
+    st2 = {"tube_allow": 0.5, "sheet_allow": 0.3,
+           "materials": {"08пс": {"sheets": [3.0]}, "40Х": {"bars": [70.0]},
+                         "40ХН2МА": {"tubes": [{"D": 73.0, "s": 14.0}]}}}
+    b2 = blanks(32.5, 34.0, st2, ["40ХН2МА", "40Х"])
+    assert (b2["material"], b2["tube"]["D"], b2["alt"], b2["sheet"]) == \
+        ("40ХН2МА", 73.0, ["40Х"], None), b2
+    b3 = blanks(32.5, 34.0, st2, ["20ХН3А"])
+    assert b3["material"] is None and not (b3["tube"] or b3["sheet"] or b3["bar"]), b3
+    b4 = blanks(32.5, 34.0, st2)
+    assert b4["material"] == "08пс" and b4["sheet"] == 3.0, b4
+    b5 = blanks(32.5, 34.0, st2, ["38Х2МЮА", "40ХН2МА", "40Х"], FORMS_BY_02["cup"])
+    assert (b5["material"], b5["bar"], b5["tube"], b5["missing"]) == \
+        ("40Х", 70.0, None, ["38Х2МЮА", "40ХН2МА"]), b5
+    b6 = blanks(32.5, 34.0, st2, ["40Х", "40ХН2МА"])
+    assert b6["alt_fit"] == {"40ХН2МА": [{"D": 73.0, "s": 14.0}, None, None]}, b6
+    assert "61806" in md_row("K10", r)
+    # Д-113: предел числа отверстий — только шаг по хорде; потолка 12 нет
+    assert holes_max(34.2, 8.0, 1.0) == 23 and holes_max(46.5, 8.0, 1.0) == 32, \
+        (holes_max(34.2, 8.0, 1.0), holes_max(46.5, 8.0, 1.0))
+    assert holes_max(3.0, 8.0, 1.0) == 3, holes_max(3.0, 8.0, 1.0)     # окружность мала — минимум
+    assert holes_max(100.0, 8.0, 1.0) > 12, "потолок 12 вернулся"
+    vp = _vp() or {}
+    if vp.get("screws") and vp.get("bearings"):
+        b10t = pick_brg(vp["bearings"], 20.0)           # K20: .10 61804, M 1160.5 Н·м
+        out, why = out_flange(1160.5, {}, vp["bearings"], b10t, SUP, 131.1)
+        assert out and not why, why
+        fl = out["flange"]
+        assert fl["n_p"] == 0, fl                # Д-113: сначала трение, штифты — только если не держит
+        assert fl["T_fric"] >= 1160.5 * SUP["fl_safety"] - 1e-6, fl     # момент с запасом
+        assert fl["n"] == int(math.ceil(SUP["fl_safety"] * 1160.5e3
+                                        / (vp["screws"][fl["screw"]]["F_M"] * SUP["fl_mu"] * fl["r"]))), fl
+        assert fl["n"] <= holes_max(fl["r"], vp["screws"][fl["screw"]]["d"], SUP["fl_web"]), fl
+        assert fl["n"] - 1 > holes_max(fl["r"], vp["screws"][fl["screw"]]["d"], SUP["fl_web"]) \
+            or (fl["n"] - 1) * vp["screws"][fl["screw"]]["F_M"] * SUP["fl_mu"] * fl["r"] \
+            < 1160.5 * SUP["fl_safety"], fl       # число минимально: на одно меньше — не держит
     ids = [q["id"] for q in r["cad_parts"]]                                   # CP-45
     assert ids == ["PTK-T-8M4P2-AAAAAA.02A", "PTK-T-8M4P2-AAAAAA.07A", "PTK-T-8M4P2-AAAAAA.07B",
                    "PTK-T-8M4P2-AAAAAA.11"], ids
