@@ -141,6 +141,31 @@ def out_flange(M, oo, bears, b10, o, D_max):
                   f"D ≤ {D_max:.1f}) — Д-104, Д-113")
 
 
+def flange_selftest():
+    """Самотест выбора фланца (Д-113): K20 — M 1160.5 Н·м, D_max 131.1.
+
+    Проверяет свойства решения, а не конкретные числа: запас по моменту (трение + срез),
+    прилегание (n ≥ fl_n_min), шаг по хорде между соседними отверстиями и минимальность
+    (снятие одного штифта ломает запас). Без таблиц vendor_prices — пропуск.
+    """
+    vp = _vp() or {}
+    if not (vp.get("screws") and vp.get("bearings")):
+        return True
+    b10 = pick_brg(vp["bearings"], 20.0)
+    out, why = out_flange(1160.5, {}, vp["bearings"], b10, SUP, 131.1)
+    assert out and not why, why
+    fl = out["flange"]
+    n, npin, rc = fl["n"], fl["n_p"], fl["r"]
+    sc = vp["screws"][fl["screw"]]
+    per_p = rc * math.pi * fl["pin_d"] ** 2 / 4 * SUP["fl_tau_pin"] / 1e3
+    cap, need = n * sc["F_M"] * SUP["fl_mu"] * rc + npin * per_p, 1160.5 * SUP["fl_safety"]
+    assert cap >= need - 1e-6, (cap, need)
+    assert n >= SUP["fl_n_min"], (n, SUP["fl_n_min"])
+    assert 2 * rc * math.sin(math.pi / (n + npin)) >= max(sc["d"], fl["pin_d"]) + SUP["fl_web"] - 1e-6, (rc, n, npin)
+    assert npin == 0 or cap - per_p < need, (cap, per_p, need)
+    return True
+
+
 def bolt_clear(cid):
     """Ø отверстия под болт по ID (сегмент крепления 8M4P2) — ISO 273 средний ряд, ≈ 1.1·M + 0.1."""
     m = re.search(r"-\d+M(\d+)P", cid)
@@ -929,6 +954,70 @@ def self_test():
     assert r["length"] == 55.0 and "12" not in r["parts"], r["length"]
     assert r["covers"]["tA"] == 6.0 and r["covers"]["tB"] == 14.0, r["covers"]
     assert r["cup"]["z_in"] == 36.5 and r["cup"]["hub_l"] == 10.5, r["cup"]
+    assert [t["fx"] for t in r["tooling"]] == ["разжимная оправка", "пакетная оправка венцов"], \
+        r["tooling"]
+    assert "пакетом в сборе" in r["tooling"][-1]["route"] and len(md_tool("K10", r)) == 2
+    b = r["blank"]
+    assert b["bar"] == 70.0 and (b["tube"] == {"D": 70.0, "s": 2.5}) == ("tubes" in b["forms"]) \
+        and (b["sheet"] == 1.5) == ("sheets" in b["forms"]), b
+    st2 = {"tube_allow": 0.5, "sheet_allow": 0.3,
+           "materials": {"08пс": {"sheets": [3.0]}, "40Х": {"bars": [70.0]},
+                         "40ХН2МА": {"tubes": [{"D": 73.0, "s": 14.0}]}}}
+    b2 = blanks(32.5, 34.0, st2, ["40ХН2МА", "40Х"])
+    assert (b2["material"], b2["tube"]["D"], b2["alt"], b2["sheet"]) == \
+        ("40ХН2МА", 73.0, ["40Х"], None), b2
+    b3 = blanks(32.5, 34.0, st2, ["20ХН3А"])
+    assert b3["material"] is None and not (b3["tube"] or b3["sheet"] or b3["bar"]), b3
+    b4 = blanks(32.5, 34.0, st2)
+    assert b4["material"] == "08пс" and b4["sheet"] == 3.0, b4
+    b5 = blanks(32.5, 34.0, st2, ["38Х2МЮА", "40ХН2МА", "40Х"], FORMS_BY_02["cup"])
+    assert (b5["material"], b5["bar"], b5["tube"], b5["missing"]) == \
+        ("40Х", 70.0, None, ["38Х2МЮА", "40ХН2МА"]), b5
+    b6 = blanks(32.5, 34.0, st2, ["40Х", "40ХН2МА"])
+    assert b6["alt_fit"] == {"40ХН2МА": [{"D": 73.0, "s": 14.0}, None, None]}, b6
+    assert "61806" in md_row("K10", r)
+    # Д-113: предел числа отверстий — только шаг по хорде; потолка 12 нет
+    assert holes_max(34.2, 8.0, 1.0) == 23 and holes_max(46.5, 8.0, 1.0) == 32, \
+        (holes_max(34.2, 8.0, 1.0), holes_max(46.5, 8.0, 1.0))
+    assert holes_max(3.0, 8.0, 1.0) == 3, holes_max(3.0, 8.0, 1.0)     # окружность мала — минимум
+    assert holes_max(100.0, 8.0, 1.0) > 12, "потолок 12 вернулся"
+    vp = _vp() or {}
+    if vp.get("screws") and vp.get("bearings"):
+        b10t = pick_brg(vp["bearings"], 20.0)           # K20: .10 61804, M 1160.5 Н·м
+    assert flange_selftest() is True
+    assert [t["fx"] for t in r["tooling"]] == ["разжимная оправка", "пакетная оправка венцов"], \
+        r["tooling"]
+    assert "пакетом в сборе" in r["tooling"][-1]["route"] and len(md_tool("K10", r)) == 2
+    b = r["blank"]
+    assert b["bar"] == 70.0 and (b["tube"] == {"D": 70.0, "s": 2.5}) == ("tubes" in b["forms"]) \
+        and (b["sheet"] == 1.5) == ("sheets" in b["forms"]), b
+    st2 = {"tube_allow": 0.5, "sheet_allow": 0.3,
+           "materials": {"08пс": {"sheets": [3.0]}, "40Х": {"bars": [70.0]},
+                         "40ХН2МА": {"tubes": [{"D": 73.0, "s": 14.0}]}}}
+    b2 = blanks(32.5, 34.0, st2, ["40ХН2МА", "40Х"])
+    assert (b2["material"], b2["tube"]["D"], b2["alt"], b2["sheet"]) == \
+        ("40ХН2МА", 73.0, ["40Х"], None), b2
+    b3 = blanks(32.5, 34.0, st2, ["20ХН3А"])
+    assert b3["material"] is None and not (b3["tube"] or b3["sheet"] or b3["bar"]), b3
+    b4 = blanks(32.5, 34.0, st2)
+    assert b4["material"] == "08пс" and b4["sheet"] == 3.0, b4
+    b5 = blanks(32.5, 34.0, st2, ["38Х2МЮА", "40ХН2МА", "40Х"], FORMS_BY_02["cup"])
+    assert (b5["material"], b5["bar"], b5["tube"], b5["missing"]) == \
+        ("40Х", 70.0, None, ["38Х2МЮА", "40ХН2МА"]), b5
+    b6 = blanks(32.5, 34.0, st2, ["40Х", "40ХН2МА"])
+    assert b6["alt_fit"] == {"40ХН2МА": [{"D": 73.0, "s": 14.0}, None, None]}, b6
+    assert "61806" in md_row("K10", r)
+    # Д-113: предел числа отверстий — только шаг по хорде; потолка 12 нет
+    assert holes_max(34.2, 8.0, 1.0) == 23 and holes_max(46.5, 8.0, 1.0) == 32, \
+        (holes_max(34.2, 8.0, 1.0), holes_max(46.5, 8.0, 1.0))
+    assert holes_max(3.0, 8.0, 1.0) == 3, holes_max(3.0, 8.0, 1.0)     # окружность мала — минимум
+    assert holes_max(100.0, 8.0, 1.0) > 12, "потолок 12 вернулся"
+    vp = _vp() or {}
+    if vp.get("screws") and vp.get("bearings"):
+        b10t = pick_brg(vp["bearings"], 20.0)           # K20: .10 61804, M 1160.5 Н·м
+        out, why = out_flange(1160.5, {}, vp["bearings"], b10t, SUP, 131.1)
+        assert out and not why, why
+    assert flange_selftest() is True
     assert [t["fx"] for t in r["tooling"]] == ["разжимная оправка", "пакетная оправка венцов"], \
         r["tooling"]
     assert "пакетом в сборе" in r["tooling"][-1]["route"] and len(md_tool("K10", r)) == 2
