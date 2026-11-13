@@ -51,6 +51,54 @@ def holes_max(r, d_hole, web, lo=3):
     return lo if x >= 1.0 else max(lo, int(math.floor(math.pi / math.asin(x) + 1e-9)))
 
 
+def _ceil_div(a, b):
+    return -(-a // b)
+
+
+def flange_ring(n, n_p, r, d_s, d_p, web):
+    """Венец фланца выхода (CP-92, Д-113): углы n винтов и n_p штифтов -> (holes, запас, мм).
+
+    Винты — равномерно через 360/n, первый на 0°. Штифты — между соседними винтами по кратности:
+    в промежуток g — c_g = ⌈(g+1)·n_p/n⌉ − ⌈g·n_p/n⌉ (разница промежутков ≤ 1, пустой сектор
+    ≤ 2 шагов), внутри промежутка равномерно. Проверка каждой пары соседей по хорде:
+    2·r·sin(Δ/2) ≥ (d_a + d_b)/2 + web (винт–винт d_s + web, штифт–штифт d_p + web).
+    holes — [(угол, "screw"|"pin")] по возрастанию угла; запас — min(хорда − требуемое), < 0 —
+    венец не проходит. Единственный источник углов: генератор CAD их только читает."""
+    if n < 1:
+        return [], -1.0
+    w = 360.0 / n
+    out = []
+    for g in range(n):
+        a0 = g * w
+        out.append((round(a0, 4), "screw"))
+        c = _ceil_div((g + 1) * n_p, n) - _ceil_div(g * n_p, n)
+        out += [(round(a0 + (i + 1) * w / (c + 1), 4), "pin") for i in range(c)]
+    dd, N, m = {"screw": d_s, "pin": d_p}, len(out), None
+    for k in range(N):
+        (a1, k1), (a2, k2) = out[k], out[(k + 1) % N]
+        da = (a2 - a1) % 360.0 or 360.0
+        x = 2 * r * math.sin(math.radians(da) / 2) - ((dd[k1] + dd[k2]) / 2 + web)
+        m = x if m is None or x < m else m
+    return out, round(m, 3)
+
+
+def flange_selftest():
+    """CP-92: венец фланца — смешанный (3 + 23), только винты (n_p = 0), прежняя схема n ≥ n_p."""
+    h, m = flange_ring(3, 23, 32.5, 6.0, 6.0, 1.0)
+    a = [x[0] for x in h]
+    assert len(h) == 26 and len(set(a)) == 26 and a == sorted(a), h
+    assert [x[0] for x in h if x[1] == "screw"] == [0.0, 120.0, 240.0], h
+    assert sum(x[1] == "pin" for x in h) == 23 and abs(m - 0.546) < 1e-3, m
+    gaps = [(a[(k + 1) % 26] - a[k]) % 360.0 for k in range(26)]
+    assert max(gaps) <= 2 * min(gaps) + 1e-9, gaps          # нет пустого сектора > 2 шагов
+    h0, m0 = flange_ring(4, 0, 16.0, 5.0, 0.0, 1.0)
+    assert [x[0] for x in h0] == [0.0, 90.0, 180.0, 270.0] and m0 > 0, h0
+    h1, m1 = flange_ring(6, 3, 16.0, 5.0, 4.0, 1.0)
+    assert [x[0] for x in h1 if x[1] == "pin"] == [30.0, 150.0, 270.0] and m1 > 0, h1
+    assert flange_ring(3, 40, 32.5, 6.0, 6.0, 1.0)[1] < 0   # 14 штифтов в промежутке не встают
+    return True
+
+
 def out_flange(M, oo, bears, b10, o, D_max):
     """CP-90 этап 2b-2, Д-104 + Д-113: момент — фланцем на торце ступицы (винты трением,
     иначе штифты срезом); ступица вровень: hub_l = ax_gap + B.09 + lip_B. .09 по возрастанию D:
@@ -68,6 +116,10 @@ def out_flange(M, oo, bears, b10, o, D_max):
         fl = {"screw": ks, "n": n, "r": r, "d_tap": s["d_tap"], "depth": round(1.5 * s["d"] + 1.0, 1),
               "T_fric": Tf, "n_p": n_p, "pin_d": pd if n_p else 0.0,
               "pin_depth": round(min(2 * pd, hl), 1) if n_p else 0.0}
+        hs = flange_ring(n, n_p, r, s["d"], pd, o["fl_web"])[0]       # CP-92: углы — только здесь
+        fl["holes"] = [{"angle": a, "kind": k,
+                        "d": fl["d_tap"] if k == "screw" else fl["pin_d"],
+                        "depth": fl["depth"] if k == "screw" else fl["pin_depth"]} for a, k in hs]
         txt = f"{n}×{ks} r {r:g}" + (f" + {n_p}×Ø{pd:g} шт." if n_p else "") + f", трение {Tf:.0f} Н·м"
         ext = {**((vp.get("rings_ext") or {}).get(f"{k9[3:] and ''}" ) or {}), "std": "ГОСТ 13942-86"}
         ext = {**((vp.get("rings_ext") or {}).get(f"{b['d']:g}") or {}), "std": "ГОСТ 13942-86"}
@@ -114,14 +166,18 @@ def out_flange(M, oo, bears, b10, o, D_max):
                 else:
                     break
                 tot = n_s + n_p
-                if n_p and 2 * r * math.sin(math.pi / tot) < (s["d"] + pd) / 2 + o["fl_web"] - 1e-9:
-                    continue                                          # шаг мал — берём больше винтов
+                if n_p and flange_ring(n_s, n_p, r, s["d"], pd, o["fl_web"])[1] < -1e-9:
+                    continue                                  # CP-92: шаг венца мал — больше винтов
                 if best is None or tot < best[0]:
                     best = (tot, ks, s, r, n_s, n_p, pd)
                 break
         if best:
             _, ks, s, r, n_s, n_p, pd = best
             return ret(k9, b, tau, ks, s, hl, lb, r, n_s, n_p, pd), ""
+    return None, (f"нет .09 с фланцем на торце ступицы под M {M:g} Н·м (винты screws, штифты pins, "
+                  f"D ≤ {D_max:.1f}) — Д-104, Д-113")
+
+
 def bolt_clear(cid):
     """Ø отверстия под болт по ID (сегмент крепления 8M4P2) — ISO 273 средний ряд, ≈ 1.1·M + 0.1."""
     m = re.search(r"-\d+M(\d+)P", cid)
@@ -932,6 +988,7 @@ def self_test():
     b6 = blanks(32.5, 34.0, st2, ["40Х", "40ХН2МА"])
     assert b6["alt_fit"] == {"40ХН2МА": [{"D": 73.0, "s": 14.0}, None, None]}, b6
     assert "61806" in md_row("K10", r)
+    assert flange_selftest() is True       # CP-92: венец фланца
     ids = [q["id"] for q in r["cad_parts"]]                                   # CP-45
     assert ids == ["PTK-T-8M4P2-AAAAAA.02A", "PTK-T-8M4P2-AAAAAA.07A", "PTK-T-8M4P2-AAAAAA.07B",
                    "PTK-T-8M4P2-AAAAAA.11"], ids
