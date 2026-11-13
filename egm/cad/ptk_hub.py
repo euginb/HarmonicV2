@@ -64,17 +64,17 @@ def out_feats(cfg, z_hub, z_end, rb, z_in=None):
 
 
 def flange_holes(cfg, z_end):
-    """CP-90 этап 2b-2, Д-104: резьбовые отверстия фланца (Ø под резьбу, глубина depth) и штифты
-    между ними — с наружного торца ступицы z_end; данные — layout.output.flange."""
+    """CP-90 этап 2b-2, Д-104; CP-92: отверстия фланца с наружного торца ступицы z_end — по готовому
+    списку layout.output.flange.holes (угол, вид, Ø, глубина) из ptk_layout.flange_ring; генератор
+    ничего не делит и не округляет. Нет holes — ptk_designs.yaml до CP-92: перегенерировать."""
     f = ((cfg.get("layout") or {}).get("output") or {}).get("flange")
     if not f:
         return []
-    out = [AxialHole(a, f["r"], f["d_tap"], z_end - f["depth"], f["depth"] + 1.0) for a in _ang(f["n"])]
-    if f.get("n_p"):
-        st = f["n"] // f["n_p"]
-        out += [AxialHole(round((j * st + 0.5) * 360.0 / f["n"], 4), f["r"], f["pin_d"],
-                          z_end - f["pin_depth"], f["pin_depth"] + 1.0) for j in range(f["n_p"])]
-    return out
+    hs = f.get("holes")
+    if hs is None:
+        raise ValueError("layout.output.flange.holes нет — specs/ptk_designs.yaml до CP-92: "
+                         "python main.py design --publish")
+    return [AxialHole(h["angle"], f["r"], h["d"], z_end - h["depth"], h["depth"] + 1.0) for h in hs]
 
 
 def build(cfg, part, row=None):
@@ -310,10 +310,33 @@ def self_test():
     fb, fs, fl, _ = out_feats(lo2, 11.0, 45.5, 9.5)                                     # CP-90 этап 2b
     assert (fb[0].r_out, fb[0].z0, fb[0].h, fb[0].op) == (23.5, 11.0, 0.5, "add") and len(fs) == 1, fb
     assert [x[0] for x in fl] == ["da", "d_o"], fl
-    lf = {"layout": {"output": {"flange": {"n": 6, "r": 16.0, "d_tap": 4.2, "depth": 8.5,
-                                            "n_p": 3, "pin_d": 4.0, "pin_depth": 8.0}}}}   # Д-104
-    fh = flange_holes(lf, 10.0)
-    assert len(fh) == 9 and fh[0].r == 16.0 and abs(fh[6].angle - 30.0) < 1e-9, fh
+    from egm import ptk_layout                                                          # CP-92
+    assert ptk_layout.flange_selftest()
+
+    def _fl(n, n_p, r, ds, dt, dp, dep, pdep, holes=True):
+        hs = ptk_layout.flange_ring(n, n_p, r, ds, dp, 1.0)[0]
+        f = {"n": n, "r": r, "d_tap": dt, "depth": dep, "n_p": n_p, "pin_d": dp, "pin_depth": pdep}
+        if holes:
+            f["holes"] = [{"angle": a, "kind": k, "d": dt if k == "screw" else dp,
+                           "depth": dep if k == "screw" else pdep} for a, k in hs]
+        return {"layout": {"output": {"flange": f}}}
+    fh = flange_holes(_fl(6, 3, 16.0, 5.0, 4.2, 4.0, 8.5, 8.0), 10.0)                 # n ≥ n_p — прежняя
+    assert len(fh) == 9 and fh[0].r == 16.0 and abs(fh[1].angle - 30.0) < 1e-9 and fh[1].d == 4.0, fh
+    fm = flange_holes(_fl(3, 23, 32.5, 6.0, 5.0, 6.0, 10.0, 12.0), 50.0)              # Д-113: 3 + 23
+    am = [h.angle for h in fm]
+    assert len(fm) == 26 and len(set(am)) == 26 and sum(h.d == 5.0 for h in fm) == 3, am
+    assert all(h.z0 == (40.0 if h.d == 5.0 else 38.0) for h in fm), fm
+    for k in range(26):                                                                 # без пересечений
+        h1, h2 = fm[k], fm[(k + 1) % 26]
+        ch = 2 * 32.5 * math.sin(math.radians((h2.angle - h1.angle) % 360.0) / 2)
+        assert ch >= (h1.d + h2.d) / 2, (h1, h2, ch)
+    f0 = flange_holes(_fl(4, 0, 16.0, 5.0, 4.2, 0.0, 8.5, 0.0), 10.0)                 # только винты
+    assert [h.angle for h in f0] == [0.0, 90.0, 180.0, 270.0], f0
+    try:
+        flange_holes(_fl(3, 23, 32.5, 6.0, 5.0, 6.0, 10.0, 12.0, holes=False), 50.0)
+        raise AssertionError("flange без holes должен отклоняться (CP-92)")
+    except ValueError:
+        pass
     assert flange_holes({}, 10.0) == []
     js = {"scheme": "ring", "seat": True, "L": 9.0, "r_seat": 30.06, "pin_d": 3.0, "pin_n": 10,   # Д-102 п. 2
           "pin_l": 8.0, "hole12": 5.0, "pin_a": [36.0 * k for k in range(10)],
