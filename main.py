@@ -207,6 +207,7 @@ def main(argv):
                            ("hub", __import__("egm.cad.ptk_hub", fromlist=["self_test"]).self_test),
                            ("shaft_cad", __import__("egm.cad.ptk_shaft", fromlist=["self_test"]).self_test),
                            ("materials", __import__("egm.materials", fromlist=["self_test"]).self_test),
+                           ("tech_proc", __import__("egm.tech_proc", fromlist=["self_test"]).self_test),
                            ("materials_cfg", __import__("egm.materials", fromlist=["check_repo"]).check_repo),
                            ("srccheck", __import__("egm.srccheck", fromlist=["self_test"]).self_test),
                            ("join", __import__("egm.ptk_join", fromlist=["self_test"]).self_test),
