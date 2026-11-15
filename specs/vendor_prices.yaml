@@ -55,8 +55,13 @@ bearings:
 # (у шарика = Ø), мм; необязательные a_w (мм), wall_min (мм) переопределяют limits
 # для этого тела. Ключ — обозначение тела: оно же в ID исполнения и в цене в items.
 rollers:
+  R_D8x16: {type: roller, d: 8.0, l: 16.0}
+  R_D8x8: {type: roller, d: 8.0, l: 8.0}
+  R_D7x20: {type: roller, d: 7.0, l: 20.0}
+  R_D6x6: {type: roller, d: 6.0, l: 6.0}
+  R_D5x8: {type: roller, d: 5.0, l: 8.0}
+  R_D5x5: {type: roller, d: 5.0, l: 5.0}
   R_D3x8: {type: roller, d: 3.0, l: 8.0}
-  R_D2x4: {type: roller, d: 2.0, l: 4.2}
   B_D3: {type: ball, d: 3.0, l: 3.0}
 
 # Штифты цилиндрические закалённые (Д-74): соединение .02–.12 (L2, L3) и штифты венца
