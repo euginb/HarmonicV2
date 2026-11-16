@@ -49,6 +49,8 @@ class PtkLimits:
     sep_S: float = 2.5            # запас многоцикловой усталости перемычки (OQ-44)
     sep_sigma_H: float = 880.0    # допускаемое σ_H тело/сторона окна сепаратора, МПа (OQ-44)
     sep_k_edge: float = 1.2       # рост σ_H у кромки стенки окна — кромочный контакт (OQ-44)
+    sep_band_t: float = 0.0       # радиальная толщина поясов сепаратора, мм; 0 — = стенка (CP-98, OQ-46)
+    sep_band_gap: float = 0.2     # зазор утолщённого пояса до dвн шайбы .05, мм (CP-98)
     M_min: float = 0.0            # требуемый выходной момент, Н·м; 0 — не проверяется (Д-41)
     gen_types: tuple = ("bearing", "eccentric")   # генераторы для расчёта (Д-42)
     dgen_step: float = 0.1        # округление вверх D_г эксцентрика без подшипника, мм (Д-42)
@@ -107,9 +109,14 @@ class PtkResult:
     M_H: float = 0.0              # допускаемый момент по Герцу, Н·м (Д-41)
     M_B: float = 0.0              # то же по C0 подшипника, Н·м
     M_sep: float = 0.0            # предел по сепаратору, Н·м (CP-94, Д-116)
+    M_row: float = 0.0            # референс: предел одного ряда окон, Н·м (CP-98, Д-118)
     M: float = 0.0                # допускаемый выходной момент, Н·м
     M_by: str = ""                # что ограничивает M: контакт | подшипник | крепление | сепаратор
     sep_why: str = ""             # причина M_sep: механизм, напряжения, [σ] (CP-94)
+    M_body_gen: float = 0.0       # предел тела по контакту с генератором, Н·м (CP-98)
+    M_body_ring: float = 0.0      # то же с венцом, Н·м
+    M_body_win: float = 0.0       # то же со стороной окна сепаратора, Н·м
+    M_by_body: str = ""           # первый контакт тела: генератор | венец | окно
     ring_variants: int = 0
     phasing: list = field(default_factory=list)
     parts: list = field(default_factory=list)
@@ -430,6 +437,8 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
     r.width = round(lim.rows * pitch + (lim.rows + 1) * lim.row_gap, 1)
     if not r.errors and (brg is not None or gen == "eccentric"):    # Д-46: детали .02, .03
         r.sep = ptk_parts.separator(n, R, a, D, rol["l"], pitch, r.phasing, lim, SEP_K)
+        r.sep["band"] = ptk_parts.sep_band(r.sep, d_root, lim)      # CP-98: пояса
+        r.warnings += r.sep["band"].pop("warnings")
         r.ecc = ptk_parts.eccentric(n, a, D, rol, brg, r.phasing, lim, gen, R)
         r.warnings += r.ecc.pop("warnings")
         r.parts += ptk_parts.parts(r.id, r.ecc)
@@ -441,16 +450,24 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
         t = ptk_force.torque(n, z, a, R, D, rol["l"], rol.get("type", "roller"), brg, lim,
                              lim.rows)
         r.M_H, r.M_B = t["M_H"], t["M_B"] or 0.0
+        r.M_body_gen, r.M_body_ring = t["M_g"], t["M_v"]             # CP-98
         cand = [(r.M_H, "контакт"), (round(r.t_hold / holes.safety, 1), "крепление")]
         if brg is not None:
             cand.append((r.M_B, "подшипник"))
         sep_in = (r.sep, t["k_sep"], D, rol["l"], rol.get("type", "roller"), lim.rows, R, a, lim)
+        ref = {}
         if r.sep:                                        # Д-116, CP-94: предел сепаратора
             r.M_sep, r.sep_why = ptk_force.sep_limit(*sep_in)
+            ref = ptk_force.sep_refs(*sep_in)            # CP-98: M_row, M_win
+            r.M_row, r.M_body_win = ref["M_row"], ref["M_win"]
             cand.append((r.M_sep, "сепаратор"))
         r.M, r.M_by = min(cand)
+        body = [(r.M_body_gen, "генератор"), (r.M_body_ring, "венец")]
+        r.M_by_body = min(body + ([(r.M_body_win, "окно")] if r.sep else []))[1]
         if r.sep:
-            r.sep_chk = ptk_force.sep_check(r.M, *sep_in)
+            eta = round(r.M_sep / (lim.rows * r.M_row), 3) if r.M_row else 0.0
+            r.sep_chk = {**ptk_force.sep_check(r.M, *sep_in), **ref,
+                         "M_pack": r.M_sep, "eta_pack": eta}
         if r.M < lim.M_min:
             r.errors.append(f"M {r.M:g} < M_min {lim.M_min:g} Н·м, ограничивает: {r.M_by} (Д-41)")
     if gen == "eccentric":                               # Д-45
@@ -500,20 +517,29 @@ def two_stage_table(lim, u_list=(101, 120, 150, 200, 300, 500, 1000, 2500)):
             "калькулятором как самостоятельный редуктор.\n\n" + "\n".join(rows))
 
 
+def _body(r):
+    """M_body_* (CP-98): генератор / венец / окно, в скобках — первый контакт."""
+    if not r.get("M_body_gen"):
+        return "—"
+    w = f"{r['M_body_win']:g}" if r.get("M_body_win") else "—"
+    return f"{r['M_body_gen']:g} / {r['M_body_ring']:g} / {w} ({r['M_by_body']})"
+
+
 def profile_table(rows):
     """Д-38: профиль и нагрузки по исполнениям (раздел SPEC-10)."""
     t = ["### Профиль и нагрузки по исполнениям (Д-38)", "",
          "R_о/R, R_в/R — (8), (9) при φ = 90° (α = α max), на 1 Н реакции генератора.", "",
          "| ID | $a_\\omega$ | $R_\\Sigma$ | $R_\\Sigma$ задан | $D_\\text{г}$ | α max, ° | "
-         "$R_\\text{о}/R$ | $R_\\text{в}/R$ | r верш., мм | перемычка сеп., мм | Статус |",
-         "|---|---|---|---|---|---|---|---|---|---|---|"]
+         "$R_\\text{о}/R$ | $R_\\text{в}/R$ | r верш., мм | перемычка сеп., мм | "
+         "M тела: генер. / венец / окно, Н·м (первый) | Статус |",
+         "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         if not r["z"]:
             continue
         ro, rv = ptk_profile.contact_ratios(math.pi / 2, r["a_w"], r["R_sum"], r["z"])
         t.append(f"| {r['id']} | {r['a_w']} | {r['R_sum']} | {r['R_by']} | {r['Dgen']} | "
                  f"{r['alpha_max']} | {ro:.2f} | {rv:.2f} | {r['r_tip']} | {r['sep_web']} | "
-                 f"{'OK' if r['ok'] else 'нет'} |")
+                 f"{_body(r)} | {'OK' if r['ok'] else 'нет'} |")
     return "\n".join(t)
 
 
@@ -579,6 +605,11 @@ def self_test():
     assert r.M > 0 and r.M_by in ("контакт", "подшипник", "крепление", "сепаратор"), (r.M, r.M_by)
     assert r.M <= min(r.M_H, r.M_B, r.t_hold / holes.safety, r.M_sep) + 0.1       # Д-41, Д-116
     assert r.M_sep > 0 and r.sep_chk["sig_b"] <= r.sep_chk["sig_allow"], r.sep_chk   # CP-94
+    # CP-98: шаг ряда = l (B 7 < l 8) — пояс 0.95 мм лимитирует; усиление пояса поднимает M_sep,
+    # ID не меняется (sep_band_t не в GEOM_LIMITS до CAD пояса, OQ-46)
+    rr = calc(19, "t", b, PtkLimits(sep_band_t=3.0), holes, fast, bears)
+    assert r.sep_chk["lim_elem"] == "пояс" and rr.sep["band"]["t"] == 3.0, (r.sep_chk, rr.sep)
+    assert rr.M_sep > 1.2 * r.M_sep and rr.id == r.id, (rr.M_sep, r.M_sep)
     assert not calc(19, "t", b, PtkLimits(M_min=1e6), holes, fast, bears).ok
     assert not calc(19, "t", b, lim, holes, fast, {}).ok                         # нет подшипника
     assert c(19, rol={**b, "a_w": 0.5}).alpha_max < r.alpha_max   # меньше a_ω — меньше α
@@ -644,6 +675,14 @@ def self_test():
     s20 = k20.sep_chk
     assert 120.0 < k20.M_sep < 300.0 and s20["by"] == "изгиб", (k20.M_sep, s20)
     assert s20["sig_b"] <= s20["sig_allow"] and s20["sig_H"] < s20["sigH_allow"], s20
+    # CP-98: пояс K20 5.95 мм не лимитирует — M_sep как в CP-94 (188.1), предел — перемычка ряда 1
+    assert abs(k20.M_sep - 188.1) < 0.2 and s20["lim_elem"] == "перемычка", (k20.M_sep, s20)
+    assert s20["n_row_lim"] == 1 and k20.sep["band"]["h_mid"] == 5.95, (s20, k20.sep["band"])
+    assert 0 < k20.M_row < k20.M_sep < 4 * s20["M_row_b"], (k20.M_row, k20.M_sep, s20)
+    b20 = (k20.M_body_gen, k20.M_body_ring, k20.M_body_win)
+    assert min(b20) > 0 and k20.M_H == min(b20[:2]) and k20.M <= min(b20), (b20, k20.M)
+    assert k20.M_by_body in ("генератор", "венец", "окно") and s20["M_pack"] == k20.M_sep
+    assert 0 < s20["eta_pack"] < 1, s20
     return True
 
 

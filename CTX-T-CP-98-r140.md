@@ -1,0 +1,1526 @@
+# CTX-T — CP-98 (доработка предела сепаратора) и CP-95 (инверсия постановки), rev14.0
+
+База: `76afc5a2fd5e56ebcae3b49e5545925dc619ca96` (ветка `rev14.0`; содержит CP-94 — предел сепаратора `M_sep`, прогон принят 2026-11-16).
+Продукт `euginb/HarmonicV2`, ПТК. Язык ответа — русский; комментарии в коде — русский, с номерами Д-##/CP-##.
+
+## Правила вывода (INS-91B §6)
+
+1. Ответ — два блока: `p.diff` (unified diff от указанной базы, корректные счётчики `@@`) и `upd.md`.
+2. Маркеры `===== FILE: … =====` — только в этом CTX.
+3. Правки минимальные; стиль — как в приложенных файлах. Числа, полученные вручную, помечать как оценку.
+
+## Состав контекста (по просьбе заказчика)
+
+Машиночитаемые YAML поданы **без комментариев** (они пишутся для людей) и только по нужным разделам;
+SPEC-10 ограничен одним исполнением `PTK-063-R3X8-22M6P2-BDBB72`. Полные файлы есть в репозитории.
+
+## Задача 1 — CP-98 (Д-118): доработка M_sep. Приоритет — первая
+
+Прогон CP-94 принят, но результат показал перекос: у K20 `M_sep` 188.1 Н·м, `M_H` 4124.9 Н·м —
+сепаратор ограничивает в 22 раза раньше контакта тел. Значит поднимать надо несущую способность
+сепаратора, а не перебирать тела. Требуется:
+
+1. **Момент по одному ряду как референс.** Кроме `M_sep` для пакета (`M_pack`) выводить `M_row` —
+   предел по одному ряду окон без переноса момента через дальние ряды (только изгиб своим рядом).
+   В `sep_chk` — `M_row`, `M_pack`, `n_row_lim` (какой ряд первым достигает `[σ]`). Смысл: разница
+   `M_pack`/`M_row` показывает, сколько «съедает» перенос через ряд, то есть и потенциал межрядного усиления.
+2. **Межрядное усиление.** Кольца-пояса между рядами сейчас — жёсткая заделка. Рассмотреть усиление
+   межрядных зон (буртики/утолщения между рядами окон, бандаж, накатка): тогда момент идёт не изгибом
+   перемычки, а срезом пояса. Стенку ряда `t = 2.2·a_ω` поднимать нельзя (кинематика, запас 0.06 мм), а
+   межрядные зоны в кинематике не участвуют. Нужны проверки: жёсткость пояса `EI`, `σ_см`/`τ` в поясе,
+   влияние на массу и балансировку. Критерий — рост `M_sep` при сохранении габарита.
+3. **Ограничения по моменту для тел качения.** Отдельный выход `M_body_*` для трёх контактов тела:
+   с генератором, с венцом, со стороной окна сепаратора; плюс `M_by_body` — какой контакт первый.
+   Сейчас `M_H` — общий минимум (генератор+венец), а окно видно только как `sep_chk.sig_H`.
+4. Приёмка: `self_test` фиксирует `M_row < M_sep`, рост `M_sep` при усилении пояса, три `M_body_*` > 0
+   и `M = min(...)`; пересчёт SPEC-10/11; K10 (Ø10) должен снова стать осмысленным (после роста `M_sep`).
+
+## Задача 2 — CP-95 (Д-116 п. 2): инверсия постановки. После CP-98
+
+Сейчас: задаётся `u`, перебираются тела и крепления, минимизируется габарит `D`, а `M` получается
+следствием. Нужно: на входе требуемый `M_req`, на выходе — `Dш`, `R_Σ` (через обод), тип генератора и
+крепление при минимальном `D`, с отбором по **всем** пределам (`M_H`, `M_B`, `M_крепл`, `M_sep`,
+`M_body_*`). Крепление подбирается по моменту, а не «первое наименьшее» (сейчас у K20 `М` диктовало
+наименьшее крепление). Таблица SPEC-10 получает колонку `M_req`; ID исполнений меняются (Д-80).
+`gen_type: rim` и каталог тел 4–6 мм (CP-96, CP-97) — отдельные пункты, здесь только постановка.
+
+## Формулы, действующие сейчас (CP-94, Д-116)
+
+`V = M(rows−½)/(rows·n·R_Σ)`, `M_изг = V·L/2`; `F = k_sep·M/rows`, `F·L/12`; `σ = (V·L/2 + F·L/12)/W`,
+`W = t·b²/6`; `[σ] = σ₋₁/(K·S)`; контакт — Герц тело/плоскость на `min(l, L)`, `× sep_k_edge`.
+
+
+---
+
+# Исходники
+
+## Расчётное ядро
+
+===== FILE: egm/ptk_force.py (строки 1–240) =====
+"""Силовой расчёт ПТК (CP-30, Д-40, Д-41): нагрузка тел ряда, контакт Герца,
+статическая проверка подшипника генератора, допускаемый выходной момент.
+
+Схема (OQ-07): эксцентрик → подшипник .08 (внутреннее кольцо на эксцентрике) →
+наружное кольцо, D_г = D подшипника → тела качения → венец; тела ведут сепаратор (выход).
+Реакции — (8), (9) Янгулова без трения; трение (11), износ, ресурс подшипника — OQ-08.
+"""
+import math
+from types import SimpleNamespace
+
+from egm import ptk_profile
+
+K_PHASE = 8        # положений генератора внутри шага тел; берётся худшее
+
+
+def e_star(E, nu):
+    """Приведённый модуль двух тел из одного материала: 1/E* = 2(1 − ν²)/E, МПа."""
+    return E / (2 * (1 - nu * nu))
+
+
+def _k(*r):
+    """Сумма кривизн 1/r, 1/мм; inf — плоскость, r < 0 — вогнутая поверхность."""
+    return sum(0.0 if math.isinf(x) else 1.0 / x for x in r)
+
+
+def f_line(sigma, l, r1, r2, Es):
+    """Линейный контакт (ролик): σ_H = √(F·E*·k/(π·l)), k = 1/r1 + 1/r2 -> F при σ_H = sigma, Н."""
+    return sigma ** 2 * math.pi * l / (Es * _k(r1, r2))
+
+
+def sigma_line(F, l, r1, r2, Es):
+    return math.sqrt(F * Es * _k(r1, r2) / (math.pi * l))
+
+
+def f_point(sigma, kx, ky, Es):
+    """Точечный контакт (шарик), круговое приближение R_e² = 1/(kx·ky):
+    σ_H = (6F·E*²/(π³·R_e²))^(1/3) -> F при σ_H = sigma, Н."""
+    return sigma ** 3 * math.pi ** 3 / (6 * Es ** 2 * kx * ky)
+
+
+def sigma_point(F, kx, ky, Es):
+    return (6 * F * Es ** 2 * kx * ky / math.pi ** 3) ** (1 / 3)
+
+
+def pair_limits(D, l, kind, Dg, B, lim, groove=False):
+    """Допускаемые силы на теле, Н: (F_г — тело/наружное кольцо подшипника, F_в — тело/венец).
+    Венец — плоскость (запас: во впадине профиль вогнутый); ролик на кольце — длина min(l, B).
+    groove — шарик в жёлобе эксцентрика r = groove_f·D (Д-45, Т2)."""
+    Es = e_star(lim.E_mod, lim.nu)
+    if kind == "ball":
+        s = lim.sigma_H_point
+        ky = _k(D / 2, -lim.groove_f * D) if groove else _k(D / 2)
+        return (f_point(s, _k(D / 2, Dg / 2), ky, Es),
+                f_point(s, _k(D / 2), _k(D / 2), Es))
+    s = lim.sigma_H_line
+    return (f_line(s, min(l, B), D / 2, Dg / 2, Es), f_line(s, l, D / 2, math.inf, Es))
+
+
+def torque(n, z, a, R, D, l, kind, brg, lim, rows):
+    """Допускаемый момент пакета рядов, Н·м (Д-41): M_H — по Герцу, M_B — по C0 подшипника.
+
+    Тело в фазе φ_i от направления эксцентрика нагружено при 0 < φ_i < π: R_i = R_max·sin φ_i.
+    Выход: M_р = Σ R_i·(R_о/R)_i·Y_i; подшипник: R_max·|Σ sin φ_i·e_i| ≤ C0/s0_brg.
+    Худшее из K_PHASE положений генератора внутри шага тел.
+    brg = None — тела на эксцентрике (Д-42): пара тело/эксцентрик на всей длине l, M_B нет."""
+    Fg, Fv = pair_limits(D, l, kind, 2 * R - D, brg["B"] if brg else l, lim,
+                         kind == "ball" and brg is None)
+    MH = MB = math.inf
+    k_sep = 0.0                    # CP-94: max сила тела на окно / M ряда, 1/мм
+    for j in range(K_PHASE):
+        s_max = srv = mom = bx = by = so = 0.0
+        for i in range(n):
+            p = (2 * math.pi * (i + j / K_PHASE) / n) % (2 * math.pi)
+            if not 1e-9 < p < math.pi - 1e-9:
+                continue
+            s = math.sin(p)
+            ro, rv = ptk_profile.contact_ratios(p, a, R, z)
+            y = ptk_profile.Y(p, a, R)
+            s_max, srv = max(s_max, s), max(srv, s * rv)
+            so = max(so, s * ro)
+            mom += s * ro * y
+            bx += s * (y * math.cos(p) - a) / R
+            by += s * y * math.sin(p) / R
+        if mom <= 0:
+            continue
+        k_sep = max(k_sep, so / mom)
+        MH = min(MH, min(Fg / s_max, Fv / srv) * mom / 1000)
+        if brg:
+            MB = min(MB, brg["C0"] * 1000 / (lim.s0_brg * math.hypot(bx, by)) * mom / 1000)
+    if math.isinf(MH):
+        MH = MB = 0.0
+    return {"M_H": round(rows * MH, 1), "M_B": round(rows * MB, 1) if brg else None,
+            "F_g": round(Fg, 1), "F_v": round(Fv, 1), "k_sep": k_sep}
+
+
+def _sep(M, sep, k_sep, D, l, kind, rows, R, lim):
+    """Сепаратор при моменте пакета M, Н·м (CP-94, Д-116) — без округления.
+
+    Момент выходит к торцу через ряды окон: перемычки ряда у выходного торца несут моменты
+    дальних рядов и половину своего. Рама Виренделя (кольца между рядами — жёсткие пояса):
+    V = M·(rows − ½)/(rows·n·R_Σ), изгиб с заделкой M_изг = V·L/2. Свой ряд: тело давит на
+    перемычку силой F = k_sep·M/rows, балка с заделкой F·L/12 — у того же торца.
+    σ = (V·L/2 + F·L/12)/W, W = t·b²/6: t — стенка 2·SEP_K·a_ω, b — перемычка, L — высота окна.
+    Контакт тело/сторона окна — Герц тело/плоскость (ролик на min(l, L)), × sep_k_edge.
+    u_b, u_H — загрузка в долях момента: M_sep = M/max(u_b, u_H)."""
+    n, L, b = sep["n"], sep["h"], sep["web"]
+    W = (sep["r_out"] - sep["r_in"]) * b * b / 6
+    Mr = M * 1000 / rows                                  # момент ряда, Н·мм
+    V = Mr * (rows - 0.5) / (n * R)
+    F = k_sep * Mr
+    Es = e_star(lim.E_mod, lim.nu)
+    if kind == "ball":                                    # шарик/плоскость: σ ∝ F^(1/3)
+        sH, p = sigma_point(F, _k(D / 2), _k(D / 2), Es), 3
+    else:                                                 # ролик/плоскость: σ ∝ F^(1/2)
+        sH, p = sigma_line(F, min(l, L), D / 2, math.inf, Es), 2
+    sH *= lim.sep_k_edge
+    s_fr, s_row = V * L / 2 / W, F * L / 12 / W
+    allow = lim.sep_sigma_m1 / (lim.sep_K * lim.sep_S)
+    return {"V": V, "F": F, "sig_frame": s_fr, "sig_row": s_row, "sig_b": s_fr + s_row,
+            "sig_allow": allow, "sig_H": sH, "sigH_allow": lim.sep_sigma_H,
+            "u_b": (s_fr + s_row) / allow, "u_H": (sH / lim.sep_sigma_H) ** p}
+
+
+def sep_check(M, sep, k_sep, D, l, kind, rows, R, a, lim):
+    """Проверка сепаратора при принятом M, Н·м -> ptk_configs.yaml → sep_chk (CP-94).
+    edge — запас от линии контакта до кромки стенки при крайнем ходе тела (SEP_K − 1)·a_ω;
+    b_H — полуширина площадки Герца ролика: при b_H ~ edge контакт кромочный (sep_k_edge)."""
+    c = _sep(M, sep, k_sep, D, l, kind, rows, R, lim)
+    c["by"] = "изгиб" if c["u_b"] >= c["u_H"] else "контакт"
+    c["edge"] = (sep["r_out"] - sep["r_in"]) / 2 - a
+    c["b_H"] = (math.sqrt(4 * c["F"] * D / 2 / (math.pi * min(l, sep["h"])
+                                               * e_star(lim.E_mod, lim.nu)))
+                if kind != "ball" else 0.0)
+    return {k: round(v, 4) if isinstance(v, float) else v for k, v in c.items()}
+
+
+def sep_limit(sep, k_sep, D, l, kind, rows, R, a, lim):
+    """M_sep, Н·м (вниз до 0.1), и причина: наименьший M, при котором σ перемычки = [σ]
+    или k_edge·σ_H = [σ_H] (CP-94, Д-116). a — для единой сигнатуры с sep_check."""
+    c = _sep(1.0, sep, k_sep, D, l, kind, rows, R, lim)
+    u = max(c["u_b"], c["u_H"])
+    if u <= 0:
+        return 0.0, "сепаратор не нагружен (k_sep = 0) — проверка не выполнена"
+    M = math.floor(10 / u) / 10
+    s = _sep(M, sep, k_sep, D, l, kind, rows, R, lim)
+    if c["u_b"] >= c["u_H"]:
+        why = (f"изгиб перемычки ряда у выходного торца: σ рамы {s['sig_frame']:.0f} + σ ряда "
+               f"{s['sig_row']:.0f} МПа = [σ] = σ₋₁/(K·S) = {lim.sep_sigma_m1:g}/"
+               f"({lim.sep_K:g}·{lim.sep_S:g}) = {s['sig_allow']:.1f} МПа (CP-94)")
+    else:
+        why = (f"контакт тело/окно: k_edge·σ_H = {s['sig_H']:.0f} МПа = [σ_H] "
+               f"{lim.sep_sigma_H:g} МПа при F {s['F']:.0f} Н (CP-94)")
+    return M, why
+
+
+def theory_md():
+    return r"""### Силовой расчёт (Д-40, Д-41)
+
+Схема: эксцентрик → подшипник генератора (внутреннее кольцо на эксцентрике) → наружное
+кольцо, $D_\text{г}$ = D подшипника → тела → венец; тела ведут сепаратор (выход).
+
+Тело ряда в фазе $\varphi_i$ от направления эксцентрика нагружено при $0 < \varphi_i < \pi$:
+$R_i = R_\text{max} \sin\varphi_i$. Реакции по (8), (9) без трения:
+$R_\text{о} / R = \sin(\alpha - \psi) / \cos\alpha = u\, a_\omega \sin\varphi / R_\Sigma$,
+$R_\text{в} / R = \cos\psi / \cos\alpha$.
+Момент ряда $M_\text{р} = R_\text{max} \sum \sin\varphi_i (R_\text{о}/R)_i Y_i$, пакета —
+rows · $M_\text{р}$; берётся худшее из 8 положений генератора внутри шага тел.
+
+Контакт Герца, $1/E^* = 2(1 - \nu^2)/E$:
+ролик — $\sigma_H = \sqrt{F E^* k / (\pi l)}$; шарик — $\sigma_H = (6 F E^{*2} k_x k_y / \pi^3)^{1/3}$.
+Кривизны: тело/наружное кольцо $k = 2/D_\text{ш} + 2/D_\text{г}$ (ролик — на длине
+min(l, B подш.)), тело/венец $k = 2/D_\text{ш}$ (венец как плоскость — запас).
+Шарик на эксцентрике (Д-45, Т2): жёлоб $r = f D_\text{ш}$, $f$ = `groove_f`,
+$k_y = 2/D_\text{ш} - 1/(f D_\text{ш})$; шарик на подшипнике исключён (Т1), венец без жёлоба (Т3).
+
+$R_\text{max}$ = min($F_\text{г}$ / max sin φ, $F_\text{в}$ / max(sin φ · $R_\text{в}/R$)) → $M_H$;
+подшипник $R_\text{max} \lvert \sum \sin\varphi_i \vec e_i \rvert \le C_0 / s_0$ → $M_B$.
+M = min($M_H$, $M_B$, M крепл. / safety, $M_\text{sep}$), в скобках — что ограничивает.
+Генератор `eccentric` (Д-42): тела катятся прямо по эксцентрику, $D_\text{г}$ — его наружный
+диаметр (вверх до `dgen_step`, не меньше `shaft_d_min` + 2($a_\omega$ + `ecc_wall_min`)); пара
+тело/эксцентрик на всей длине тела, $M_B$ нет. В (12) $\omega_\text{к} = -\omega$ задана
+кинематически (кольцо — сам эксцентрик), а не из равновесия кольца: скольжение в $K_\text{г}$
+порядка $\omega D_\text{г}/2$, потери и износ выше, чем с подшипником (OQ-10).
+Сепаратор (CP-94, Д-116): $M_\text{sep}$ — наименьший M, при котором перемычка ряда у выходного
+торца достигает $[\sigma] = \sigma_{-1}/(K S)$ (`sep_sigma_m1`, `sep_K`, `sep_S`; многоцикловая
+усталость — нагружение на каждый оборот входа) или контакт тело/сторона окна — `sep_sigma_H`.
+Перемычка b × t ($t = 2.2 a_\omega$), высота окна L. Рама Виренделя:
+$V = M (rows - 1/2)/(rows\, n R_\Sigma)$, $M_\text{изг} = V L/2$; свой ряд — $F = k_\text{sep} M/rows$,
+$k_\text{sep}$ = max(sin φ · $R_\text{о}/R$) / Σ sin φ ($R_\text{о}/R$) Y, балка с заделкой $F L/12$;
+$\sigma = (V L/2 + F L/12)/W$, $W = t b^2/6$. Контакт — Герц тело/плоскость на длине min(l, L),
+× `sep_k_edge`: тело доходит до кромки стенки (запас $(1.1 - 1) a_\omega$). K, S, k_edge, [σ_H] — OQ-44.
+Не учтены: трение (11), (12), ресурс подшипника, жёсткость колец между рядами (OQ-08, OQ-44)."""
+
+
+def self_test():
+    Es = e_star(210000.0, 0.3)
+    assert abs(Es - 115384.6) < 0.1, Es
+    s = sigma_line(1000.0, 10.0, 5.0, math.inf, Es)           # ролик R5 × 10 мм на плоскости
+    assert 850.0 < s < 865.0, s
+    assert abs(f_line(s, 10.0, 5.0, math.inf, Es) - 1000.0) < 1e-6
+    s = sigma_point(1000.0, 0.1, 0.1, Es)                     # шар R10 на плоскости
+    assert 2900.0 < s < 3000.0, s
+    assert abs(f_point(s, 0.1, 0.1, Es) - 1000.0) < 1e-6
+    a, D, z = 1.0, 5.0, 20
+    R = (58.0 + D) / 2
+    for p in (0.3, 1.0, 2.0):                                 # без трения: M вых = u·M вх
+        ro, _ = ptk_profile.contact_ratios(p, a, R, z)
+        assert abs(ro - (z - 1) * a * math.sin(p) / R) < 1e-9, (p, ro)
+    lim = SimpleNamespace(E_mod=210000.0, nu=0.3, sigma_H_line=2500.0,
+                          sigma_H_point=3000.0, s0_brg=1.0, groove_f=0.52)
+    g0 = pair_limits(2.0, 2.0, "ball", 60.0, 2.0, lim)                    # Д-45: жёлоб
+    g1 = pair_limits(2.0, 2.0, "ball", 60.0, 2.0, lim, True)
+    assert g1[0] > 10 * g0[0] and g1[1] == g0[1], (g0, g1)
+    brg = {"d": 45.0, "D": 58.0, "B": 7.0, "C": 6.63, "C0": 6.1}
+    t1 = torque(19, z, a, R, D, 8.0, "roller", brg, lim, 4)
+    assert t1["M_H"] > 0 and t1["M_B"] > 0, t1
+    t2 = torque(19, z, a, R, D, 8.0, "roller", brg,
+                SimpleNamespace(**{**vars(lim), "sigma_H_line": 5000.0}), 4)
+    assert abs(t2["M_H"] - 4 * t1["M_H"]) < 0.01 * t2["M_H"] and t2["M_B"] == t1["M_B"]
+    t4 = torque(19, z, a, R, D, 8.0, "roller", brg, lim, 1)
+    assert abs(4 * t4["M_H"] - t1["M_H"]) < 0.5
+    assert torque(19, z, a, R, D, 5.0, "ball", brg, lim, 4)["M_H"] < t1["M_H"]
+    t5 = torque(19, z, a, R, D, 8.0, "roller", None, lim, 4)         # Д-42: эксцентрик
+    assert t5["M_B"] is None and t5["M_H"] >= t1["M_H"], (t5, t1)
+    lim2 = SimpleNamespace(**vars(lim), sep_sigma_m1=509.0, sep_K=2.0, sep_S=2.5,  # CP-94
+                           sep_sigma_H=880.0, sep_k_edge=1.2)
+    sep = {"n": 19, "r_in": R - 1.1 * a, "r_out": R + 1.1 * a, "h": 8.05,
+           "web": 2 * (R - 1.1 * a) * math.sin(math.pi / 19) - 5.05}
+    k = t1["k_sep"]
+    assert 0 < k < 5.5 / (19 * R), k                      # ≈ 4/(n·R_Σ): Σ sin²φ ≈ n/4
+    Ms, why = sep_limit(sep, k, D, 8.0, "roller", 4, R, a, lim2)
+    c1 = sep_check(Ms, sep, k, D, 8.0, "roller", 4, R, a, lim2)
+    assert Ms > 0 and 0.98 < max(c1["u_b"], c1["u_H"]) <= 1.0 + 1e-3, (Ms, c1)
+    c2 = sep_check(2 * Ms, sep, k, D, 8.0, "roller", 4, R, a, lim2)
+    assert abs(c2["sig_b"] - 2 * c1["sig_b"]) < 0.01, (c1, c2)               # изгиб ∝ M
+    assert abs(c2["sig_H"] - 2 ** 0.5 * c1["sig_H"]) < 0.1, (c1, c2)        # Герц ∝ √M
+    assert sep_limit({**sep, "web": 1.5 * sep["web"]}, k, D, 8.0, "roller", 4, R, a, lim2)[0] > Ms
+    assert sep_limit(sep, k, D, 8.0, "roller", 4, R, a,
+                     SimpleNamespace(**{**vars(lim2), "sep_K": 4.0}))[0] < Ms
+    return True
+===== END FILE =====
+===== FILE: egm/ptk.py (строки 1–651) =====
+"""Калькулятор волнового редуктора ПТК: кинематика, профиль венца, реализуемость.
+
+Схема (Д-11, Д-31): генератор волн — вход, венец с z впадинами неподвижен, сепаратор
+с n телами — выход; u = n = z − 1, для заданного u — z = u + 1 (egm/calc_vptc.py:
+zg = i + 1, zsh = i). 4 ряда 0/90/180/270° (Д-08). Отверстия венца — крепёж и
+технологические базы (Д-16), пакет сквозной, фаза ряда — поворот сверловки (Д-19).
+
+Порядок расчёта (Д-38): u, D_ш, a_ω → R_Σ — наименьший без подреза вершины зуба, с
+перемычкой сепаратора и D_г ≥ Dgen_min → профиль по (6) Янгулова → D_В, α max →
+отверстия, D. Обозначения — Д-37. Параметры — specs/ptk_input.yaml (INS-10);
+значения по умолчанию в dataclass — только для self_test() (Д-79).
+"""
+import hashlib
+import json
+import math
+from dataclasses import asdict, dataclass, field, fields
+from fractions import Fraction
+
+from egm import ptk_force, ptk_parts, ptk_profile
+
+SEP_K = 1.1    # полутолщина кольца сепаратора / a_ω (egm/calc_vptc.py: hc = 2.2·e)
+GEN_TYPES = ("bearing", "eccentric")   # Д-42: тела на наружном кольце подшипника | на эксцентрике
+
+
+@dataclass
+class PtkLimits:
+    d_out_max: float = 110.0      # D max — наружный Ø редуктора, мм (Д-08); None — без предела (Д-43)
+    u_min: int = 10               # диапазон одноступенчатого u (Д-08, Д-11)
+    u_max: int = 100
+    wall_min: float = 4.0         # стенка впадины–отверстие и отверстие–D, мм; у тела — своя
+    a_k: float = 0.2              # a_ω = a_k·D_ш, если у тела нет a_w (calc_vptc.py: 0.2)
+    r_tip_min: float = 0.05       # наименьший радиус вершины зуба венца, мм
+    sep_web_min: float = 1.0      # наименьшая перемычка сепаратора между пазами, мм
+    shaft_d_min: float = 6.0      # Ø входного вала в эксцентрике, мм (Д-40)
+    ecc_wall_min: float = 1.0     # стенка эксцентрика: d подш. ≥ shaft_d_min + 2(a_ω + ecc_wall_min)
+    d_bc_step: float = 0.1        # округление вверх D_отв, мм (Д-35)
+    d_out_step: float = 1.0       # округление вверх D, мм (Д-35)
+    row_gap: float = 1.0          # осевой зазор (шайба) между рядами, мм
+    rows: int = 4
+    row_phases: tuple = (0, 90, 180, 270)   # фазы эксцентриков рядов, град (Д-19)
+    u_list: tuple = (10, 16, 20, 25, 32, 40, 50, 63, 80, 100)
+    E_mod: float = 210000.0       # модуль упругости тел, венца, колец подшипника, МПа (Д-41)
+    nu: float = 0.3               # коэффициент Пуассона
+    sigma_H_line: float = 2500.0  # допускаемое σ_H, линейный контакт (ролик), МПа (OQ-08)
+    sigma_H_point: float = 3000.0  # допускаемое σ_H, точечный контакт (шарик), МПа (OQ-08)
+    s0_brg: float = 1.0           # запас статической грузоподъёмности подшипника, C0/P0
+    sep_sigma_m1: float = 509.0   # σ₋₁ материала сепаратора, МПа (40Х, materials.yaml; CP-94)
+    sep_K: float = 2.0            # концентрация напряжений в углах окон сепаратора (OQ-44)
+    sep_S: float = 2.5            # запас многоцикловой усталости перемычки (OQ-44)
+    sep_sigma_H: float = 880.0    # допускаемое σ_H тело/сторона окна сепаратора, МПа (OQ-44)
+    sep_k_edge: float = 1.2       # рост σ_H у кромки стенки окна — кромочный контакт (OQ-44)
+    M_min: float = 0.0            # требуемый выходной момент, Н·м; 0 — не проверяется (Д-41)
+    gen_types: tuple = ("bearing", "eccentric")   # генераторы для расчёта (Д-42)
+    dgen_step: float = 0.1        # округление вверх D_г эксцентрика без подшипника, мм (Д-42)
+    groove_f: float = 0.52        # жёлоб под шарик на эксцентрике: r = groove_f·D_ш, > 0.5 (Д-45)
+    sep_gap: float = 0.05         # зазор тела в окне сепаратора, мм (Д-46)
+    rho: float = 7850.0           # плотность стали эксцентрика, тел, колец, кг/м³
+    brg_mass_k: float = 0.35      # масса подшипника / сплошное кольцо D×d×B, если нет bearings.m
+    shaft_key_b: float = 2.0      # шпонка вала: ширина паза b, мм (DIN 6885 A — сверить)
+    shaft_key_t2: float = 1.0     # глубина паза в ступице t2, мм
+    key_angle: float = 45.0       # паз ряда 1 от эксцентриситета, град; ряд k: key_angle − φk
+    bal_wall: float = 1.0         # стенка у отверстий балансировки, мм
+    bal_n_max: int = 3            # наибольшее число отверстий балансировки
+    bal_d_min: float = 1.0        # Ø отверстий балансировки: от, мм
+    bal_d_step: float = 0.1       # шаг Ø (сверло), мм
+    spacer_gap: float = 0.5       # зазор dвн шайбы .05 над DВ венца, мм; не в хэше ID (Д-53)
+
+
+@dataclass
+class RingHoles:
+    bolt: str = "M4"              # ключ таблицы fasteners
+    n: int = 8                    # число крепёжных отверстий венца (любое, Д-19)
+    pins: int = 2                 # штифтовые отверстия H7 в промежутках между болтами
+    pin_d: float = 4.0            # Ø штифта, мм
+    head_margin: float = 0.5      # зазор головки болта до кромки/впадин, мм
+    web_min: float = 1.0          # мин. перемычка между головками/штифтами, мм
+    mu: float = 0.12              # коэффициент трения в стыке венец/корпус
+    safety: float = 1.5           # запас удержания момента крепежом
+
+
+@dataclass
+class PtkResult:
+    u: int
+    roller: str                   # ключ vendor_prices.yaml → rollers
+    Drol: float                   # D_ш
+    id: str = ""
+    n: int = 0                    # тел в ряду
+    z: int = 0                    # впадин венца
+    a_w: float = 0.0              # a_ω
+    R_sum: float = 0.0            # R_Σ
+    R_by: str = ""                # что задало R_Σ: подрез | сепаратор | генератор
+    Dgen: float = 0.0             # D_г
+    bearing: str = ""             # подшипник генератора, ключ vendor_prices.yaml → bearings (Д-40)
+    gen: str = "bearing"          # тип генератора: bearing | eccentric (Д-42)
+    d_root: float = 0.0           # D_В
+    d_tip: float = 0.0            # D_верш
+    alpha_max: float = 0.0        # α max, град
+    r_tip: float = 0.0            # радиус вершины зуба венца, мм
+    sep_web: float = 0.0          # перемычка сепаратора, мм
+    holes: str = ""
+    mount: str = ""
+    d_bc: float = 0.0             # D_отв
+    d_out: float = 0.0            # D
+    width: float = 0.0            # B
+    Drol_max: float = 0.0
+    t_hold: float = 0.0
+    M_H: float = 0.0              # допускаемый момент по Герцу, Н·м (Д-41)
+    M_B: float = 0.0              # то же по C0 подшипника, Н·м
+    M_sep: float = 0.0            # предел по сепаратору, Н·м (CP-94, Д-116)
+    M: float = 0.0                # допускаемый выходной момент, Н·м
+    M_by: str = ""                # что ограничивает M: контакт | подшипник | крепление | сепаратор
+    sep_why: str = ""             # причина M_sep: механизм, напряжения, [σ] (CP-94)
+    ring_variants: int = 0
+    phasing: list = field(default_factory=list)
+    parts: list = field(default_factory=list)
+    geom: dict = field(default_factory=dict)
+    ok: bool = False
+    errors: list = field(default_factory=list)
+    warnings: list = field(default_factory=list)
+    tech: list = field(default_factory=list)      # коды TECH (Д-45)
+    excluded: str = ""                            # код TECH, по которому исключено из SPEC-10
+    sep: dict = field(default_factory=dict)       # сепаратор .02 (Д-46)
+    sep_chk: dict = field(default_factory=dict)   # проверка сепаратора при M (CP-94)
+    ecc: dict = field(default_factory=dict)       # эксцентрик .03 (Д-46)
+    spacer: dict = field(default_factory=dict)    # шайбы .05 (Д-53)
+
+
+def _load(cls, d):
+    names = {f.name for f in fields(cls)}
+    data = {k: v for k, v in d.items() if not k.startswith("_")}
+    unknown = sorted(set(data) - names)
+    if unknown:
+        raise ValueError(f"{cls.__name__}: неизвестные параметры {unknown}")
+    return cls(**{k: tuple(v) if isinstance(v, list) else v for k, v in data.items()})
+
+
+def load_config(cfg):
+    """specs/ptk_input.yaml -> (PtkLimits, {ключ: RingHoles}, fasteners, mount_mode) (Д-33)."""
+    fast = {k: v for k, v in cfg["fasteners"].items() if not k.startswith("_")}
+    raw = cfg.get("ring_mounts") or {"default": cfg["ring_holes"]}
+    mounts = {k: _load(RingHoles, v) for k, v in raw.items() if not k.startswith("_")}
+    lim = _load(PtkLimits, cfg["limits"])
+    bad = [g for g in lim.gen_types if g not in GEN_TYPES]
+    if bad or not lim.gen_types:
+        raise ValueError(f"limits.gen_types: {list(lim.gen_types)} — допустимы {GEN_TYPES} (Д-42)")
+    if lim.groove_f <= 0.5:
+        raise ValueError(f"limits.groove_f = {lim.groove_f}: нужно > 0.5 — жёлоб шире шарика (Д-45)")
+    return lim, mounts, fast, cfg.get("mount_mode", "first_ok")
+
+
+def _band(holes, fast, wall):
+    """b — от профиля впадин до оси отверстия; столько же от оси до D."""
+    f = fast.get(holes.bolt)
+    if f is None:
+        return wall
+    return max(wall + f["d_clear"] / 2, f["dk"] / 2 + holes.head_margin)
+
+
+def _ceil(x, step):
+    """Округление вверх до шага (Д-35)."""
+    return round(math.ceil(x / step - 1e-9) * step, 6) if step else x
+
+
+def _deg(x):
+    return round(float(x), 4)
+
+
+def pin_gaps(holes):
+    """Промежутки между болтами под штифты: j = round(i·n/pins); промежуток j —
+    между болтами j и j+1 (болт j на угле j·360/n)."""
+    if holes.pins <= 0 or holes.n < 1:
+        return []
+    return sorted({round(i * holes.n / holes.pins) % holes.n for i in range(holes.pins)})
+
+
+def pattern_order(holes):
+    """Порядок N поворотной симметрии сверловки (болты + штифты), шаг σ = 360/N."""
+    n = holes.n
+    if n < 1:
+        return 1
+    gaps = set(pin_gaps(holes))
+    for m in sorted((m for m in range(1, n + 1) if n % m == 0), reverse=True):
+        step = n // m
+        if {(g + step) % n for g in gaps} == gaps:
+            return m
+    return 1
+
+
+def phasing(z, n_rol, holes, lim):
+    """Д-19: сдвиг сверловки венцов при сквозных отверстиях пакета.
+
+    Ряд k — копия ряда 1, повёрнутая на φk. В системе профиля венца сверловка ряда k
+    повёрнута на s = (−φk) mod g, g = 360°/НОК(z, N). Равные s — один вариант венца.
+    Окна сепаратора ряда k повёрнуты на (−s·z − φk)/n mod (360/n) (Д-46, Д-53, OQ-13)."""
+    order = pattern_order(holes)
+    g = Fraction(360, z * order // math.gcd(z, order))
+    p = Fraction(360, z)
+    q = Fraction(360, max(n_rol, 1))
+    phases = [Fraction(str(x)) for x in lim.row_phases]
+    base = phases[0] if phases else Fraction(0)
+    rows, labels = [], {}
+    for k, ph in enumerate(phases):
+        phi = (ph - base) % 360
+        s = (-phi) % g
+        var = labels.setdefault(s, chr(ord("A") + len(labels)))
+        rows.append({"row": k + 1, "phi": _deg(phi), "delta_p": _deg((phi % p) / p),
+                     "s": _deg(s), "cage": _deg(((-s * z - phi) / max(n_rol, 1)) % q),
+                     "variant": var})
+    return {"z": z, "pitch": _deg(p), "order": order, "g": _deg(g),
+            "variants": len(labels), "rows": rows}
+
+
+def ring(d_root, holes, fast, lim, wall):
+    """Отверстия венца (Д-16): D_отв, D, момент удержания, ошибки."""
+    err = []
+    f = fast.get(holes.bolt)
+    band = _band(holes, fast, wall)
+    r_bc = _ceil(d_root + 2 * band, lim.d_bc_step) / 2
+    pins = f"+{holes.pins}шт Ø{holes.pin_d:g}" if holes.pins else ""
+    res = {"d_bc": round(2 * r_bc, 2), "d_out": _ceil(2 * (r_bc + band), lim.d_out_step),
+           "t_hold": 0.0, "label": f"{holes.n}×{holes.bolt}{pins}"}
+    if f is None:
+        return res, [f"крепёж {holes.bolt} отсутствует в таблице fasteners"]
+    if holes.n < 1:
+        return res, [f"число отверстий венца {holes.n} < 1"]
+    n = holes.n
+    if n >= 2:
+        chord = 2 * r_bc * math.sin(math.pi / n)
+        need = max(f["dk"] + holes.web_min, f["d_clear"] + wall)
+        if chord < need:
+            err.append(f"{holes.n}×{holes.bolt} не помещаются на D_отв {2 * r_bc:.1f}: "
+                       f"шаг {chord:.1f} < {need:.1f} мм")
+    if holes.pins:
+        half = 2 * r_bc * math.sin(math.pi / (2 * n))
+        need_p = f["dk"] / 2 + holes.pin_d / 2 + holes.web_min
+        if half < need_p:
+            err.append(f"штифт Ø{holes.pin_d:g} между болтами не помещается: "
+                       f"{half:.1f} < {need_p:.1f} мм")
+        if holes.pins > holes.n:
+            err.append(f"штифтов {holes.pins} больше, чем промежутков между болтами {holes.n}")
+    res["t_hold"] = round(holes.n * f["F_M"] * holes.mu * r_bc, 1)  # кН·мм = Н·м
+    return res, err
+
+
+# Д-80: маркировка. GEOM_REV повышается при смене формул геометрии — меняются все ID.
+GEOM_REV = 6                       # Д-42: тип генератора bearing | eccentric в хэше
+# Д-48: параметры эксцентрика (rho, brg_mass_k, shaft_key_*, key_angle, bal_*) — не в хэше;
+# эксцентрик в SPEC-10 предварительный по limits, окончательный — шаг 2 (egm/ptk_design.py)
+GEOM_LIMITS = ("a_k", "r_tip_min", "sep_web_min", "shaft_d_min", "ecc_wall_min", "wall_min",
+               "row_gap", "rows", "row_phases", "d_bc_step", "d_out_step", "dgen_step",
+               "sep_gap")
+GEOM_HOLES = ("bolt", "n", "pins", "pin_d", "head_margin")
+GEOM_ROLLER = ("type", "d", "l", "a_w", "wall_min")
+GEOM_BEARING = ("d", "D", "B")     # Д-40
+ROLLER_TYPES = {"roller": "R", "ball": "B"}
+
+# Д-45: технологические ограничения пар тело/генератор/венец — код: (пара, следствие, обоснование)
+TECH = {
+    "Т1": ("шарик / наружное кольцо подшипника",
+           "исключено из результатов SPEC-10",
+           "без жёлоба контакт точечный: допускаемая сила на шарик — десятки Н (B_D3, u = 10: "
+           "M ≈ 1 Н·м, CP-32); жёлоб на закалённой шлифованной дорожке покупного подшипника "
+           "не изготовить"),
+    "Т2": ("шарик / эксцентрик",
+           "контакт с жёлобом r = groove_f·Dш: k_y = 2/Dш − 1/(groove_f·Dш); Герц в круговом "
+           "приближении — оценка",
+           "жёлоб точится и шлифуется на эксцентрике .03 (своё изготовление); на чертёж .03 — "
+           "радиус и биение жёлоба (CP-28)"),
+    "Т3": ("шарик / венец",
+           "жёлоба в венце нет: шарик на профиле как на плоскости — обычно ограничивает M",
+           "жёлоб по траектории (6) — сферической фрезой (SM-1, ось C) или профильным "
+           "электродом ЭЭС; не заложен — OQ-11"),
+    "Т4": ("тело / эксцентрик без подшипника",
+           "M без проверки по скорости входа; η и износ не считаются",
+           "скольжение ≈ ω·Dг/2: твёрдость эксцентрика не ниже тел, смазка; предел скорости — "
+           "OQ-10 после калибровки OQ-08"),
+}
+
+
+def _n(v):
+    """Нормализация для хэша: 4 и 4.0 — одно значение."""
+    if isinstance(v, bool) or v is None or isinstance(v, str):
+        return v
+    if isinstance(v, (int, float)):
+        return round(float(v), 6)
+    if isinstance(v, (list, tuple)):
+        return [_n(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _n(x) for k, x in v.items()}
+    return v
+
+
+def _num(x):
+    return f"{float(x):g}".replace(".", "_")   # точка занята разделителем детали
+
+
+def roller_code(rol):
+    t = ROLLER_TYPES.get(rol.get("type"), "X")
+    if t == "B":
+        return f"B{_num(rol['d'])}"
+    return f"{t}{_num(rol['d'])}X{_num(rol.get('l', rol['d']))}"
+
+
+def holes_code(holes):
+    return f"{holes.n}{holes.bolt}" + (f"P{holes.pins}" if holes.pins else "")
+
+
+def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing"):
+    """Все параметры, определяющие геометрию исполнения (вход хэша и CAD)."""
+    f = fast.get(holes.bolt, {})
+    return _n({"rev": GEOM_REV, "u": u, "gen": gen,
+               "roller": {k: rol.get(k) for k in GEOM_ROLLER},
+               "bearing": {k: brg.get(k) for k in GEOM_BEARING} if brg else None,
+               "limits": {k: getattr(lim, k) for k in GEOM_LIMITS},
+               "ring_holes": {k: getattr(holes, k) for k in GEOM_HOLES},
+               "fastener": {k: f.get(k) for k in ("d_clear", "dk")}})
+
+
+def config_id(u, rol, lim, holes, fast, brg=None, gen="bearing"):
+    """ID исполнения PTK-<u>-<тело>-<отверстия>-<хэш> (Д-80) и снимок геометрии."""
+    g = geom_params(u, rol, lim, holes, fast, brg, gen)
+    raw = json.dumps(g, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+    h = hashlib.sha1(raw.encode("ascii")).hexdigest()[:6].upper()
+    return f"PTK-{u:03d}-{roller_code(rol)}-{holes_code(holes)}-{h}", g
+
+
+def ring_parts(cid, ph):
+    """Детали .01<вариант> — венцы (Д-19, Д-80)."""
+    out = {}
+    for row in ph["rows"]:
+        v = row["variant"]
+        p = out.setdefault(v, {"id": f"{cid}.01{v}", "name": "венец", "variant": v,
+                               "s": row["s"], "s_arc_mm": row.get("s_arc_mm"), "rows": []})
+        p["rows"].append(row["row"])
+    return list(out.values())
+
+
+def find(rows, cid):
+    """Запись ptk_configs.yaml по ID исполнения или детали."""
+    base = cid.split(".")[0]
+    for r in rows:
+        if r.get("id") == base:
+            return r
+    raise KeyError(f"конфигурация {base} не найдена в ptk_configs.yaml")
+
+
+def r_sum(u, D, a, lim):
+    """Д-38, Д-40: наименьший R_Σ по подрезу и сепаратору -> (R_Σ min, условие)."""
+    z, n = u + 1, u
+    return max((ptk_profile.r_sum_undercut(round(a, 6), round(D / 2 + lim.r_tip_min, 6), z),
+                "подрез"),
+               ((D + lim.sep_web_min) / (2 * math.sin(math.pi / n)) + SEP_K * a, "сепаратор"))
+
+
+def bearing(D, R_min, a, bears, lim):
+    """Д-40: подшипник генератора — наименьший D ≥ 2R_Σ min − D_ш с d ≥ shaft_d_min +
+    2(a_ω + ecc_wall_min); при равных D — больший C0. -> (ключ | None, D треб., d треб.)."""
+    need_D = 2 * R_min - D
+    need_d = lim.shaft_d_min + 2 * (a + lim.ecc_wall_min)
+    fit = sorted((b["D"], -b["C0"], k) for k, b in bears.items()
+                 if not k.startswith("_") and b["D"] >= need_D - 1e-9 and b["d"] >= need_d - 1e-9)
+    return (fit[0][2] if fit else None), need_D, need_d
+
+
+def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
+    """Расчёт одной конфигурации. rol = {'type','d','l'[, 'a_w', 'wall_min']};
+    gen — bearing (тела на наружном кольце подшипника, Д-40) | eccentric (на эксцентрике, Д-42)."""
+    D = rol["d"]
+    wall = rol.get("wall_min", lim.wall_min)
+    a = rol.get("a_w") or lim.a_k * D
+    r = PtkResult(u, rid, D, gen=gen)
+    r.id, r.geom = config_id(u, rol, lim, holes, fast, None, gen)
+    if u > lim.u_max:
+        s = two_stage(u, lim)
+        r.errors.append(f"u={u} > {lim.u_max}: одноступенчатый ПТК не считается; рекомендуется "
+                        f"двухступенчатая схема {s['u1']}×{s['u2']} = {s['u']} (Д-11)")
+        return r
+    if u < lim.u_min:
+        r.errors.append(f"u={u} < {lim.u_min}: вне диапазона (Д-08)")
+    if u < 2:
+        return r
+    z, n = u + 1, u                                     # Д-31
+    if rol.get("type") == "ball" and gen == "bearing":   # Д-45: жёлоб на покупном кольце не сделать
+        r.n, r.z, r.excluded, r.tech = n, z, "Т1", ["Т1"]
+        return r
+    R, by = r_sum(u, D, a, lim)
+    brg = None
+    if gen == "bearing":
+        bk, need_D, need_d = bearing(D, R, a, bears, lim)
+        brg = bears.get(bk) if bk else None
+        if brg is None:
+            r.errors.append(f"нет подшипника генератора с D ≥ {need_D:.1f} и d ≥ {need_d:.1f} мм "
+                            f"в vendor_prices.yaml → bearings (Д-40)")
+        else:
+            R = (brg["D"] + D) / 2
+            r.bearing = bk
+            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen)
+    else:                                               # Д-42: D_г — наружный Ø эксцентрика
+        need_d = lim.shaft_d_min + 2 * (a + lim.ecc_wall_min)
+        if need_d > 2 * R - D + 1e-9:
+            by = "вал"
+        R = (_ceil(max(2 * R - D, need_d), lim.dgen_step) + D) / 2
+    rho_k = ptk_profile.curv_radius_min(a, R, z)
+    d_root = 2 * (R + a) + D
+    r.n, r.z, r.a_w, r.R_sum, r.R_by = n, z, round(a, 3), round(R, 3), by
+    r.Dgen = round(2 * R - D, 2)
+    r.d_root, r.d_tip = round(d_root, 2), round(2 * (R - a) + D, 2)
+    r.alpha_max = round(ptk_profile.alpha_max(a, R, z), 1)
+    r.r_tip = round(min(rho_k, 1e3) - D / 2, 3)
+    r.sep_web = round(2 * (R - SEP_K * a) * math.sin(math.pi / n) - D, 2)
+    rg, rerr = ring(d_root, holes, fast, lim, wall)
+    r.errors += rerr
+    band = _band(holes, fast, wall)
+    if lim.d_out_max:                                   # None / 0 — без предела габарита (Д-43)
+        r.Drol_max = math.floor((lim.d_out_max - 4 * band) / (d_root / D) * 100) / 100
+        if rg["d_out"] > lim.d_out_max:
+            r.errors.append(f"D {rg['d_out']:g} > {lim.d_out_max:g}: тела Dш {D:g} при n={n} "
+                            f"с отверстиями {rg['label']} не вмещаются; Dш max ≈ "
+                            f"{r.Drol_max:g} мм (OQ-05)")
+    if lim.rows != len(lim.row_phases):
+        r.errors.append("число рядов не совпадает с фазировкой")
+    ph = phasing(z, n, holes, lim)
+    for row in ph["rows"]:
+        row["s_arc_mm"] = round(row["s"] * math.pi * rg["d_bc"] / 360, 3)
+    r.holes, r.d_bc, r.t_hold = rg["label"], rg["d_bc"], rg["t_hold"]
+    r.ring_variants, r.phasing = ph["variants"], ph["rows"]
+    r.parts = ring_parts(r.id, ph)
+    r.d_out = round(rg["d_out"], 2)
+    pitch = max(rol["l"], brg["B"]) if brg else rol["l"]          # Д-40: шаг ряда
+    r.width = round(lim.rows * pitch + (lim.rows + 1) * lim.row_gap, 1)
+    if not r.errors and (brg is not None or gen == "eccentric"):    # Д-46: детали .02, .03
+        r.sep = ptk_parts.separator(n, R, a, D, rol["l"], pitch, r.phasing, lim, SEP_K)
+        r.ecc = ptk_parts.eccentric(n, a, D, rol, brg, r.phasing, lim, gen, R)
+        r.warnings += r.ecc.pop("warnings")
+        r.parts += ptk_parts.parts(r.id, r.ecc)
+        r.spacer = ptk_parts.spacers(d_root, r.d_out, r.d_bc, r.geom["fastener"]["d_clear"],
+                                     rol["l"], pitch, lim.rows, lim)
+        r.warnings += r.spacer.pop("warnings")
+        r.parts += ptk_parts.spacer_parts(r.id, r.spacer, lim.rows)
+    if (brg is not None or gen == "eccentric") and not r.errors:
+        t = ptk_force.torque(n, z, a, R, D, rol["l"], rol.get("type", "roller"), brg, lim,
+                             lim.rows)
+        r.M_H, r.M_B = t["M_H"], t["M_B"] or 0.0
+        cand = [(r.M_H, "контакт"), (round(r.t_hold / holes.safety, 1), "крепление")]
+        if brg is not None:
+            cand.append((r.M_B, "подшипник"))
+        sep_in = (r.sep, t["k_sep"], D, rol["l"], rol.get("type", "roller"), lim.rows, R, a, lim)
+        if r.sep:                                        # Д-116, CP-94: предел сепаратора
+            r.M_sep, r.sep_why = ptk_force.sep_limit(*sep_in)
+            cand.append((r.M_sep, "сепаратор"))
+        r.M, r.M_by = min(cand)
+        if r.sep:
+            r.sep_chk = ptk_force.sep_check(r.M, *sep_in)
+        if r.M < lim.M_min:
+            r.errors.append(f"M {r.M:g} < M_min {lim.M_min:g} Н·м, ограничивает: {r.M_by} (Д-41)")
+    if gen == "eccentric":                               # Д-45
+        r.tech += (["Т2", "Т3"] if rol.get("type") == "ball" else []) + ["Т4"]
+    r.ok = not r.errors
+    return r
+
+
+def sweep(rollers, bears, lim, mounts, fast, mode="first_ok"):
+    """Д-33, Д-42: для (u, тело, генератор) — все крепления (all) или первое прошедшее (first_ok)."""
+    out = []
+    for u in lim.u_list:
+        for rid, rol in rollers.items():
+            if rid.startswith("_"):
+                continue
+            for gen in lim.gen_types:
+                rs = []
+                for key, h in mounts.items():
+                    r = calc(u, rid, rol, lim, h, fast, bears, gen)
+                    r.mount = key
+                    rs.append(r)
+                out += rs if mode == "all" else [next((r for r in rs if r.ok), rs[0])]
+    return out
+
+
+def two_stage(u, lim):
+    """Д-11: u = u1·u2, обе ступени в u_min..u_max, ступени по возможности равны."""
+    best = None
+    for u1 in range(lim.u_min, lim.u_max + 1):
+        u2 = min(max(round(u / u1), lim.u_min), lim.u_max)
+        key = (abs(u1 * u2 - u), abs(u1 - u2))
+        if best is None or key < best[0]:
+            best = (key, max(u1, u2), min(u1, u2))
+    _, u1, u2 = best
+    return {"u": u1 * u2, "u1": u1, "u2": u2, "exact": u1 * u2 == u,
+            "ok": lim.u_min ** 2 <= u <= lim.u_max ** 2}
+
+
+def two_stage_table(lim, u_list=(101, 120, 150, 200, 300, 500, 1000, 2500)):
+    rows = ["| u | u1 | u2 | u1·u2 | Точно |", "|---|---|---|---|---|"]
+    for u in u_list:
+        s = two_stage(u, lim)
+        exact = "да" if s["exact"] else "нет, ближайшее"
+        rows.append(f"| {u} | {s['u1']} | {s['u2']} | {s['u']} | {exact} |")
+    return (f"Одноступенчатый ПТК считается только для u ≤ {lim.u_max} (Д-11). Для больших u "
+            "применяется двухступенчатая схема; каждая ступень рассчитывается этим же "
+            "калькулятором как самостоятельный редуктор.\n\n" + "\n".join(rows))
+
+
+def profile_table(rows):
+    """Д-38: профиль и нагрузки по исполнениям (раздел SPEC-10)."""
+    t = ["### Профиль и нагрузки по исполнениям (Д-38)", "",
+         "R_о/R, R_в/R — (8), (9) при φ = 90° (α = α max), на 1 Н реакции генератора.", "",
+         "| ID | $a_\\omega$ | $R_\\Sigma$ | $R_\\Sigma$ задан | $D_\\text{г}$ | α max, ° | "
+         "$R_\\text{о}/R$ | $R_\\text{в}/R$ | r верш., мм | перемычка сеп., мм | Статус |",
+         "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for r in rows:
+        if not r["z"]:
+            continue
+        ro, rv = ptk_profile.contact_ratios(math.pi / 2, r["a_w"], r["R_sum"], r["z"])
+        t.append(f"| {r['id']} | {r['a_w']} | {r['R_sum']} | {r['R_by']} | {r['Dgen']} | "
+                 f"{r['alpha_max']} | {ro:.2f} | {rv:.2f} | {r['r_tip']} | {r['sep_web']} | "
+                 f"{'OK' if r['ok'] else 'нет'} |")
+    return "\n".join(t)
+
+
+def phasing_table(lim, holes):
+    """Таблица фазировки рядов и сдвигов сверловки для SPEC-10 (Д-19)."""
+    order = pattern_order(holes)
+    gaps = pin_gaps(holes)
+    pins = (f", штифты Ø{holes.pin_d:g} в промежутках {gaps}" if gaps else ", без штифтов")
+    head = (f"Сверловка венца: {holes.n}×{holes.bolt} через {360 / max(holes.n, 1):g}°{pins}; "
+            f"порядок симметрии сверловки N = {order} (σ = {360 / order:g}°). "
+            "Не зависит от тела качения, поэтому дана по u.")
+    rows = ["| u (z = u + 1) | p, ° | g, ° | Венцов | Ряд | φ, ° | δ/p | s, ° | Сепаратор, ° | Вариант |",
+            "|---|---|---|---|---|---|---|---|---|---|"]
+    for u in lim.u_list:
+        if not 2 <= u <= lim.u_max:
+            continue
+        ph = phasing(u + 1, u, holes, lim)
+        for i, row in enumerate(ph["rows"]):
+            lead = (f"| {u} | {ph['pitch']:g} | {ph['g']:g} | {ph['variants']} |"
+                    if i == 0 else "| | | | |")
+            rows.append(lead + f" {row['row']} | {row['phi']:g} | {row['delta_p']:g} | "
+                        f"{row['s']:g} | {row['cage']:g} | {row['variant']} |")
+    return head + "\n\n" + "\n".join(rows)
+
+
+def to_rows(results, mounts):
+    """Строки ptk_configs.yaml; M, M_by считаются в calc (Д-41); mounts — для совместимости."""
+    return [asdict(r) for r in results]
+
+
+def tech_md():
+    """Расшифровка технологических кодов (Д-45) для SPEC-10."""
+    L = ["| Код | Пара | Следствие для расчёта | Обоснование |", "|---|---|---|---|"]
+    L += [f"| {k} | {p} | {e} | {w} |" for k, (p, e, w) in TECH.items()]
+    return "\n".join(L)
+
+
+def self_test():
+    """Проверки ПО на фиксированных параметрах (не зависят от ptk_input.yaml)."""
+    lim, holes = PtkLimits(), RingHoles()
+    fast = {"M4": {"d_clear": 4.5, "dk": 7.0, "F_M": 4.1}}
+    bears = {f"T{d}": {"d": d - 12.0, "D": float(d), "B": 7.0, "C": 5.0, "C0": 5.0}
+             for d in range(19, 121)}                      # шаг D 1 мм: R_Σ ≈ R_Σ min
+    b = {"type": "roller", "d": 5.0, "l": 8.0}
+
+    def c(u, h=holes, rol=b):
+        return calc(u, "t", rol, lim, h, fast, bears)
+
+    r = c(19)                                             # z = 20 кратно 4
+    assert r.ok, r.errors
+    assert r.z == 20 and r.n == 19 and r.a_w == 1.0       # Д-31, a_ω = 0.2·D_ш
+    assert r.R_by == "подрез" and r.r_tip >= lim.r_tip_min - 1e-3, (r.R_by, r.r_tip)
+    assert abs(r.d_root - r.d_tip - 4 * r.a_w) < 0.02
+    assert 75.0 < r.d_out < 100.0 and r.d_out == int(r.d_out), r.d_out   # Д-35
+    assert 25.0 < r.alpha_max < 40.0, r.alpha_max          # ≈ √(2·a_k)
+    assert r.sep_web >= lim.sep_web_min - 1e-6
+    assert r.bearing and r.Dgen == bears[r.bearing]["D"], (r.bearing, r.Dgen)   # Д-40
+    assert abs(2 * r.R_sum - r.Dgen - r.Drol) < 1e-3
+    assert r.width == 4 * 8.0 + 5 * lim.row_gap
+    sp = [p for p in r.parts if ".05" in p["id"]]                 # Д-53: шаг = l — один вариант
+    assert [p["id"][-4:] for p in sp] == [".05A"] and sp[0]["pos"] == [0, 1, 2, 3, 4], sp
+    assert abs(sum(x["h"] for x in r.spacer["pos"]) + 4 * 8.0 - r.width) < 1e-6, r.spacer
+    assert r.M > 0 and r.M_by in ("контакт", "подшипник", "крепление", "сепаратор"), (r.M, r.M_by)
+    assert r.M <= min(r.M_H, r.M_B, r.t_hold / holes.safety, r.M_sep) + 0.1       # Д-41, Д-116
+    assert r.M_sep > 0 and r.sep_chk["sig_b"] <= r.sep_chk["sig_allow"], r.sep_chk   # CP-94
+    assert not calc(19, "t", b, PtkLimits(M_min=1e6), holes, fast, bears).ok
+    assert not calc(19, "t", b, lim, holes, fast, {}).ok                         # нет подшипника
+    assert c(19, rol={**b, "a_w": 0.5}).alpha_max < r.alpha_max   # меньше a_ω — меньше α
+    assert c(19, rol={**b, "wall_min": 8.0}).d_out > r.d_out       # wall_min тела
+    e = calc(19, "t", b, lim, holes, fast, {}, "eccentric")      # Д-42: каталог не нужен
+    assert e.ok and not e.bearing and e.gen == "eccentric", e.errors
+    assert e.Dgen >= lim.shaft_d_min + 2 * (e.a_w + lim.ecc_wall_min) - 1e-9
+    assert abs(2 * e.R_sum - e.Dgen - e.Drol) < 1e-3 and e.M_B == 0.0
+    assert e.M_by in ("контакт", "крепление", "сепаратор") and e.id != r.id, (e.M_by, e.id)
+    assert e.width == 4 * 8.0 + 5 * lim.row_gap
+    assert "Т4" in e.tech and not r.tech, (e.tech, r.tech)
+    bb = c(10, rol={"type": "ball", "d": 2.0, "l": 2.0})          # Д-45: шарик на подшипнике
+    assert not bb.ok and bb.excluded == "Т1" and not bb.errors, bb
+    be = calc(10, "t", {"type": "ball", "d": 2.0, "l": 2.0}, lim, holes, fast, {}, "eccentric")
+    assert not be.excluded and be.tech == ["Т2", "Т3", "Т4"], be.tech
+    assert tech_md().count("| Т") == len(TECH)
+    big = calc(100, "t", b, PtkLimits(d_out_max=None), holes, fast, {}, "eccentric")
+    assert big.ok and big.d_out > 110.0 and big.Drol_max == 0.0, big.errors   # Д-43
+    try:
+        load_config({"limits": {"gen_types": ["magnet"]}, "ring_mounts": {"x": {}}, "fasteners": {}})
+        raise AssertionError("неизвестный gen_types принят")
+    except ValueError:
+        pass
+    rb = c(10, rol={"type": "roller", "d": 2.0, "l": 2.0})
+    assert bears[rb.bearing]["d"] >= lim.shaft_d_min + 2 * (rb.a_w + lim.ecc_wall_min) - 1e-9
+    assert r.ring_variants == 1, r.phasing
+    assert not c(5).ok and not c(100).ok
+    r = c(120)
+    assert not r.ok and "двухступенчат" in r.errors[0]
+    assert two_stage(200, lim)["u"] == 200 and two_stage(200, lim)["exact"]
+    assert c(63).Drol_max < 5.0
+    assert c(20, RingHoles(n=6)).ok                       # кратность 4 не нужна (Д-19)
+    assert not c(20, RingHoles(n=40)).ok
+    assert not c(20, RingHoles(bolt="M99")).ok
+    h8 = RingHoles(n=8, pins=0)
+    assert pattern_order(h8) == 8 and pattern_order(holes) == 2
+    assert pattern_order(RingHoles(n=8, pins=4)) == 4
+    ph = phasing(63, 62, holes, lim)
+    assert ph["variants"] == 2 and abs(ph["rows"][1]["s"] - 180 / 126) < 1e-3, ph
+    assert phasing(63, 62, h8, lim)["variants"] == 1
+    ph = phasing(25, 24, RingHoles(n=5, pins=0), lim)
+    assert ph["variants"] == 4 and abs(ph["rows"][1]["s"] - 10.8) < 1e-3, ph
+    r = c(20)
+    assert r.id.startswith("PTK-020-R5X8-8M4P2-") and len(r.id.split("-")[-1]) == 6, r.id
+    assert c(20).id == r.id
+    assert c(20, RingHoles(safety=3.0, mu=0.2)).id == r.id
+    assert c(20, RingHoles(pin_d=4)).id == r.id
+    assert c(20, RingHoles(pin_d=5.0)).id != r.id
+    assert calc(20, "t", b, PtkLimits(a_k=0.15), holes, fast, bears).id != r.id
+    assert roller_code({"type": "ball", "d": 2.5}) == "B2_5"
+    assert [p["id"] for p in c(62).parts if ".01" in p["id"]] == [c(62).id + ".01A", c(62).id + ".01B"]
+    rows = [asdict(c(20)), asdict(c(62))]
+    assert find(rows, c(62).id + ".01B")["u"] == 62
+    # CP-94: K20 = PTK-063-R3X8-22M6P2-BDBB72 (SPEC-10: 61819, 22×M6+2×Ø6, D ≤ 200) —
+    # сепаратор ограничивает M: σ перемычки ≤ [σ], M_sep < M_H, M_by «сепаратор» (Д-116)
+    k20 = calc(63, "R_D3x8", {"type": "roller", "d": 3.0, "l": 8.0}, PtkLimits(d_out_max=200.0),
+               RingHoles(bolt="M6", n=22, pins=2, pin_d=6.0),
+               {"M6": {"d_clear": 6.6, "dk": 10.0, "F_M": 9.3}},
+               {"61819": {"d": 95.0, "D": 120.0, "B": 13.0, "C": 19.9, "C0": 18.8}})
+    assert k20.ok and k20.id == "PTK-063-R3X8-22M6P2-BDBB72", (k20.id, k20.errors)
+    assert abs(k20.t_hold - 1740.7) < 0.1 and k20.sep["web"] == 3.015, (k20.t_hold, k20.sep)
+    assert k20.M_by == "сепаратор" and k20.M == k20.M_sep < k20.M_H, (k20.M, k20.M_sep, k20.M_H)
+    s20 = k20.sep_chk
+    assert 120.0 < k20.M_sep < 300.0 and s20["by"] == "изгиб", (k20.M_sep, s20)
+    assert s20["sig_b"] <= s20["sig_allow"] and s20["sig_H"] < s20["sigH_allow"], s20
+    return True
+
+
+if __name__ == "__main__":
+    print(self_test())
+===== END FILE =====
+===== FILE: egm/ptk_parts.py (строки 1–223) =====
+"""Детали ПТК: .02 сепаратор, .03 эксцентрик — геометрия и балансировка (CP-35, Д-46).
+
+Числа считаются здесь (слой расчёта, Д-39) и попадают в ptk_configs.yaml → sep, ecc;
+egm/cad/ptk_sep.py и ptk_ecc.py только строят PartModel.
+
+Сепаратор .02 — одна деталь на пакет: втулка R_Σ ± SEP_K·a_ω длиной B пакета с прямыми
+радиальными окнами (тела движутся строго радиально); окна ряда k повёрнуты на
+(−s_k·z − φk)/n mod (360/n) — ptk.phasing → cage (Д-46, Д-53).
+Шайбы .05 — кольца пакета венцов по торцам и между рядами (Д-53).
+Эксцентрик .03 — диск толщиной t: наружный Ø D_э со смещением a_ω (посадка подшипника d
+или поверхность качения D_г), отверстие под вал shaft_d_min с пазом шпонки; паз ряда k —
+на угле key_angle − φk от эксцентриситета, отсюда варианты .03A… по рядам.
+Балансировка ряда (Д-36): U = U_диска + m_подш·a_ω + (n/2)·m_тела·a_ω, г·мм; снимается
+N сквозными отверстиями Ø d на радиусе r_h со стороны эксцентриситета:
+U_отв = ρ·t·π·d²/4·r_h·Σcos β_j. Паз шпонки (~1 % U) не учитывается.
+"""
+import math
+
+from egm.ptk_profile import Y
+
+
+def separator(n, R, a, D, l, pitch, rows, lim, sep_k):
+    """Сепаратор: радиусы, окна w × h, положение окон рядов по оси и углу."""
+    r_in, r_out = R - sep_k * a, R + sep_k * a
+    w, h = D + lim.sep_gap, l + lim.sep_gap
+    win = [{"row": row["row"],
+            "cage": round(((-row["s"] * (n + 1) - row["phi"]) / n) % (360 / n), 4),
+            "z0": round(lim.row_gap + k * (pitch + lim.row_gap) + (pitch - h) / 2, 3)}
+           for k, row in enumerate(rows)]
+    return {"n": n, "r_in": round(r_in, 3), "r_out": round(r_out, 3), "w": round(w, 3),
+            "h": round(h, 3), "length": round(len(rows) * pitch + (len(rows) + 1) * lim.row_gap, 3),
+            "web": round(2 * r_in * math.sin(math.pi / n) - w, 3), "rows": win}
+
+
+def _fit(N, d, a, Re, r_lo, w):
+    """N отверстий Ø d у наружной кромки, перемычки w -> (r_h, [β, рад]) | None."""
+    r = Re + a - w - d / 2
+    for _ in range(500):
+        r = math.floor(r * 100 + 1e-9) / 100
+        if r - d / 2 < r_lo - 1e-9 or (N > 1 and d + w > 2 * r):
+            return None
+        db = 2 * math.asin((d + w) / (2 * r)) if N > 1 else 0.0
+        bs = [(j - (N - 1) / 2) * db for j in range(N)]
+        if abs(bs[0]) > math.pi / 2:
+            return None
+        r_max = min(Y(b, a, Re) for b in bs) - w - d / 2
+        if r <= r_max + 1e-9:
+            return r, bs
+        r = min(r - 0.01, r_max)
+    return None
+
+
+def balance(U, a, Re, t, rho, r_lo, lim):
+    """Подбор N × Ø d с наименьшим |U − U_отв|; N = 0 — без отверстий."""
+    k = rho * t * math.pi / 4
+    best = (abs(U), 0, 0.0, 0.0, [], 0.0)
+    ds = getattr(lim, "bal_drills", None)       # Д-48: только свёрла из списка
+    for N in range(1, int(lim.bal_n_max) + 1):
+        i = 0
+        while True:
+            if ds is not None and i >= len(ds):
+                break
+            d = ds[i] if ds is not None else round(lim.bal_d_min + i * lim.bal_d_step, 4)
+            g = _fit(N, d, a, Re, r_lo, lim.bal_wall)
+            if g is None:
+                break
+            r, bs = g
+            Ur = k * d * d * r * sum(math.cos(b) for b in bs)
+            if abs(U - Ur) < best[0] - 1e-9:
+                best = (abs(U - Ur), N, d, r, bs, Ur)
+            if Ur >= U:
+                break
+            i += 1
+    _, N, d, r, bs, Ur = best
+    return {"n": N, "d": d, "r": r, "U_rem": round(Ur, 2), "res": round(U - Ur, 2),
+            "holes": [(round(r * math.cos(b), 3), round(r * math.sin(b), 3)) for b in bs]}
+
+
+def eccentric(n, a, D, rol, brg, rows, lim, gen, R):
+    """Эксцентрик ряда: размеры, дисбаланс, отверстия балансировки, пазы шпонки рядов."""
+    rho = lim.rho * 1e-6                                  # г/мм³
+    if gen == "bearing":
+        De, t, est = brg["d"], brg["B"], not brg.get("m")
+        m_b = (rho * lim.brg_mass_k * math.pi / 4 * (brg["D"] ** 2 - brg["d"] ** 2) * brg["B"]
+               if est else brg["m"] * 1e3)
+    else:
+        De, t, m_b, est = 2 * R - D, rol["l"], 0.0, False
+    ball = rol.get("type", "roller") == "ball"
+    vol = math.pi * D ** 3 / 6 if ball else math.pi * D * D * rol["l"] / 4
+    U = {"disk": rho * t * math.pi * De * De / 4 * a, "brg": m_b * a,
+         "bodies": n / 2 * rho * vol * a}
+    U["sum"] = sum(U.values())
+    rs, t2 = lim.shaft_d_min / 2, lim.shaft_key_t2
+    bal = balance(U["sum"], a, De / 2, t, rho, rs + t2 + lim.bal_wall, lim)
+    warns = []
+    if abs(bal["res"]) > 0.05 * U["sum"]:
+        warns.append(f"эксцентрик: остаток дисбаланса {bal['res']:g} из {U['sum']:.1f} г·мм — "
+                     f"отверстия балансировки не помещаются (Д-46)")
+    out = []
+    for row in rows:
+        ka = round((lim.key_angle - row["phi"]) % 360, 3)
+        wall = Y(math.radians(ka), a, De / 2) - rs - t2
+        if wall < lim.ecc_wall_min - 1e-9:
+            warns.append(f"ряд {row['row']}: стенка эксцентрика у паза шпонки {wall:.2f} < "
+                         f"ecc_wall_min {lim.ecc_wall_min:g} мм — изменить key_angle (Д-46)")
+        out.append({"row": row["row"], "phi": row["phi"], "key_angle": ka,
+                    "key_wall": round(wall, 2)})
+    return {"De": round(De, 3), "t": t, "a": a, "d_shaft": lim.shaft_d_min,
+            "key_b": lim.shaft_key_b, "key_t2": t2, "m_brg_g": round(m_b, 1), "m_brg_est": est,
+            "groove_r": round(lim.groove_f * D, 3) if ball and gen == "eccentric" else None,
+            "U": {k: round(v, 2) for k, v in U.items()}, "bal": bal, "rows": out,
+            "warnings": warns}
+
+
+def parts(cid, ecc):
+    """Детали .02 (одна на пакет) и .03<вариант> (по пазу шпонки ряда)."""
+    out = [{"id": f"{cid}.02", "name": "сепаратор", "variant": "",
+            "rows": [x["row"] for x in ecc["rows"]]}]
+    var = {}
+    for x in ecc["rows"]:
+        v = var.setdefault(x["key_angle"], chr(ord("A") + len(var)))
+        p = next((q for q in out if q["id"] == f"{cid}.03{v}"), None)
+        if p is None:
+            p = {"id": f"{cid}.03{v}", "name": "эксцентрик", "variant": v,
+                 "key_angle": x["key_angle"], "rows": []}
+            out.append(p)
+        p["rows"].append(x["row"])
+    return out
+
+
+def spacers(d_root, d_out, d_bc, d_clear, l, pitch, rows, lim):
+    """Шайбы .05 (Д-53): венец ряда k занимает zc ± l/2 (egm/cad/assy.plan), шайбы — остальное.
+
+    У торца h = row_gap + (шаг − l)/2, между рядами h = row_gap + шаг − l; dвн = DВ + 2·spacer_gap,
+    поэтому тела и сепаратор шайб не касаются; осевую фиксацию тел даёт окно сепаратора."""
+    r_in = d_root / 2 + lim.spacer_gap
+    h_end = round(lim.row_gap + (pitch - l) / 2, 3)
+    h_mid = round(lim.row_gap + pitch - l, 3)
+    pos, var, z = [], {}, 0.0
+    for j in range(rows + 1):
+        h = h_end if j in (0, rows) else h_mid
+        v = var.setdefault(h, chr(ord("A") + len(var)))
+        pos.append({"pos": j, "z": round(z, 3), "h": h, "variant": v})
+        z += h + l
+    web = round(d_bc / 2 - d_clear / 2 - r_in, 2)
+    warns = [] if web > 0 else [f"шайба .05: dвн {2 * r_in:.2f} заходит на отверстия Dотв "
+                                f"{d_bc:g} — уменьшить spacer_gap (Д-53)"]
+    return {"r_in": round(r_in, 3), "d_out": d_out, "h_end": h_end, "h_mid": h_mid,
+            "web": web, "pos": pos, "warnings": warns}
+
+
+def spacer_parts(cid, sp, rows):
+    """Детали .05<вариант>: вариант — по толщине; pos — места в пакете (0 — торец входа)."""
+    out = {}
+    for x in sp["pos"]:
+        v = x["variant"]
+        p = out.setdefault(v, {"id": f"{cid}.05{v}", "name": "межрядная шайба", "variant": v,
+                               "h": x["h"], "pos": [], "rows": []})
+        p["pos"].append(x["pos"])
+        near = {x["pos"], x["pos"] + 1} & set(range(1, rows + 1))
+        p["rows"] = sorted(set(p["rows"]) | near)
+    return list(out.values())
+
+
+def _sp(s):
+    return (f"{2 * s['r_in']:g} / {s['d_out']:g}, {s['h_end']:g} / {s['h_mid']:g}"
+            if s else "—")
+
+
+def _msep(r):
+    """M_sep, Н·м (что задаёт: изгиб | контакт) — CP-94."""
+    c = r.get("sep_chk") or {}
+    return f"{r['M_sep']:g} ({c.get('by', '—')})" if r.get("M_sep") else "—"
+
+
+def table(rows):
+    """SPEC-10: детали .02, .03 реализуемых исполнений."""
+    L = ["| ID | Генератор | Dэ × t, мм | Пазы шпонки, ° | U, г·мм | Отв. балансировки | "
+         "Остаток, г·мм | Сепаратор dс / Dс × B | Окна w × h | Перемычка | M_sep, Н·м | "
+         "Шайбы .05 dвн / D, h торец / между |",
+         "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for r in rows:
+        e, s = r.get("ecc"), r.get("sep")
+        if not e or not s:
+            continue
+        b = e["bal"]
+        holes = f"{b['n']}×Ø{b['d']:g}, r {b['r']:g}" if b["n"] else "нет"
+        keys = ", ".join(f"{x['key_angle']:g}" for x in e["rows"])
+        L.append(f"| {r['id']} | {r['bearing'] or 'эксцентрик'} | {e['De']:g} × {e['t']:g} | {keys} | "
+                 f"{e['U']['sum']:g} | {holes} | {b['res']:g} | "
+                 f"{2 * s['r_in']:g} / {2 * s['r_out']:g} × {s['length']:g} | "
+                 f"{s['w']:g} × {s['h']:g} | {s['web']:g} | {_msep(r)} | {_sp(r.get('spacer'))} |")
+    return "\n".join(L) if len(L) > 2 else "нет реализуемых исполнений"
+
+
+def self_test():
+    from types import SimpleNamespace
+    lim = SimpleNamespace(sep_gap=0.05, row_gap=1.0, rho=7850.0, brg_mass_k=0.35,
+                          shaft_d_min=6.0, shaft_key_b=2.0, shaft_key_t2=1.0, bal_wall=1.0,
+                          bal_n_max=3, bal_d_min=1.0, bal_d_step=0.1, ecc_wall_min=1.0,
+                          key_angle=45.0, groove_f=0.52, spacer_gap=0.5)
+    rows = [{"row": k + 1, "phi": p, "s": -p} for k, p in enumerate((0, 90, 180, 270))]
+    s = separator(50, 33.5, 0.4, 2.0, 4.2, 7.0, rows, lim, 1.1)
+    assert s["web"] > 0 and len(s["rows"]) == 4, s
+    c = s["rows"][1]["cage"]
+    assert abs(c - 90 % 7.2) < 1e-6, ("s = −φ: cage = φ mod 360/n (Д-46)", c)
+    s0 = separator(50, 33.5, 0.4, 2.0, 4.2, 7.0, [{**x, "s": 0.0} for x in rows], lim, 1.1)
+    c0 = s0["rows"][1]["cage"]
+    assert abs(c0 - (-90 / 50) % 7.2) < 1e-6, ("s = 0: cage = −φ/n mod 360/n (Д-46)", c0)
+    e = eccentric(50, 0.4, 2.0, {"type": "roller", "d": 2.0, "l": 4.2},
+                  {"d": 50.0, "D": 65.0, "B": 7.0}, rows, lim, "bearing", 33.5)
+    assert e["bal"]["n"] >= 1 and abs(e["bal"]["res"]) <= 0.05 * e["U"]["sum"], e["bal"]
+    assert not e["warnings"], e["warnings"]
+    p = parts("PTK-T", e)
+    assert [q["id"] for q in p] == ["PTK-T.02", "PTK-T.03A", "PTK-T.03B", "PTK-T.03C",
+                                    "PTK-T.03D"], p
+    sp = spacers(69.8, 88.0, 80.0, 4.5, 4.2, 7.0, 4, lim)           # Д-53
+    assert (sp["h_end"], sp["h_mid"]) == (2.4, 3.8) and not sp["warnings"], sp
+    assert abs(sum(x["h"] for x in sp["pos"]) + 4 * 4.2 - 33.0) < 1e-6, ("шайбы + венцы = B", sp)
+    q = spacer_parts("PTK-T", sp, 4)
+    assert [(x["id"], x["pos"]) for x in q] == [("PTK-T.05A", [0, 4]), ("PTK-T.05B", [1, 2, 3])], q
+    assert q[0]["rows"] == [1, 4] and q[1]["rows"] == [1, 2, 3, 4], q
+    return True
+===== END FILE =====
+===== FILE: egm/ptk_doc.py (строки 52–52) =====
+GLOSSARY = {
+===== END FILE =====
+
+===== FILE: egm/ptk_doc.py (строки 80–80) =====
+    "M_sep": "Предел по сепаратору: изгиб перемычки ряда у выходного торца или контакт тело/окно, Н·м (CP-94, Д-116).",
+===== END FILE =====
+
+===== FILE: egm/ptk_doc.py (строки 166–166) =====
+    "sep_chk": "Сепаратор при принятом M: силы, напряжения, допускаемые (CP-94, Д-116).",
+===== END FILE =====
+
+===== FILE: egm/ptk_doc.py (строки 177–177) =====
+    "sep_chk.by": "Что задаёт M_sep: «изгиб» | «контакт».",
+===== END FILE =====
+
+===== FILE: egm/ptk_doc.py (строки 286–286) =====
+           "M_sep": 188.1, "sep_why": "изгиб", "sep_chk": {"sig_b": 101.8, "by": "изгиб"},
+===== END FILE =====
+
+## Вход и каталоги (без комментариев)
+
+===== FILE: specs/ptk_input.yaml (разделы limits; без комментариев) =====
+limits — все пределы шага 1, включая sep_*.
+limits:
+  d_out_max: 200.0
+
+  u_min: 10
+  u_max: 100
+
+  u_list: [10, 16, 20, 25, 32, 40, 50, 63, 80, 100]
+
+  a_k: 0.2
+
+  r_tip_min: 0.05
+
+  sep_web_min: 1.0
+
+  wall_min: 4.0
+
+  shaft_d_min: 6.0
+
+  ecc_wall_min: 1.0
+
+  d_bc_step: 0.1
+  d_out_step: 1.0
+
+  row_gap: 1.0
+
+  rows: 4
+  row_phases: [0, 90, 180, 270]
+
+  gen_types: [bearing, eccentric]
+
+  dgen_step: 0.1
+
+  groove_f: 0.52
+
+  sep_gap: 0.05
+
+  E_mod: 210000.0
+  nu: 0.3
+
+  sigma_H_line: 2500.0
+  sigma_H_point: 3000.0
+
+  s0_brg: 1.0
+
+  sep_sigma_m1: 509.0
+  sep_K: 2.0
+  sep_S: 2.5
+  sep_sigma_H: 880.0
+  sep_k_edge: 1.2
+
+  M_min: 0.0
+
+
+  rho: 7850.0
+
+  brg_mass_k: 0.35
+
+  shaft_key_b: 2.0
+  shaft_key_t2: 1.0
+
+  key_angle: 45.0
+
+  bal_wall: 1.0
+  bal_n_max: 3
+  bal_d_min: 1.0
+  bal_d_step: 0.1
+
+  spacer_gap: 0.5
+
+===== END FILE =====
+===== FILE: specs/vendor_prices.yaml (разделы rollers, bearings, screws; без комментариев) =====
+rollers — тела качения (8 позиций: 3/5/6/7/8 мм), bearings — 61800…, screws — M3…M12.
+bearings:
+  "61800": {d: 10.0, D: 19.0, B: 5.0, C: 1.72, C0: 0.83, da: 12.0}
+  "61801": {d: 12.0, D: 21.0, B: 5.0, C: 1.74, C0: 0.915, da: 14.0}
+  "61802": {d: 15.0, D: 24.0, B: 5.0, C: 1.9, C0: 1.1, da: 17.0}
+  "61803": {d: 17.0, D: 26.0, B: 5.0, C: 2.03, C0: 1.27, da: 19.0}
+  "61804": {d: 20.0, D: 32.0, B: 7.0, C: 4.03, C0: 2.32, da: 22.0}
+  "61805": {d: 25.0, D: 37.0, B: 7.0, C: 4.36, C0: 2.6, da: 27.0}
+  "61806": {d: 30.0, D: 42.0, B: 7.0, C: 4.49, C0: 2.9, da: 32.0}
+  "61807": {d: 35.0, D: 47.0, B: 7.0, C: 4.75, C0: 3.2, da: 37.0}
+  "61808": {d: 40.0, D: 52.0, B: 7.0, C: 4.94, C0: 3.45, da: 42.0}
+  "61809": {d: 45.0, D: 58.0, B: 7.0, C: 6.63, C0: 6.1, da: 47.0}
+  "61810": {d: 50.0, D: 65.0, B: 7.0, C: 6.76, C0: 6.8, da: 52.0}
+  "61811": {d: 55.0, D: 72.0, B: 9.0, C: 9.04, C0: 8.8, da: 57.0}
+  "61812": {d: 60.0, D: 78.0, B: 10.0, C: 11.9, C0: 11.4, da: 62.0}
+  "61813": {d: 65.0, D: 85.0, B: 10.0, C: 12.1, C0: 12.5}
+  "61814": {d: 70.0, D: 90.0, B: 10.0, C: 12.4, C0: 13.2}
+  "61815": {d: 75.0, D: 95.0, B: 10.0, C: 12.5, C0: 10.8}
+  "61816": {d: 80.0, D: 100.0, B: 10.0, C: 12.7, C0: 11.2}
+  "61817": {d: 85.0, D: 110.0, B: 13.0, C: 19.5, C0: 16.6}
+  "61818": {d: 90.0, D: 115.0, B: 13.0, C: 19.5, C0: 17.0}
+  "61819": {d: 95.0, D: 120.0, B: 13.0, C: 19.9, C0: 18.8}
+  "61820": {d: 100.0, D: 125.0, B: 13.0, C: 20.8, C0: 19.6}
+  "61821": {d: 105.0, D: 130.0, B: 13.0, C: 20.8, C0: 19.6}
+  "61822": {d: 110.0, D: 140.0, B: 16.0, C: 28.1, C0: 26.5}
+
+rollers:
+  R_D8x16: {type: roller, d: 8.0, l: 16.0}
+  R_D8x8: {type: roller, d: 8.0, l: 8.0}
+  R_D7x20: {type: roller, d: 7.0, l: 20.0}
+  R_D6x6: {type: roller, d: 6.0, l: 6.0}
+  R_D5x8: {type: roller, d: 5.0, l: 8.0}
+  R_D5x5: {type: roller, d: 5.0, l: 5.0}
+  R_D3x8: {type: roller, d: 3.0, l: 8.0}
+  B_D3: {type: ball, d: 3.0, l: 3.0}
+
+screws:
+  M3: {d: 3.0, d_tap: 2.5, F_M: 2.2}
+  M4: {d: 4.0, d_tap: 3.3, F_M: 3.9}
+  M5: {d: 5.0, d_tap: 4.2, F_M: 6.4}
+  M6: {d: 6.0, d_tap: 5.0, F_M: 9.0}
+  M8: {d: 8.0, d_tap: 6.8, F_M: 16.5}
+  M10: {d: 10.0, d_tap: 8.5, F_M: 26.2}
+  M12: {d: 12.0, d_tap: 10.2, F_M: 38.3}
+===== END FILE =====
+
+## Публикуемые результаты
+
+===== FILE: specs/SPEC-10_PTK_CALC.md (шапка + строка PTK-063-R3X8-22M6P2-BDBB72) =====
+| ID | u | Тело | $D_\text{ш}$ | $D_\text{ш}$ max | n | z | $a_\omega$ | Генератор | $D_\text{г}$ | $D_\text{В}$ | α max, ° | Отверстия | Вар. венца | $D_\text{отв}$ | D | B | M, Н·м (огр.) | M крепл., Н·м | Статус |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| PTK-010-R8X16-10M5P2-8B0907 | 10 | R_D8x16 | 8.0 | 20.9 | 10 | 11 | 1.6 | 61807 | 47.0 | 66.2 | 32.7 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 79.7 | 94.0 | 69.0 | 121.2 (сепаратор) | 315.6 | OK |
+| PTK-010-R8X16-10M5P2-8F60AF | 10 | R_D8x16 | 8.0 | 21.32 | 10 | 11 | 1.6 | эксцентрик | 45.7 | 64.9 | 33.3 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 78.4 | 92.0 | 69.0 | 106.6 (сепаратор) | 310.5 | OK (Т4) |
+| PTK-010-R8X8-10M5P2-070C3C | 10 | R_D8x8 | 8.0 | 20.9 | 10 | 11 | 1.6 | 61807 | 47.0 | 66.2 | 32.7 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 79.7 | 94.0 | 37.0 | 128.6 (сепаратор) | 315.6 | OK |
+| PTK-010-R8X8-10M5P2-FF6078 | 10 | R_D8x8 | 8.0 | 21.32 | 10 | 11 | 1.6 | эксцентрик | 45.7 | 64.9 | 33.3 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 78.4 | 92.0 | 37.0 | 125.6 (сепаратор) | 310.5 | OK (Т4) |
+| PTK-010-R7X20-10M5P2-7D60D6 | 10 | R_D7x20 | 7.0 | 20.59 | 10 | 11 | 1.4 | 61806 | 42.0 | 58.8 | 32.2 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 72.3 | 86.0 | 85.0 | 62.4 (сепаратор) | 286.3 | OK |
+| PTK-010-R7X20-10M5P2-2EA179 | 10 | R_D7x20 | 7.0 | 21.32 | 10 | 11 | 1.4 | эксцентрик | 40.0 | 56.8 | 33.3 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 70.3 | 84.0 | 85.0 | 50 (сепаратор) | 278.4 | OK (Т4) |
+| PTK-010-R6X6-10M5P2-B73626 | 10 | R_D6x6 | 6.0 | 20.19 | 10 | 11 | 1.2 | 61805 | 37.0 | 51.4 | 31.6 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 64.9 | 79.0 | 33.0 | 56.5 (сепаратор) | 257.0 | OK |
+| PTK-010-R6X6-10M5P2-8AD44D | 10 | R_D6x6 | 6.0 | 21.31 | 10 | 11 | 1.2 | эксцентрик | 34.3 | 48.7 | 33.3 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 62.2 | 76.0 | 29.0 | 53 (сепаратор) | 246.3 | OK (Т4) |
+| PTK-010-R5X8-10M5P2-2ECBA4 | 10 | R_D5x8 | 5.0 | 19.65 | 10 | 11 | 1.0 | 61804 | 32.0 | 44.0 | 30.8 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 57.5 | 71.0 | 37.0 | 53.5 (сепаратор) | 227.7 | OK |
+| PTK-010-R5X8-10M5P2-D97113 | 10 | R_D5x8 | 5.0 | 21.25 | 10 | 11 | 1.0 | эксцентрик | 28.7 | 40.7 | 33.2 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 54.2 | 68.0 | 37.0 | 32.9 (сепаратор) | 214.6 | OK (Т4) |
+| PTK-010-R5X5-10M5P2-979E07 | 10 | R_D5x5 | 5.0 | 19.65 | 10 | 11 | 1.0 | 61804 | 32.0 | 44.0 | 30.8 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 57.5 | 71.0 | 33.0 | 33.8 (сепаратор) | 227.7 | OK |
+| PTK-010-R5X5-10M5P2-FDAB21 | 10 | R_D5x5 | 5.0 | 21.25 | 10 | 11 | 1.0 | эксцентрик | 28.7 | 40.7 | 33.2 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 54.2 | 68.0 | 25.0 | 30.7 (сепаратор) | 214.6 | OK (Т4) |
+| PTK-010-R3X8-10M3P2-A16061 | 10 | R_D3x8 | 3.0 | 20.29 | 10 | 11 | 0.6 | 61800 | 19.0 | 26.2 | 31.0 | 10×M3+2шт Ø3 (M3x12P2) | 2 | 37.6 | 49.0 | 37.0 | 6.5 (сепаратор) | 49.6 | OK |
+| PTK-010-R3X8-10M3P2-1A947D | 10 | R_D3x8 | 3.0 | 21.69 | 10 | 11 | 0.6 | эксцентрик | 17.3 | 24.5 | 33.1 | 10×M3+2шт Ø3 (M3x12P2) | 2 | 35.9 | 48.0 | 37.0 | 4.2 (сепаратор) | 47.4 | OK (Т4) |
+| PTK-010-B3-10M3P2-C587B2 | 10 | B_D3 | 3.0 | 21.69 | 10 | 11 | 0.6 | эксцентрик | 17.3 | 24.5 | 33.1 | 10×M3+2шт Ø3 (M3x12P2) | 2 | 35.9 | 48.0 | 17.0 | — | 47.4 | OK (Т2, Т3, Т4) |
+| PTK-016-R8X16-10M5P2-079658 | 16 | R_D8x16 | 8.0 | 14.23 | 16 | 17 | 1.6 | 61812 | 78.0 | 97.2 | 32.3 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 110.7 | 125.0 | 69.0 | 292.3 (крепление) | 438.4 | OK |
+| PTK-016-R8X16-10M5P2-EBEF90 | 16 | R_D8x16 | 8.0 | 14.5 | 16 | 17 | 1.6 | эксцентрик | 76.2 | 95.4 | 32.9 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 108.9 | 123.0 | 69.0 | 284.5 (сепаратор) | 431.2 | OK (Т4) |
+| PTK-016-R8X8-10M5P2-519C3A | 16 | R_D8x8 | 8.0 | 14.23 | 16 | 17 | 1.6 | 61812 | 78.0 | 97.2 | 32.3 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 110.7 | 125.0 | 45.0 | 292.3 (крепление) | 438.4 | OK |
+| PTK-016-R8X8-10M5P2-999A95 | 16 | R_D8x8 | 8.0 | 14.5 | 16 | 17 | 1.6 | эксцентрик | 76.2 | 95.4 | 32.9 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 108.9 | 123.0 | 37.0 | 287.5 (крепление) | 431.2 | OK (Т4) |
+| PTK-016-R7X20-10M5P2-A6FA18 | 16 | R_D7x20 | 7.0 | 13.63 | 16 | 17 | 1.4 | 61811 | 72.0 | 88.8 | 31.1 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 102.3 | 116.0 | 85.0 | 190.4 (сепаратор) | 405.1 | OK |
+| PTK-016-R7X20-10M5P2-B6A6DE | 16 | R_D7x20 | 7.0 | 14.5 | 16 | 17 | 1.4 | эксцентрик | 66.7 | 83.5 | 32.9 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 97.0 | 111.0 | 85.0 | 133.5 (сепаратор) | 384.1 | OK (Т4) |
+| PTK-016-R6X6-10M5P2-C54A11 | 16 | R_D6x6 | 6.0 | 14.33 | 16 | 17 | 1.2 | 61809 | 58.0 | 72.4 | 32.5 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 85.9 | 100.0 | 33.0 | 134.8 (сепаратор) | 340.2 | OK |
+| PTK-016-R6X6-10M5P2-1E58F3 | 16 | R_D6x6 | 6.0 | 14.47 | 16 | 17 | 1.2 | эксцентрик | 57.3 | 71.7 | 32.8 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 85.2 | 99.0 | 29.0 | 133.3 (сепаратор) | 337.4 | OK (Т4) |
+| PTK-016-R5X8-10M5P2-66659B | 16 | R_D5x8 | 5.0 | 13.51 | 16 | 17 | 1.0 | 61808 | 52.0 | 64.0 | 30.8 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 77.5 | 91.0 | 37.0 | 129.1 (сепаратор) | 306.9 | OK |
+| PTK-016-R5X8-10M5P2-424AEF | 16 | R_D5x8 | 5.0 | 14.46 | 16 | 17 | 1.0 | эксцентрик | 47.8 | 59.8 | 32.8 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 73.3 | 87.0 | 37.0 | 87.4 (сепаратор) | 290.3 | OK (Т4) |
+| PTK-016-R5X5-10M5P2-96A041 | 16 | R_D5x5 | 5.0 | 13.51 | 16 | 17 | 1.0 | 61808 | 52.0 | 64.0 | 30.8 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 77.5 | 91.0 | 33.0 | 83.4 (сепаратор) | 306.9 | OK |
+| PTK-016-R5X5-10M5P2-303BBF | 16 | R_D5x5 | 5.0 | 14.46 | 16 | 17 | 1.0 | эксцентрик | 47.8 | 59.8 | 32.8 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 73.3 | 87.0 | 25.0 | 77.2 (сепаратор) | 290.3 | OK (Т4) |
+| PTK-016-R3X8-10M5P2-7841A0 | 16 | R_D3x8 | 3.0 | 13.23 | 16 | 17 | 0.6 | 61804 | 32.0 | 39.2 | 30.3 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 52.7 | 67.0 | 37.0 | 18.5 (сепаратор) | 208.7 | OK |
+| PTK-016-R3X8-10M5P2-4F895B | 16 | R_D3x8 | 3.0 | 14.37 | 16 | 17 | 0.6 | эксцентрик | 28.9 | 36.1 | 32.6 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 49.6 | 64.0 | 37.0 | 11.5 (сепаратор) | 196.4 | OK (Т4) |
+| PTK-016-B3-10M5P2-40D6F0 | 16 | B_D3 | 3.0 | 14.37 | 16 | 17 | 0.6 | эксцентрик | 28.9 | 36.1 | 32.6 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 49.6 | 64.0 | 17.0 | — | 196.4 | OK (Т2, Т3, Т4) |
+| PTK-020-R8X16-22M6P2-4A32DD | 20 | R_D8x16 | 8.0 | 11.46 | 20 | 21 | 1.6 | 61816 | 100.0 | 119.2 | 31.9 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 133.8 | 149.0 | 69.0 | 530.7 (сепаратор) | 1642.5 | OK |
+| PTK-020-R8X16-22M6P2-0377C3 | 20 | R_D8x16 | 8.0 | 11.8 | 20 | 21 | 1.6 | эксцентрик | 96.5 | 115.7 | 32.8 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 130.3 | 145.0 | 69.0 | 448 (сепаратор) | 1599.6 | OK (Т4) |
+| PTK-020-R8X8-22M6P2-656315 | 20 | R_D8x8 | 8.0 | 11.46 | 20 | 21 | 1.6 | 61816 | 100.0 | 119.2 | 31.9 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 133.8 | 149.0 | 45.0 | 505.8 (сепаратор) | 1642.5 | OK |
+| PTK-020-R8X8-22M6P2-7C7CC0 | 20 | R_D8x8 | 8.0 | 11.8 | 20 | 21 | 1.6 | эксцентрик | 96.5 | 115.7 | 32.8 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 130.3 | 145.0 | 37.0 | 489.4 (сепаратор) | 1599.6 | OK (Т4) |
+| PTK-020-R7X20-10M5P2-388229 | 20 | R_D7x20 | 7.0 | 11.89 | 20 | 21 | 1.4 | 61813 | 85.0 | 101.8 | 32.6 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 115.3 | 129.0 | 85.0 | 216.6 (сепаратор) | 456.6 | OK |
+| PTK-020-R7X20-10M5P2-EAC535 | 20 | R_D7x20 | 7.0 | 11.94 | 20 | 21 | 1.4 | эксцентрик | 84.6 | 101.4 | 32.7 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 114.9 | 129.0 | 85.0 | 211.8 (сепаратор) | 455.0 | OK (Т4) |
+| PTK-020-R6X6-10M5P2-AFCBDF | 20 | R_D6x6 | 6.0 | 11.23 | 20 | 21 | 1.2 | 61812 | 78.0 | 92.4 | 31.0 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 105.9 | 120.0 | 45.0 | 221.3 (сепаратор) | 419.4 | OK |
+| PTK-020-R6X6-10M5P2-CDD24C | 20 | R_D6x6 | 6.0 | 11.93 | 20 | 21 | 1.2 | эксцентрик | 72.6 | 87.0 | 32.7 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 100.5 | 114.0 | 29.0 | 207 (сепаратор) | 398.0 | OK (Т4) |
+| PTK-020-R5X8-10M5P2-04E9EC | 20 | R_D5x8 | 5.0 | 11.23 | 20 | 21 | 1.0 | 61810 | 65.0 | 77.0 | 31.0 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 90.5 | 104.0 | 37.0 | 192.3 (сепаратор) | 358.4 | OK |
+| PTK-020-R5X8-10M5P2-4FDD6C | 20 | R_D5x8 | 5.0 | 11.91 | 20 | 21 | 1.0 | эксцентрик | 60.6 | 72.6 | 32.6 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 86.1 | 100.0 | 37.0 | 138.3 (сепаратор) | 341.0 | OK (Т4) |
+| PTK-020-R5X5-10M5P2-0A0407 | 20 | R_D5x5 | 5.0 | 11.23 | 20 | 21 | 1.0 | 61810 | 65.0 | 77.0 | 31.0 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 90.5 | 104.0 | 33.0 | 128 (сепаратор) | 358.4 | OK |
+| PTK-020-R5X5-10M5P2-67323B | 20 | R_D5x5 | 5.0 | 11.91 | 20 | 21 | 1.0 | эксцентрик | 60.6 | 72.6 | 32.6 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 86.1 | 100.0 | 25.0 | 120 (сепаратор) | 341.0 | OK (Т4) |
+| PTK-020-R3X8-10M5P2-DBE2F2 | 20 | R_D3x8 | 3.0 | 11.74 | 20 | 21 | 0.6 | 61805 | 37.0 | 44.2 | 32.2 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 57.7 | 72.0 | 37.0 | 19.2 (сепаратор) | 228.5 | OK |
+| PTK-020-R3X8-10M5P2-248D14 | 20 | R_D3x8 | 3.0 | 11.84 | 20 | 21 | 0.6 | эксцентрик | 36.6 | 43.8 | 32.5 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 57.3 | 71.0 | 37.0 | 18.2 (сепаратор) | 226.9 | OK (Т4) |
+| PTK-020-B3-10M5P2-74A23C | 20 | B_D3 | 3.0 | 11.84 | 20 | 21 | 0.6 | эксцентрик | 36.6 | 43.8 | 32.5 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 57.3 | 71.0 | 17.0 | 0.1 (сепаратор) | 226.9 | OK (Т2, Т3, Т4) |
+| PTK-025-R8X16-22M6P2-754C59 | 25 | R_D8x16 | 8.0 | 9.47 | 25 | 26 | 1.6 | 61820 | 125.0 | 144.2 | 32.0 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 158.8 | 174.0 | 69.0 | 794.2 (сепаратор) | 1949.4 | OK |
+| PTK-025-R8X16-22M6P2-0F2F2C | 25 | R_D8x16 | 8.0 | 9.67 | 25 | 26 | 1.6 | эксцентрик | 122.0 | 141.2 | 32.6 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 155.8 | 171.0 | 69.0 | 706.6 (сепаратор) | 1912.6 | OK (Т4) |
+| PTK-025-R8X8-22M6P2-2C1E5B | 25 | R_D8x8 | 8.0 | 9.47 | 25 | 26 | 1.6 | 61820 | 125.0 | 144.2 | 32.0 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 158.8 | 174.0 | 57.0 | 778.5 (сепаратор) | 1949.4 | OK |
+| PTK-025-R8X8-22M6P2-391A86 | 25 | R_D8x8 | 8.0 | 9.67 | 25 | 26 | 1.6 | эксцентрик | 122.0 | 141.2 | 32.6 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 155.8 | 171.0 | 37.0 | 760.9 (сепаратор) | 1912.6 | OK (Т4) |
+| PTK-025-R7X20-22M6P2-1327C5 | 25 | R_D7x20 | 7.0 | 9.42 | 25 | 26 | 1.4 | 61817 | 110.0 | 126.8 | 31.9 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 141.4 | 156.0 | 85.0 | 382.3 (сепаратор) | 1735.8 | OK |
+| PTK-025-R7X20-22M6P2-772B35 | 25 | R_D7x20 | 7.0 | 9.67 | 25 | 26 | 1.4 | эксцентрик | 106.8 | 123.6 | 32.6 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 138.2 | 153.0 | 85.0 | 331.7 (сепаратор) | 1696.5 | OK (Т4) |
+| PTK-025-R6X6-10M5P2-505845 | 25 | R_D6x6 | 6.0 | 9.48 | 25 | 26 | 1.2 | 61815 | 95.0 | 109.4 | 31.7 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 122.9 | 137.0 | 45.0 | 324.5 (крепление) | 486.7 | OK |
+| PTK-025-R6X6-10M5P2-D85760 | 25 | R_D6x6 | 6.0 | 9.78 | 25 | 26 | 1.2 | эксцентрик | 91.7 | 106.1 | 32.6 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 119.6 | 134.0 | 29.0 | 315.7 (крепление) | 473.6 | OK (Т4) |
+| PTK-025-R5X8-10M5P2-2182BD | 25 | R_D5x8 | 5.0 | 9.61 | 25 | 26 | 1.0 | 61812 | 78.0 | 90.0 | 32.1 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 103.5 | 117.0 | 45.0 | 238 (сепаратор) | 409.9 | OK |
+| PTK-025-R5X8-10M5P2-E7AF17 | 25 | R_D5x8 | 5.0 | 9.76 | 25 | 26 | 1.0 | эксцентрик | 76.6 | 88.6 | 32.5 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 102.1 | 116.0 | 37.0 | 218.1 (сепаратор) | 404.3 | OK (Т4) |
+| PTK-025-R5X5-10M5P2-01744D | 25 | R_D5x5 | 5.0 | 9.61 | 25 | 26 | 1.0 | 61812 | 78.0 | 90.0 | 32.1 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 103.5 | 117.0 | 45.0 | 189.7 (сепаратор) | 409.9 | OK |
+| PTK-025-R5X5-10M5P2-AC2DD3 | 25 | R_D5x5 | 5.0 | 9.76 | 25 | 26 | 1.0 | эксцентрик | 76.6 | 88.6 | 32.5 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 102.1 | 116.0 | 25.0 | 186.5 (сепаратор) | 404.3 | OK (Т4) |
+| PTK-025-R3X8-10M5P2-70E7B4 | 25 | R_D3x8 | 3.0 | 9.57 | 25 | 26 | 0.6 | 61807 | 47.0 | 54.2 | 32.0 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 67.7 | 82.0 | 37.0 | 31 (сепаратор) | 268.1 | OK |
+| PTK-025-R3X8-10M5P2-A700AA | 25 | R_D3x8 | 3.0 | 9.7 | 25 | 26 | 0.6 | эксцентрик | 46.3 | 53.5 | 32.3 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 67.0 | 81.0 | 37.0 | 28.8 (сепаратор) | 265.3 | OK (Т4) |
+| PTK-025-B3-10M5P2-7EC60B | 25 | B_D3 | 3.0 | 9.7 | 25 | 26 | 0.6 | эксцентрик | 46.3 | 53.5 | 32.3 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 67.0 | 81.0 | 17.0 | 0.2 (сепаратор) | 265.3 | OK (Т2, Т3, Т4) |
+| PTK-032-R8X16-22M6P2-9E294B | 32 | R_D8x16 | 8.0 | 7.72 | 32 | 33 | 1.6 | — | 157.58 | 176.78 | 32.5 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 191.4 | 206.0 | 69.0 | — | 2349.6 | нет |
+| PTK-032-R8X16-10M3P2-B06A75 | 32 | R_D8x16 | 8.0 | 8.01 | 32 | 33 | 1.6 | эксцентрик | 157.6 | 176.8 | 32.5 | 10×M3+2шт Ø3 (M3x12P2) | 2 | 188.2 | 200.0 | 69.0 | 165.6 (крепление) | 248.4 | OK (Т4) |
+| PTK-032-R8X8-22M6P2-12A3E4 | 32 | R_D8x8 | 8.0 | 7.72 | 32 | 33 | 1.6 | — | 157.58 | 176.78 | 32.5 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 191.4 | 206.0 | 37.0 | — | 2349.6 | нет |
+| PTK-032-R8X8-10M3P2-8F3875 | 32 | R_D8x8 | 8.0 | 8.01 | 32 | 33 | 1.6 | эксцентрик | 157.6 | 176.8 | 32.5 | 10×M3+2шт Ø3 (M3x12P2) | 2 | 188.2 | 200.0 | 37.0 | 165.6 (крепление) | 248.4 | OK (Т4) |
+| PTK-032-R7X20-22M6P2-BAC1EE | 32 | R_D7x20 | 7.0 | 7.62 | 32 | 33 | 1.4 | 61822 | 140.0 | 156.8 | 32.2 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 171.4 | 186.0 | 85.0 | 586.1 (сепаратор) | 2104.1 | OK |
+| PTK-032-R7X20-22M6P2-1A4385 | 32 | R_D7x20 | 7.0 | 7.71 | 32 | 33 | 1.4 | эксцентрик | 138.1 | 154.9 | 32.5 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 169.5 | 185.0 | 85.0 | 548.3 (сепаратор) | 2080.8 | OK (Т4) |
+| PTK-032-R6X6-22M6P2-E942C3 | 32 | R_D6x6 | 6.0 | 7.62 | 32 | 33 | 1.2 | 61819 | 120.0 | 134.4 | 32.2 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 149.0 | 164.0 | 57.0 | 531.2 (сепаратор) | 1829.1 | OK |
+| PTK-032-R6X6-22M6P2-D4BE19 | 32 | R_D6x6 | 6.0 | 7.71 | 32 | 33 | 1.2 | эксцентрик | 118.5 | 132.9 | 32.5 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 147.5 | 163.0 | 29.0 | 524.9 (сепаратор) | 1810.7 | OK (Т4) |
+| PTK-032-R5X8-22M6P2-19B83D | 32 | R_D5x8 | 5.0 | 7.62 | 32 | 33 | 1.0 | 61816 | 100.0 | 112.0 | 32.2 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 126.6 | 142.0 | 45.0 | 377.8 (сепаратор) | 1554.1 | OK |
+| PTK-032-R5X8-10M5P2-2CBB5C | 32 | R_D5x8 | 5.0 | 7.79 | 32 | 33 | 1.0 | эксцентрик | 98.9 | 110.9 | 32.4 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 124.4 | 138.0 | 37.0 | 328.4 (крепление) | 492.6 | OK (Т4) |
+| PTK-032-R5X5-22M6P2-793017 | 32 | R_D5x5 | 5.0 | 7.62 | 32 | 33 | 1.0 | 61816 | 100.0 | 112.0 | 32.2 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 126.6 | 142.0 | 45.0 | 307.4 (сепаратор) | 1554.1 | OK |
+| PTK-032-R5X5-10M5P2-3F07B6 | 32 | R_D5x5 | 5.0 | 7.79 | 32 | 33 | 1.0 | эксцентрик | 98.9 | 110.9 | 32.4 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 124.4 | 138.0 | 25.0 | 304.2 (сепаратор) | 492.6 | OK (Т4) |
+| PTK-032-R3X8-10M5P2-1E1E34 | 32 | R_D3x8 | 3.0 | 7.18 | 32 | 33 | 0.6 | 61810 | 65.0 | 72.2 | 30.2 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 85.7 | 100.0 | 37.0 | 70.6 (сепаратор) | 339.4 | OK |
+| PTK-032-R3X8-10M5P2-7AE1CB | 32 | R_D3x8 | 3.0 | 7.74 | 32 | 33 | 0.6 | эксцентрик | 59.8 | 67.0 | 32.2 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 80.5 | 94.0 | 37.0 | 47.5 (сепаратор) | 318.8 | OK (Т4) |
+| PTK-032-B3-10M5P2-DEDB0E | 32 | B_D3 | 3.0 | 7.74 | 32 | 33 | 0.6 | эксцентрик | 59.8 | 67.0 | 32.2 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 80.5 | 94.0 | 17.0 | 0.3 (сепаратор) | 318.8 | OK (Т2, Т3, Т4) |
+| PTK-040-R8X16-22M6P2-0C160E | 40 | R_D8x16 | 8.0 | 6.28 | 40 | 41 | 1.6 | — | 198.3 | 217.5 | 32.5 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 232.2 | 247.0 | 69.0 | — | 2850.5 | нет |
+| PTK-040-R8X16-22M6P2-0343C4 | 40 | R_D8x16 | 8.0 | 6.27 | 40 | 41 | 1.6 | эксцентрик | 198.4 | 217.6 | 32.4 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 232.2 | 247.0 | 69.0 | — | 2850.5 | нет (Т4) |
+| PTK-040-R8X8-22M6P2-95EB68 | 40 | R_D8x8 | 8.0 | 6.28 | 40 | 41 | 1.6 | — | 198.3 | 217.5 | 32.5 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 232.2 | 247.0 | 37.0 | — | 2850.5 | нет |
+| PTK-040-R8X8-22M6P2-201151 | 40 | R_D8x8 | 8.0 | 6.27 | 40 | 41 | 1.6 | эксцентрик | 198.4 | 217.6 | 32.4 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 232.2 | 247.0 | 37.0 | — | 2850.5 | нет (Т4) |
+| PTK-040-R7X20-22M6P2-76A018 | 40 | R_D7x20 | 7.0 | 6.27 | 40 | 41 | 1.4 | — | 173.67 | 190.47 | 32.4 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 205.1 | 220.0 | 85.0 | — | 2517.8 | нет |
+| PTK-040-R7X20-22M6P2-F1EFD7 | 40 | R_D7x20 | 7.0 | 6.27 | 40 | 41 | 1.4 | эксцентрик | 173.7 | 190.5 | 32.4 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 205.1 | 220.0 | 85.0 | — | 2517.8 | нет (Т4) |
+| PTK-040-R6X6-22M6P2-650479 | 40 | R_D6x6 | 6.0 | 6.27 | 40 | 41 | 1.2 | — | 149.04 | 163.44 | 32.4 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 178.1 | 193.0 | 29.0 | — | 2186.4 | нет |
+| PTK-040-R6X6-22M6P2-E2D3CD | 40 | R_D6x6 | 6.0 | 6.26 | 40 | 41 | 1.2 | эксцентрик | 149.1 | 163.5 | 32.4 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 178.1 | 193.0 | 29.0 | 817.4 (сепаратор) | 2186.4 | OK (Т4) |
+| PTK-040-R5X8-22M6P2-A1C64A | 40 | R_D5x8 | 5.0 | 6.23 | 40 | 41 | 1.0 | 61820 | 125.0 | 137.0 | 32.2 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 151.6 | 167.0 | 57.0 | 573.3 (сепаратор) | 1861.0 | OK |
+| PTK-040-R5X8-22M6P2-5D1664 | 40 | R_D5x8 | 5.0 | 6.25 | 40 | 41 | 1.0 | эксцентрик | 124.5 | 136.5 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 151.1 | 166.0 | 37.0 | 562.2 (сепаратор) | 1854.9 | OK (Т4) |
+| PTK-040-R5X5-22M6P2-3F1C4A | 40 | R_D5x5 | 5.0 | 6.23 | 40 | 41 | 1.0 | 61820 | 125.0 | 137.0 | 32.2 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 151.6 | 167.0 | 57.0 | 475.8 (сепаратор) | 1861.0 | OK |
+| PTK-040-R5X5-22M6P2-2DF37C | 40 | R_D5x5 | 5.0 | 6.25 | 40 | 41 | 1.0 | эксцентрик | 124.5 | 136.5 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 151.1 | 166.0 | 25.0 | 473.9 (сепаратор) | 1854.9 | OK (Т4) |
+| PTK-040-R3X8-10M5P2-C1B79F | 40 | R_D3x8 | 3.0 | 6.09 | 40 | 41 | 0.6 | 61812 | 78.0 | 85.2 | 31.3 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 98.7 | 113.0 | 45.0 | 88.7 (сепаратор) | 390.9 | OK |
+| PTK-040-R3X8-10M5P2-4EE27D | 40 | R_D3x8 | 3.0 | 6.29 | 40 | 41 | 0.6 | эксцентрик | 75.2 | 82.4 | 32.2 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 95.9 | 110.0 | 37.0 | 74.2 (сепаратор) | 379.8 | OK (Т4) |
+| PTK-040-B3-10M5P2-80BC3D | 40 | B_D3 | 3.0 | 6.29 | 40 | 41 | 0.6 | эксцентрик | 75.2 | 82.4 | 32.2 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 95.9 | 110.0 | 17.0 | 0.5 (сепаратор) | 379.8 | OK (Т2, Т3, Т4) |
+| PTK-050-R8X16-22M6P2-986467 | 50 | R_D8x16 | 8.0 | 5.09 | 50 | 51 | 1.6 | — | 249.21 | 268.41 | 32.4 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 283.1 | 298.0 | 69.0 | — | 3475.3 | нет |
+| PTK-050-R8X16-22M6P2-0C64BB | 50 | R_D8x16 | 8.0 | 5.08 | 50 | 51 | 1.6 | эксцентрик | 249.3 | 268.5 | 32.4 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 283.1 | 298.0 | 69.0 | — | 3475.3 | нет (Т4) |
+| PTK-050-R8X8-22M6P2-84F4C5 | 50 | R_D8x8 | 8.0 | 5.09 | 50 | 51 | 1.6 | — | 249.21 | 268.41 | 32.4 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 283.1 | 298.0 | 37.0 | — | 3475.3 | нет |
+| PTK-050-R8X8-22M6P2-ED6334 | 50 | R_D8x8 | 8.0 | 5.08 | 50 | 51 | 1.6 | эксцентрик | 249.3 | 268.5 | 32.4 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 283.1 | 298.0 | 37.0 | — | 3475.3 | нет (Т4) |
+| PTK-050-R7X20-22M6P2-CE97E4 | 50 | R_D7x20 | 7.0 | 5.08 | 50 | 51 | 1.4 | — | 218.25 | 235.05 | 32.4 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 249.7 | 265.0 | 85.0 | — | 3065.3 | нет |
+| PTK-050-R7X20-22M6P2-DD4090 | 50 | R_D7x20 | 7.0 | 5.08 | 50 | 51 | 1.4 | эксцентрик | 218.3 | 235.1 | 32.4 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 249.7 | 265.0 | 85.0 | — | 3065.3 | нет (Т4) |
+| PTK-050-R6X6-22M6P2-4DCB40 | 50 | R_D6x6 | 6.0 | 5.08 | 50 | 51 | 1.2 | — | 187.3 | 201.7 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 216.3 | 231.0 | 29.0 | — | 2655.3 | нет |
+| PTK-050-R6X6-22M6P2-3E50C6 | 50 | R_D6x6 | 6.0 | 5.08 | 50 | 51 | 1.2 | эксцентрик | 187.3 | 201.7 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 216.3 | 231.0 | 29.0 | — | 2655.3 | нет (Т4) |
+| PTK-050-R5X8-22M6P2-1D56A2 | 50 | R_D5x8 | 5.0 | 5.07 | 50 | 51 | 1.0 | — | 156.34 | 168.34 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 183.0 | 198.0 | 37.0 | — | 2246.5 | нет |
+| PTK-050-R5X8-22M6P2-7B07E5 | 50 | R_D5x8 | 5.0 | 5.07 | 50 | 51 | 1.0 | эксцентрик | 156.4 | 168.4 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 183.0 | 198.0 | 37.0 | 878.7 (сепаратор) | 2246.5 | OK (Т4) |
+| PTK-050-R5X5-22M6P2-20A347 | 50 | R_D5x5 | 5.0 | 5.07 | 50 | 51 | 1.0 | — | 156.34 | 168.34 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 183.0 | 198.0 | 25.0 | — | 2246.5 | нет |
+| PTK-050-R5X5-22M6P2-1AD71F | 50 | R_D5x5 | 5.0 | 5.07 | 50 | 51 | 1.0 | эксцентрик | 156.4 | 168.4 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 2 | 183.0 | 198.0 | 25.0 | 738.4 (сепаратор) | 2246.5 | OK (Т4) |
+| PTK-050-R3X8-10M5P2-E6B80C | 50 | R_D3x8 | 3.0 | 5.07 | 50 | 51 | 0.6 | 61815 | 95.0 | 102.2 | 32.0 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 115.7 | 130.0 | 45.0 | 119.4 (сепаратор) | 458.2 | OK |
+| PTK-050-R3X8-10M5P2-4AFC2C | 50 | R_D3x8 | 3.0 | 5.1 | 50 | 51 | 0.6 | эксцентрик | 94.5 | 101.7 | 32.1 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 115.2 | 129.0 | 37.0 | 116.3 (сепаратор) | 456.2 | OK (Т4) |
+| PTK-050-B3-10M5P2-7415AD | 50 | B_D3 | 3.0 | 5.1 | 50 | 51 | 0.6 | эксцентрик | 94.5 | 101.7 | 32.1 | 10×M5+2шт Ø5 (M5x12P2) | 2 | 115.2 | 129.0 | 17.0 | 0.8 (сепаратор) | 456.2 | OK (Т2, Т3, Т4) |
+| PTK-063-R8X16-22M6P2-DDA520 | 63 | R_D8x16 | 8.0 | 4.08 | 63 | 64 | 1.6 | — | 315.39 | 334.59 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 349.2 | 364.0 | 69.0 | — | 4286.8 | нет |
+| PTK-063-R8X16-22M6P2-DA30EE | 63 | R_D8x16 | 8.0 | 4.08 | 63 | 64 | 1.6 | эксцентрик | 315.4 | 334.6 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 349.2 | 364.0 | 69.0 | — | 4286.8 | нет (Т4) |
+| PTK-063-R8X8-22M6P2-C47FC5 | 63 | R_D8x8 | 8.0 | 4.08 | 63 | 64 | 1.6 | — | 315.39 | 334.59 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 349.2 | 364.0 | 37.0 | — | 4286.8 | нет |
+| PTK-063-R8X8-22M6P2-D0C75B | 63 | R_D8x8 | 8.0 | 4.08 | 63 | 64 | 1.6 | эксцентрик | 315.4 | 334.6 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 349.2 | 364.0 | 37.0 | — | 4286.8 | нет (Т4) |
+| PTK-063-R7X20-22M6P2-87BC1B | 63 | R_D7x20 | 7.0 | 4.08 | 63 | 64 | 1.4 | — | 276.22 | 293.02 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 307.7 | 323.0 | 85.0 | — | 3777.3 | нет |
+| PTK-063-R7X20-22M6P2-E7C184 | 63 | R_D7x20 | 7.0 | 4.07 | 63 | 64 | 1.4 | эксцентрик | 276.3 | 293.1 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 307.7 | 323.0 | 85.0 | — | 3777.3 | нет (Т4) |
+| PTK-063-R6X6-22M6P2-F361EE | 63 | R_D6x6 | 6.0 | 4.07 | 63 | 64 | 1.2 | — | 237.04 | 251.44 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 266.1 | 281.0 | 29.0 | — | 3266.6 | нет |
+| PTK-063-R6X6-22M6P2-7D2FF2 | 63 | R_D6x6 | 6.0 | 4.07 | 63 | 64 | 1.2 | эксцентрик | 237.1 | 251.5 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 266.1 | 281.0 | 29.0 | — | 3266.6 | нет (Т4) |
+| PTK-063-R5X8-22M6P2-ECA0D7 | 63 | R_D5x8 | 5.0 | 4.06 | 63 | 64 | 1.0 | — | 197.86 | 209.86 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 224.5 | 240.0 | 37.0 | — | 2756.0 | нет |
+| PTK-063-R5X8-22M6P2-51F025 | 63 | R_D5x8 | 5.0 | 4.06 | 63 | 64 | 1.0 | эксцентрик | 197.9 | 209.9 | 32.2 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 224.5 | 240.0 | 37.0 | — | 2756.0 | нет (Т4) |
+| PTK-063-R5X5-22M6P2-A81518 | 63 | R_D5x5 | 5.0 | 4.06 | 63 | 64 | 1.0 | — | 197.86 | 209.86 | 32.3 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 224.5 | 240.0 | 25.0 | — | 2756.0 | нет |
+| PTK-063-R5X5-22M6P2-64F71F | 63 | R_D5x5 | 5.0 | 4.06 | 63 | 64 | 1.0 | эксцентрик | 197.9 | 209.9 | 32.2 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 224.5 | 240.0 | 25.0 | — | 2756.0 | нет (Т4) |
+| PTK-063-R3X8-22M6P2-BDBB72 | 63 | R_D3x8 | 3.0 | 4.02 | 63 | 64 | 0.6 | 61819 | 120.0 | 127.2 | 32.0 | 22×M6+2шт Ø6 (M6x24P2) | 1 | 141.8 | 157.0 | 57.0 | 188.1 (сепаратор) | 1740.7 | OK |
+===== END FILE =====
+
+## Регистры
+
+===== FILE: specs/DECISIONS.md (строки 97–97) =====
+- Д-41: допускаемый момент (egm/ptk_force.py): R_i = R_max·sin φ_i на 0 < φ < π, реакции (8), (9) без трения; Герц тело/наружное кольцо и тело/венец (венец — плоскость), [σ_H] — sigma_H_line/sigma_H_point; статика подшипника R_max·|Σ sin φ·e| ≤ C0/s0_brg; худшее из 8 положений генератора; M = min(M_H, M_B, M крепл./safety), ограничение — в SPEC-10; ошибка — только M < M_min; не учтены: трение (11), ресурс подшипника, контакт тело/паз (OQ-08, CP-31).
+===== END FILE =====
+
+===== FILE: specs/DECISIONS.md (строки 262–262) =====
+- Д-41: допускаемый момент (egm/ptk_force.py): R_i = R_max·sin φ_i на 0 < φ < π, реакции (8), (9) без трения; Герц тело/наружное кольцо и тело/венец (венец — плоскость), [σ_H] — sigma_H_line/sigma_H_point; статика подшипника R_max·|Σ sin φ·e| ≤ C0/s0_brg; худшее из 8 положений генератора; M = min(M_H, M_B, M крепл./safety), ограничение — в SPEC-10; ошибка — только M < M_min; не учтены: трение (11), ресурс подшипника, контакт тело/паз (OQ-08, CP-31).
+===== END FILE =====
+
+===== FILE: specs/DECISIONS.md (строки 471–471) =====
+- Д-41: допускаемый момент (egm/ptk_force.py): R_i = R_max·sin φ_i на 0 < φ < π, реакции (8), (9) без трения; Герц тело/наружное кольцо и тело/венец (венец — плоскость), [σ_H] — sigma_H_line/sigma_H_point; статика подшипника R_max·|Σ sin φ·e| ≤ C0/s0_brg; худшее из 8 положений генератора; M = min(M_H, M_B, M крепл./safety), ограничение — в SPEC-10; ошибка — только M < M_min; не учтены: трение (11), ресурс подшипника, контакт тело/паз (OQ-08, CP-31).
+===== END FILE =====
+
+===== FILE: specs/DECISIONS.md (строки 543–543) =====
+- Д-116: предел сепаратора входит в момент, постановка переворачивается (2026-11-15; CP-94, CP-95, CP-96; уточняет Д-41): (1) момент исполнения — `M = min(M_H, M_B, t_hold/safety, M_sep)`, где `M_sep` — предел по переносу момента через ряд окон, изгибу перемычки и контакту ролика в окне; до его появления «✓» в SPEC-10 недостоверен (K20 проходит с 1160.5 Н·м при оценке предела сепаратора 250…500 Н·м). (2) Постановка шага 1 меняется: на входе требуемый момент `M_req`, на выходе — Dш, R_Σ (через обод), тип генератора и крепление при минимальном габарите; крепление подбирается по моменту, а не берётся наименьшим. (3) `gen_type: rim` (подшипник плюс обод) — штатный способ отвязать R_Σ от каталога подшипников. Обоснование: M ≈ R_max·u·a_ω·Σsin²φ — радиус центров тел R_Σ на момент по контакту не влияет, но окружная сила на сепаратор F_t = M/R_Σ падает с ростом R_Σ, а толщина стенки t = 2.2·a_ω растёт только с Dш. Порядок работ: CP-94 → CP-97 → CP-96 → CP-95.
+===== END FILE =====
+
+===== FILE: specs/DECISIONS.md (строки 545–545) =====
+- Д-118: доработка предела сепаратора (2026-11-16; CP-98, развивает Д-116 по итогам прогона CP-94): (1) `M_sep` выводится в двух видах — `M_row` (предел по одному ряду окон, референс, без переноса момента через дальние ряды) и `M_pack` (пакет целиком, как сейчас); разница между ними показывает вклад переноса через ряд и, следовательно, потенциал межрядного усиления; (2) межрядное усиление сепаратора (усиливающие пояса/буртики между рядами окон) — допустимый способ поднять несущую способность, потому что кинематическое кольцо `t = 2.2·a_ω` по стенке ряда поднимать нельзя, а межрядные зоны в кинематике не участвуют; (3) ограничения по моменту выводятся раздельно для трёх контактов тела качения — с генератором, с венцом и со стороной окна сепаратора — с указанием, какой контакт первый; (4) после цикла доработок несущая способность сепаратора вырастет и K10 (Ø10) становится актуальным (OQ-45 закрывается пересчётом SPEC-10/11). Обоснование: прогон CP-94 дал K20 M_sep 188.1 Н·м при M_H 4124.9 — то есть сепаратор ограничивает в 22 раза раньше контакта, и именно его несущую способность надо поднимать, а не перебирать тела.
+===== END FILE =====
+
+===== FILE: specs/DECISIONS.md (строки 640–641) =====
+| OQ-44 | Допускаемое напряжение в перемычке сепаратора (CP-94): концентратор K в углах окон, скругление, требование по запасу S_sep и учёт кромочного контакта ролика со стенкой 1.32 мм; от ответа зависит M_sep и, следовательно, достоверность «✓» по всем исполнениям | открыт; прогон rev13.9: K20 M_sep 188.1 Н·м (изгиб), σ рамы 85 + σ ряда 16 = 101.8 = [σ], σ_H 463 при [σ_H] 880 → контакт не лимитирует, значит K и S задают предел целиком; проверить: K 2.0 для острых углов (скругление r ≥ 0.3 мм), S 2.5 при многоцикловой усталости, и нужен ли учёт кольца-пояса между рядами (сейчас жёсткая заделка — нижняя оценка σ) |
+| OQ-45 | Отрицательный пример после CP-94 (rev13.9): с падением M у K20 в 6 раз упал T_вх, и K10 (Ø10) прошёл по валу и шпонке — отрицательного примера в наборе проработок больше нет. Решение отложено до CP-98: после цикла доработок сепаратора (Д-118) несущая способность вырастет и K10 станет актуальным — тогда отрицательный пример подбирается по новому M (либо отдельный заведомо негодный кейс в self_test) | открыт |
+===== END FILE =====
+
+===== FILE: specs/DECISIONS.md (строки 643–643) =====
+| OQ-46 | Межрядное усиление сепаратора (Д-118, CP-98): усиливающие пояса/буртики между рядами окон, бандаж или накатка межрядной зоны — конструктив, технология (точёный сепаратор, паяный/сварной пакет, посадка бандажа с натягом), проверка жёсткости пояса EI и σ_см/τ в нём, влияние на балансировку и массу; критерий — рост M_sep при сохранении габарита; до ответа рама Виренделя считается с жёсткой заделкой (нижняя оценка σ) | открыт |
+===== END FILE =====
+===== FILE: specs/CODE_PLAN.md (строки 75–79) =====
+| CP-94 | Предел по переносу момента через ряд окон (M_sep) — расчётная проверка шага 1, которой сейчас нет. Факт: `M = min(M_H, M_B, t_hold/safety)` (`egm/ptk.py`), сепаратор в минимум не входит, поэтому K20 проходит с «✓» при M 1160.5 Н·м, а оценка модели даёт предел сепаратора 250…500 Н·м. Три проверки: (1) перенос момента через ряд окон у выходного торца — рама Виренделя: V = M_ряд/(n·R_Σ), M_изг = V·L_окн/2, W = t·b²/6, σ = M_изг/W (K20: ≈450 МПа при 1160.5, ≈600 при полном моменте); (2) местный изгиб перемычки нагрузкой своего ряда — балка с заделкой, L = L_окн, W = t·b²/6 (≈100/200 МПа при F 300/600 Н); (3) контакт тела со стороной окна — Герц по линии l = L_окн (σH ≈ 960/1360 МПа) плюс кромочный контакт (ролик доходит до края стенки 1.32 мм). Допускаемое — многоцикловая усталость (нагружение на каждый оборот входа): [σ] = σ₋₁/(K·S), K ≈ 2 в углах окон (40Х: σ₋₁ 509, S 2.5 → ≈100 МПа). Стенка t = 2.2·a_ω задана кинематикой (запас по `sep_web_min` 0.06 мм), поднимать нельзя; рычаги — b через n, L_окн = длина ролика + зазор, скругление углов, путь момента. Выход: M_sep в min(...), M_by «сепаратор», причина sep_why, SUP-коэффициенты (K_окн, S_sep, k_edge) в ptk_input, глоссарий в ptk_doc, пересчёт K10/K20 — ожидается падение M до 250…500 Н·м и смена M_by, self_test на K20 (σ перемычки ≤ [σ]) | egm/ptk.py, egm/ptk_force.py, egm/ptk_profile.py, egm/ptk_doc.py, specs/SPEC-10_PTK_CALC.md, specs/ptk_input.yaml, docs/Силовой расчет ПТК/Силовой расчет ПТК.md | Д-116, Д-41, OQ-08 | CP-32 | закрыт (rev13.9, прогон принят заказчиком 2026-11-16; доработка — CP-98): ptk_force — torque() отдаёт k_sep (max sin φ·R_о/R на 1 Н·мм момента ряда, худшая из 8 фаз), _sep/sep_check/sep_limit; три механизма — рама Виренделя V = M·(rows − ½)/(rows·n·R_Σ), M_изг = V·L/2; свой ряд F = k_sep·M/rows, балка с заделкой F·L/12; сумма у одного торца σ = (V·L/2 + F·L/12)/W, W = t·b²/6; контакт Герц тело/плоскость на min(l, L) × sep_k_edge; [σ] = σ₋₁/(K·S). M_sep в min(...), M_by «сепаратор», sep_why, sep_chk (V, F, sig_frame, sig_row, sig_b, sig_allow, sig_H, u_b, u_H, by, edge, b_H). ptk_input: sep_sigma_m1 509, sep_K 2.0, sep_S 2.5, sep_sigma_H 880, sep_k_edge 1.2 (в ID не входят); глоссарий ptk_doc, колонка M_sep в SPEC-10, теория в theory_md. Прогон: self-test OK, publish rc=0. **K20: M 1160.5 → 188.1 Н·м, M_by «сепаратор», M_sep 188.1 (σ рамы + σ ряда = 101.8 = [σ]), σ_H 463 << 880, M_H 4124.9 — то есть запас по контакту был 22-кратный, а реальный предел задаёт изгиб перемычки.** Следствие: вместе с M упал T_вх, K10 перестал быть отрицательным примером — OQ‑45. K, S, k_edge, [σ_H] — OQ‑44 |
+| CP-95 | Инверсия постановки: вход — требуемый момент M_req, выход — Dш, R_Σ (через обод), тип генератора и крепление при минимальном габарите D. Сейчас задаётся u, перебираются тела и крепления, минимизируется габарит, а M получается следствием (`ptk.py`, шаг 1); крепление берётся наименьшее и его предел становится M (K20: крепл./safety = 1740.7/1.5 → 1160.5). Нужно: `M_req` в ptk_input, решение перебором по (Dш, R_Σ, gen_type, крепление) с отбором по всем пределам (M_H, M_B, M_крепл, M_sep) и минимумом D; крепление подбирается по моменту, а не «первое наименьшее»; таблица исполнений SPEC-10 получает колонку «M_req»; меняются ID исполнений (Д-80). Порядок: после CP-94 | egm/ptk.py, egm/ptk_doc.py, specs/SPEC-10_PTK_CALC.md, specs/ptk_input.yaml | Д-116, Д-41, Д-80 | CP-94 | открыт |
+| CP-96 | `gen_type: rim` (подшипник плюс обод) — новый тип генератора: геометрия свободна как у `eccentric` (Dг с шагом `dgen_step`), качение как у `bearing`. Подшипник садится на минимальный радиус эксцентрика, дорожка обода имеет длину ровно l, обод закаливается как дорожка под ролик. Сейчас у `bearing` Dг жёстко равен D подшипника и контакт по min(l, B), у `eccentric` — скольжение (OQ-10). Проверки: жёсткость обода на изгиб (тела нагружают половину окружности, тонкий обод сплющивается в овал — иначе распределение нагрузки по телам плывёт), C0 малого подшипника (Dг обода разгружает контакт, но уменьшает подшипник → M_B может стать главным; вариант — шире или игольчатый), посадка обода на наружное кольцо с натягом, масса и инерция входа. GEN_TYPES, ptk_input gen_types, выбор подшипника по C0 | egm/ptk.py, egm/ptk_profile.py, egm/ptk_doc.py, specs/ptk_input.yaml, specs/SPEC-10_PTK_CALC.md, specs/vendor_prices.yaml | Д-116, Д-40, OQ-10 | CP-94 | открыт |
+| CP-97 | Каталог тел качения 4–6 мм (`specs/vendor_prices.yaml` → rollers): сейчас только R_D2x4, R_D3x8, B_D3, поэтому Dш не растёт — перебирать нечего. При u 63 потолок Dш 4.02 мм по `d_out_max` 200 (D 157), при u 80/100 тело 3 мм уже не помещается. Добавить Dш 4, 5, 6 мм с длинами l и ценами, пометив, какие подтверждены поставщиком (как OQ-26 для штифтов). Ловушка: длинный ролик поднимает контакт, но удлиняет окно, а изгиб перемычки растёт ∝ l² — для сепаратора лучше больше коротких рядов, чем длинные ролики; выбор тел согласуется с CP-94/CP-96 | specs/vendor_prices.yaml, egm/ptk.py (GEOM/каталог тел), specs/ptk_input.yaml | CP-94, CP-96 | CP-96 | открыт |
+| CP-98 | Д-118: доработка M_sep по итогам прогона CP-94 (заказчик, 2026-11-16). (1) **Момент по одному ряду как референс.** Сейчас M_sep считается для пакета целиком; нужен второй выход — `M_row` по одному ряду окон (свой ряд, без переноса через дальние) и `M_pack` как есть; в SPEC-10 обе колонки, в `sep_chk` — `M_row`, `n_row_lim` (какой ряд первый достигает [σ]); смысл: видно, сколькоmoment «съедает» перенос через ряд и сколько даёт межрядное усиление. (2) **Межрядное усиление сепаратора (OQ-46).** Кольца-пояса между рядами сейчас считаются жёсткой заделкой; вариант — усиливающие буртики/утолщения между рядами окон в пакете (локальное увеличение t в межрядной зоне, бандаж, накатка), тогда рама Виренделя работает не на изгиб перемычки, а на срез пояса; проверка: жёсткость пояса (EI кольца), σ_см/τ в поясе, влияние на t = 2.2·a_ω кинематического кольца (поднимать t ряда нельзя — только межрядные зоны). Критерий — рост M_sep при сохранении габарита и массы. (3) **Ограничения по моменту для тел качения.** Отдельный выход: `M_body_*` — предел по контакту тела с генератором, с венцом и в окне сепаратора по отдельности (сейчас σ_H в окне виден только как `sep_chk.sig_H`, а M_H — общий минимум по генератору и венцу), плюс `M_by_body` — какое из трёх тел-контактов первое. (4) После цикла доработок несущая способность сепаратора вырастет — **K10 (Ø10) станет актуальным** (OQ-45), пересчитать SPEC-10/11 и снять избыточность фланца CP-92 и вала SH-20 при новом M. Приёмка: self_test фиксирует M_row < M_sep, рост M_sep при усилении пояса, три M_body_* положительны и M = min(всех) | egm/ptk_force.py, egm/ptk.py, egm/ptk_parts.py, egm/ptk_doc.py, specs/SPEC-10_PTK_CALC.md, templates/SPEC-10_PTK_CALC.md.tmpl, specs/ptk_input.yaml, docs/Силовой расчет ПТК/Силовой расчет ПТК.md | Д-118, Д-116, OQ-44, OQ-46, OQ-45 | CP-94 | открыт — первый по порядку, до CP-95 |
+===== END FILE =====
+
+## Силовой расчёт: сепаратор
+
+(docs/Силовой расчет ПТК/Силовой расчет ПТК.md: /перемычк/ не найден)
+
+## Точка регистрации self_test
+
+===== FILE: main.py (строки 207–215) =====
+                           ("hub", __import__("egm.cad.ptk_hub", fromlist=["self_test"]).self_test),
+                           ("shaft_cad", __import__("egm.cad.ptk_shaft", fromlist=["self_test"]).self_test),
+                           ("materials", __import__("egm.materials", fromlist=["self_test"]).self_test),
+                           ("tech_proc", __import__("egm.tech_proc", fromlist=["self_test"]).self_test),
+                           ("materials_cfg", __import__("egm.materials", fromlist=["check_repo"]).check_repo),
+                           ("srccheck", __import__("egm.srccheck", fromlist=["self_test"]).self_test),
+                           ("join", __import__("egm.ptk_join", fromlist=["self_test"]).self_test),
+                           ("shafts", shafts.self_test),
+                           ("shafts_cfg", shafts.check_repo),
+===== END FILE =====
+
+## Выжимка чисел K20 (сгенерировано)
+
+| Поле | Значение |
+|---|---|
+| `u` | 63 |
+| `z` | 64 |
+| `R_sum` | 61.5 |
+| `Dgen` | 120.0 |
+| `Drol` | 3.0 |
+| `d_out` | 157.0 |
+| `width` | 57.0 |
+| `M` | 188.1 |
+| `M_by` | сепаратор |
+| `M_H` | 4124.9 |
+| `M_B` | 2842.4 |
+| `M_sep` | 188.1 |
+| `t_hold` | 1740.7 |
+| `safety` | None |
+| `ok` | True |
+| `errors` | [] |
+| `sep_chk` | V 42.4797, F 48.549, sig_frame 85.4968, sig_row 16.2854, sig_b 101.7821, sig_allow 101.8, sig_H 462.5723, sigH_allow 880.0, u_b 0.9998, u_H 0.2763, by изгиб, edge 0.06, b_H 0.01 |
+
+| Проработка | ok | R_Σ | t сепаратора | web | окна | M | .09 |
+|---|---|---|---|---|---|---|---|
+| K10 | True | None | 0.00 | None | None×None | None | 61808 |
+| K20 | True | None | 0.00 | None | None×None | None | 61810 |
