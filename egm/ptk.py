@@ -44,6 +44,11 @@ class PtkLimits:
     sigma_H_line: float = 2500.0  # допускаемое σ_H, линейный контакт (ролик), МПа (OQ-08)
     sigma_H_point: float = 3000.0  # допускаемое σ_H, точечный контакт (шарик), МПа (OQ-08)
     s0_brg: float = 1.0           # запас статической грузоподъёмности подшипника, C0/P0
+    sep_sigma_m1: float = 509.0   # σ₋₁ материала сепаратора, МПа (40Х, materials.yaml; CP-94)
+    sep_K: float = 2.0            # концентрация напряжений в углах окон сепаратора (OQ-44)
+    sep_S: float = 2.5            # запас многоцикловой усталости перемычки (OQ-44)
+    sep_sigma_H: float = 880.0    # допускаемое σ_H тело/сторона окна сепаратора, МПа (OQ-44)
+    sep_k_edge: float = 1.2       # рост σ_H у кромки стенки окна — кромочный контакт (OQ-44)
     M_min: float = 0.0            # требуемый выходной момент, Н·м; 0 — не проверяется (Д-41)
     gen_types: tuple = ("bearing", "eccentric")   # генераторы для расчёта (Д-42)
     dgen_step: float = 0.1        # округление вверх D_г эксцентрика без подшипника, мм (Д-42)
@@ -101,8 +106,10 @@ class PtkResult:
     t_hold: float = 0.0
     M_H: float = 0.0              # допускаемый момент по Герцу, Н·м (Д-41)
     M_B: float = 0.0              # то же по C0 подшипника, Н·м
+    M_sep: float = 0.0            # предел по сепаратору, Н·м (CP-94, Д-116)
     M: float = 0.0                # допускаемый выходной момент, Н·м
-    M_by: str = ""                # что ограничивает M: контакт | подшипник | крепление
+    M_by: str = ""                # что ограничивает M: контакт | подшипник | крепление | сепаратор
+    sep_why: str = ""             # причина M_sep: механизм, напряжения, [σ] (CP-94)
     ring_variants: int = 0
     phasing: list = field(default_factory=list)
     parts: list = field(default_factory=list)
@@ -113,6 +120,7 @@ class PtkResult:
     tech: list = field(default_factory=list)      # коды TECH (Д-45)
     excluded: str = ""                            # код TECH, по которому исключено из SPEC-10
     sep: dict = field(default_factory=dict)       # сепаратор .02 (Д-46)
+    sep_chk: dict = field(default_factory=dict)   # проверка сепаратора при M (CP-94)
     ecc: dict = field(default_factory=dict)       # эксцентрик .03 (Д-46)
     spacer: dict = field(default_factory=dict)    # шайбы .05 (Д-53)
 
@@ -436,7 +444,13 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
         cand = [(r.M_H, "контакт"), (round(r.t_hold / holes.safety, 1), "крепление")]
         if brg is not None:
             cand.append((r.M_B, "подшипник"))
+        sep_in = (r.sep, t["k_sep"], D, rol["l"], rol.get("type", "roller"), lim.rows, R, a, lim)
+        if r.sep:                                        # Д-116, CP-94: предел сепаратора
+            r.M_sep, r.sep_why = ptk_force.sep_limit(*sep_in)
+            cand.append((r.M_sep, "сепаратор"))
         r.M, r.M_by = min(cand)
+        if r.sep:
+            r.sep_chk = ptk_force.sep_check(r.M, *sep_in)
         if r.M < lim.M_min:
             r.errors.append(f"M {r.M:g} < M_min {lim.M_min:g} Н·м, ограничивает: {r.M_by} (Д-41)")
     if gen == "eccentric":                               # Д-45
@@ -562,8 +576,9 @@ def self_test():
     sp = [p for p in r.parts if ".05" in p["id"]]                 # Д-53: шаг = l — один вариант
     assert [p["id"][-4:] for p in sp] == [".05A"] and sp[0]["pos"] == [0, 1, 2, 3, 4], sp
     assert abs(sum(x["h"] for x in r.spacer["pos"]) + 4 * 8.0 - r.width) < 1e-6, r.spacer
-    assert r.M > 0 and r.M_by in ("контакт", "подшипник", "крепление"), (r.M, r.M_by)
-    assert r.M <= min(r.M_H, r.M_B, r.t_hold / holes.safety) + 0.1                # Д-41
+    assert r.M > 0 and r.M_by in ("контакт", "подшипник", "крепление", "сепаратор"), (r.M, r.M_by)
+    assert r.M <= min(r.M_H, r.M_B, r.t_hold / holes.safety, r.M_sep) + 0.1       # Д-41, Д-116
+    assert r.M_sep > 0 and r.sep_chk["sig_b"] <= r.sep_chk["sig_allow"], r.sep_chk   # CP-94
     assert not calc(19, "t", b, PtkLimits(M_min=1e6), holes, fast, bears).ok
     assert not calc(19, "t", b, lim, holes, fast, {}).ok                         # нет подшипника
     assert c(19, rol={**b, "a_w": 0.5}).alpha_max < r.alpha_max   # меньше a_ω — меньше α
@@ -572,7 +587,7 @@ def self_test():
     assert e.ok and not e.bearing and e.gen == "eccentric", e.errors
     assert e.Dgen >= lim.shaft_d_min + 2 * (e.a_w + lim.ecc_wall_min) - 1e-9
     assert abs(2 * e.R_sum - e.Dgen - e.Drol) < 1e-3 and e.M_B == 0.0
-    assert e.M_by in ("контакт", "крепление") and e.id != r.id, (e.M_by, e.id)
+    assert e.M_by in ("контакт", "крепление", "сепаратор") and e.id != r.id, (e.M_by, e.id)
     assert e.width == 4 * 8.0 + 5 * lim.row_gap
     assert "Т4" in e.tech and not r.tech, (e.tech, r.tech)
     bb = c(10, rol={"type": "ball", "d": 2.0, "l": 2.0})          # Д-45: шарик на подшипнике
@@ -617,6 +632,18 @@ def self_test():
     assert [p["id"] for p in c(62).parts if ".01" in p["id"]] == [c(62).id + ".01A", c(62).id + ".01B"]
     rows = [asdict(c(20)), asdict(c(62))]
     assert find(rows, c(62).id + ".01B")["u"] == 62
+    # CP-94: K20 = PTK-063-R3X8-22M6P2-BDBB72 (SPEC-10: 61819, 22×M6+2×Ø6, D ≤ 200) —
+    # сепаратор ограничивает M: σ перемычки ≤ [σ], M_sep < M_H, M_by «сепаратор» (Д-116)
+    k20 = calc(63, "R_D3x8", {"type": "roller", "d": 3.0, "l": 8.0}, PtkLimits(d_out_max=200.0),
+               RingHoles(bolt="M6", n=22, pins=2, pin_d=6.0),
+               {"M6": {"d_clear": 6.6, "dk": 10.0, "F_M": 9.3}},
+               {"61819": {"d": 95.0, "D": 120.0, "B": 13.0, "C": 19.9, "C0": 18.8}})
+    assert k20.ok and k20.id == "PTK-063-R3X8-22M6P2-BDBB72", (k20.id, k20.errors)
+    assert abs(k20.t_hold - 1740.7) < 0.1 and k20.sep["web"] == 3.015, (k20.t_hold, k20.sep)
+    assert k20.M_by == "сепаратор" and k20.M == k20.M_sep < k20.M_H, (k20.M, k20.M_sep, k20.M_H)
+    s20 = k20.sep_chk
+    assert 120.0 < k20.M_sep < 300.0 and s20["by"] == "изгиб", (k20.M_sep, s20)
+    assert s20["sig_b"] <= s20["sig_allow"] and s20["sig_H"] < s20["sigH_allow"], s20
     return True
 
 
