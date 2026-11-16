@@ -65,7 +65,7 @@ def torque(n, z, a, R, D, l, kind, brg, lim, rows):
     brg = None — тела на эксцентрике (Д-42): пара тело/эксцентрик на всей длине l, M_B нет."""
     Fg, Fv = pair_limits(D, l, kind, 2 * R - D, brg["B"] if brg else l, lim,
                          kind == "ball" and brg is None)
-    MH = MB = math.inf
+    MG = MV = MB = math.inf        # CP-98: M_H = min(MG — тело/генератор, MV — тело/венец)
     k_sep = 0.0                    # CP-94: max сила тела на окно / M ряда, 1/мм
     for j in range(K_PHASE):
         s_max = srv = mom = bx = by = so = 0.0
@@ -84,41 +84,66 @@ def torque(n, z, a, R, D, l, kind, brg, lim, rows):
         if mom <= 0:
             continue
         k_sep = max(k_sep, so / mom)
-        MH = min(MH, min(Fg / s_max, Fv / srv) * mom / 1000)
+        MG = min(MG, Fg / s_max * mom / 1000)
+        MV = min(MV, Fv / srv * mom / 1000)
         if brg:
             MB = min(MB, brg["C0"] * 1000 / (lim.s0_brg * math.hypot(bx, by)) * mom / 1000)
+    MH = min(MG, MV)
     if math.isinf(MH):
-        MH = MB = 0.0
+        MH = MG = MV = MB = 0.0
     return {"M_H": round(rows * MH, 1), "M_B": round(rows * MB, 1) if brg else None,
+            "M_g": round(rows * MG, 1), "M_v": round(rows * MV, 1),
             "F_g": round(Fg, 1), "F_v": round(Fv, 1), "k_sep": k_sep}
 
 
 def _sep(M, sep, k_sep, D, l, kind, rows, R, lim):
-    """Сепаратор при моменте пакета M, Н·м (CP-94, Д-116) — без округления.
+    """Сепаратор при моменте пакета M, Н·м (CP-94, CP-98; Д-116, Д-118) — без округления.
 
-    Момент выходит к торцу через ряды окон: перемычки ряда у выходного торца несут моменты
-    дальних рядов и половину своего. Рама Виренделя (кольца между рядами — жёсткие пояса):
-    V = M·(rows − ½)/(rows·n·R_Σ), изгиб с заделкой M_изг = V·L/2. Свой ряд: тело давит на
-    перемычку силой F = k_sep·M/rows, балка с заделкой F·L/12 — у того же торца.
-    σ = (V·L/2 + F·L/12)/W, W = t·b²/6: t — стенка 2·SEP_K·a_ω, b — перемычка, L — высота окна.
-    Контакт тело/сторона окна — Герц тело/плоскость (ролик на min(l, L)), × sep_k_edge.
-    u_b, u_H — загрузка в долях момента: M_sep = M/max(u_b, u_H)."""
+    Ряды j = 1…rows — от выходного торца. Рама Виренделя по окружности периодична: точки
+    перегиба — в серединах перемычек и участков поясов. Перемычка ряда j несёт сдвиг
+    V_j = q·(rows − j + ½), q = M_ряд/(n·R_Σ) — момент дальних рядов и половина своего,
+    у торца перемычки V_j·L/2; свой ряд — тело давит на сторону окна силой F = k_sep·M_ряд,
+    балка с заделкой F·L/12 — у того же торца. Перемычка: σ = (V_1·L/2 + F·L/12)/W, W = t·b²/6.
+    Пояс между рядами j, j+1 (CP-98): узел уравновешивает две перемычки, на пояс
+    M_п = (V_j + V_j+1)·L/4 + F·L/12, W_п = t_п·h_п²/6, срез τ = 3·M_п/(s·t_п·h_п), s = 2πR_Σ/n;
+    пояс у выходного торца — M_т = (V_1·L/2 + F·L/12)/2, h_т. Нет sep["band"] — пояса не
+    проверяются (как CP-94). Жёсткость поясов на σ перемычки не влияет (периодичность): усиление
+    пояса поднимает M_sep, только если лимитирует пояс. Контакт — Герц тело/плоскость на
+    min(l, L), × sep_k_edge. u_b, u_H — загрузка в долях момента: M_sep = M/max(u_b, u_H)."""
     n, L, b = sep["n"], sep["h"], sep["web"]
     W = (sep["r_out"] - sep["r_in"]) * b * b / 6
     Mr = M * 1000 / rows                                  # момент ряда, Н·мм
-    V = Mr * (rows - 0.5) / (n * R)
+    q = Mr / (n * R)
+    V = [q * (rows - j + 0.5) for j in range(1, rows + 1)]
     F = k_sep * Mr
+    m_r = F * L / 12
     Es = e_star(lim.E_mod, lim.nu)
     if kind == "ball":                                    # шарик/плоскость: σ ∝ F^(1/3)
         sH, p = sigma_point(F, _k(D / 2), _k(D / 2), Es), 3
     else:                                                 # ролик/плоскость: σ ∝ F^(1/2)
         sH, p = sigma_line(F, min(l, L), D / 2, math.inf, Es), 2
     sH *= lim.sep_k_edge
-    s_fr, s_row = V * L / 2 / W, F * L / 12 / W
+    s_fr, s_row = V[0] * L / 2 / W, m_r / W
     allow = lim.sep_sigma_m1 / (lim.sep_K * lim.sep_S)
-    return {"V": V, "F": F, "sig_frame": s_fr, "sig_row": s_row, "sig_b": s_fr + s_row,
+    el = [(s_fr + s_row, "перемычка", 1)]
+    s_bd = s_end = tau = 0.0
+    bd = sep.get("band")
+    if bd:                                                # CP-98: пояса
+        tb = bd["t"]
+        if rows > 1 and bd.get("h_mid"):
+            mb = [(V[j] + V[j + 1]) * L / 4 + m_r for j in range(rows - 1)]
+            j = max(range(rows - 1), key=mb.__getitem__)
+            s_bd = 6 * mb[j] / (tb * bd["h_mid"] ** 2)
+            tau = 3 * mb[j] / (2 * math.pi * R / n) / (tb * bd["h_mid"])
+            el.append((s_bd, "пояс", j + 1))
+        s_end = 6 * (V[0] * L / 2 + m_r) / 2 / (tb * bd["h_end"] ** 2)
+        el.append((s_end, "торец", 0))
+    s_max, elem, j_lim = max(el)
+    return {"V": V[0], "F": F, "sig_frame": s_fr, "sig_row": s_row, "sig_b": s_fr + s_row,
+            "sig_band": s_bd, "sig_end": s_end, "tau_band": tau,
             "sig_allow": allow, "sig_H": sH, "sigH_allow": lim.sep_sigma_H,
-            "u_b": (s_fr + s_row) / allow, "u_H": (sH / lim.sep_sigma_H) ** p}
+            "u_b": max(s_max / allow, tau / (0.58 * allow)), "u_H": (sH / lim.sep_sigma_H) ** p,
+            "lim_elem": elem, "n_row_lim": j_lim}
 
 
 def sep_check(M, sep, k_sep, D, l, kind, rows, R, a, lim):
@@ -143,14 +168,34 @@ def sep_limit(sep, k_sep, D, l, kind, rows, R, a, lim):
         return 0.0, "сепаратор не нагружен (k_sep = 0) — проверка не выполнена"
     M = math.floor(10 / u) / 10
     s = _sep(M, sep, k_sep, D, l, kind, rows, R, lim)
-    if c["u_b"] >= c["u_H"]:
+    if c["u_b"] >= c["u_H"] and c["lim_elem"] == "перемычка":
         why = (f"изгиб перемычки ряда у выходного торца: σ рамы {s['sig_frame']:.0f} + σ ряда "
                f"{s['sig_row']:.0f} МПа = [σ] = σ₋₁/(K·S) = {lim.sep_sigma_m1:g}/"
                f"({lim.sep_K:g}·{lim.sep_S:g}) = {s['sig_allow']:.1f} МПа (CP-94)")
+    elif c["u_b"] >= c["u_H"]:                            # CP-98: лимитирует пояс
+        bd, mid = sep["band"], c["lim_elem"] == "пояс"
+        where = (f"пояс между рядами {c['n_row_lim']}–{c['n_row_lim'] + 1} от выходного торца"
+                 if mid else "пояс у выходного торца")
+        why = (f"изгиб: {where}, {bd['h_mid'] if mid else bd['h_end']:g} × {bd['t']:g} мм: "
+               f"σ {s['sig_band'] if mid else s['sig_end']:.0f} МПа = [σ] {s['sig_allow']:.1f} МПа; "
+               f"усилить пояс (sep_band_t) или поднять row_gap (CP-98, OQ-46)")
     else:
         why = (f"контакт тело/окно: k_edge·σ_H = {s['sig_H']:.0f} МПа = [σ_H] "
                f"{lim.sep_sigma_H:g} МПа при F {s['F']:.0f} Н (CP-94)")
     return M, why
+
+
+def sep_refs(sep, k_sep, D, l, kind, rows, R, a, lim):
+    """Референсы сепаратора, Н·м (CP-98, Д-118), вниз до 0.1:
+    M_row_b — один ряд, только изгиб перемычки своим рядом (без переноса через дальние ряды);
+    M_row_H — один ряд по контакту тело/окно; M_row = min(M_row_b, M_row_H);
+    M_win — пакет по контакту тело/окно (= rows·M_row_H) — предел тела в окне, M_body_win."""
+    c = _sep(1.0, sep, k_sep, D, l, kind, rows, R, lim)
+    Mb = c["sig_allow"] / (rows * c["sig_row"]) if c["sig_row"] > 0 else 0.0
+    Mw = 1 / c["u_H"] if c["u_H"] > 0 else 0.0
+    f = lambda x: math.floor(10 * x) / 10
+    return {"M_row": f(min(Mb, Mw / rows)), "M_row_b": f(Mb), "M_row_H": f(Mw / rows),
+            "M_win": f(Mw)}
 
 
 def theory_md():
@@ -189,7 +234,19 @@ $V = M (rows - 1/2)/(rows\, n R_\Sigma)$, $M_\text{изг} = V L/2$; свой р
 $k_\text{sep}$ = max(sin φ · $R_\text{о}/R$) / Σ sin φ ($R_\text{о}/R$) Y, балка с заделкой $F L/12$;
 $\sigma = (V L/2 + F L/12)/W$, $W = t b^2/6$. Контакт — Герц тело/плоскость на длине min(l, L),
 × `sep_k_edge`: тело доходит до кромки стенки (запас $(1.1 - 1) a_\omega$). K, S, k_edge, [σ_H] — OQ-44.
-Не учтены: трение (11), (12), ресурс подшипника, жёсткость колец между рядами (OQ-08, OQ-44)."""
+
+Пояса сепаратора (CP-98, Д-118): кольца между окнами соседних рядов (высота $h_п$) и у торцов
+($h_т$), радиальная толщина $t_п$ = `sep_band_t` (0 — стенка t; утолщение наружу в зоне шайб .05
+до $d_\text{вн}/2$ − `sep_band_gap`). Рама периодична по окружности, перегибы в серединах
+элементов: $M_п = (V_j + V_{j+1}) L/4 + F L/12$, $\sigma_п = 6 M_п/(t_п h_п^2)$,
+$\tau_п = 3 M_п/(s\, t_п h_п)$, $s = 2\pi R_\Sigma/n$; у выходного торца $M_т = (V_1 L/2 + F L/12)/2$.
+Жёсткость пояса на σ перемычки не влияет; потолок рамы $M \approx 2 n R_\Sigma W [\sigma]/L$ не
+зависит от числа рядов. Референс $M_\text{row}$ — один ряд по изгибу своим рядом и контакту в окне;
+$M_\text{pack}$ = $M_\text{sep}$; η = $M_\text{pack}/(rows\, M_\text{row})$ — доля, оставшаяся после переноса.
+Пределы тела (CP-98): $M_\text{body,gen}$, $M_\text{body,ring}$ — по $F_\text{г}$, $F_\text{в}$
+($M_H$ = min из них), $M_\text{body,win}$ — по контакту в окне; `M_by_body` — первый.
+Не учтены: трение (11), (12), ресурс подшипника, сдвиг окон соседних рядов по углу (перемычки
+рядов не соосны — пояс между ними работает и на сдвиг; OQ-08, OQ-44, OQ-46)."""
 
 
 def self_test():
@@ -214,6 +271,7 @@ def self_test():
     brg = {"d": 45.0, "D": 58.0, "B": 7.0, "C": 6.63, "C0": 6.1}
     t1 = torque(19, z, a, R, D, 8.0, "roller", brg, lim, 4)
     assert t1["M_H"] > 0 and t1["M_B"] > 0, t1
+    assert t1["M_H"] == min(t1["M_g"], t1["M_v"]) and t1["M_g"] > 0 and t1["M_v"] > 0, t1  # CP-98
     t2 = torque(19, z, a, R, D, 8.0, "roller", brg,
                 SimpleNamespace(**{**vars(lim), "sigma_H_line": 5000.0}), 4)
     assert abs(t2["M_H"] - 4 * t1["M_H"]) < 0.01 * t2["M_H"] and t2["M_B"] == t1["M_B"]
@@ -237,4 +295,18 @@ def self_test():
     assert sep_limit({**sep, "web": 1.5 * sep["web"]}, k, D, 8.0, "roller", 4, R, a, lim2)[0] > Ms
     assert sep_limit(sep, k, D, 8.0, "roller", 4, R, a,
                      SimpleNamespace(**{**vars(lim2), "sep_K": 4.0}))[0] < Ms
+    # CP-98: пояс 0.95 мм (шаг ряда = l) лимитирует, усиление пояса поднимает M_sep;
+    # широкий пояс не лимитирует — M_sep как в CP-94
+    wide = {**sep, "band": {"t": 2.2 * a, "h_mid": 6.0, "h_end": 4.0}}
+    assert abs(sep_limit(wide, k, D, 8.0, "roller", 4, R, a, lim2)[0] - Ms) < 0.05
+    bn = {**sep, "band": {"t": 2.2 * a, "h_mid": 0.95, "h_end": 0.975}}
+    Mn = sep_limit(bn, k, D, 8.0, "roller", 4, R, a, lim2)[0]
+    Mt = sep_limit({**bn, "band": {**bn["band"], "t": 4.4 * a}}, k, D, 8.0, "roller", 4, R, a,
+                   lim2)[0]
+    assert 0 < Mn < Ms and 1.5 * Mn < Mt <= Ms + 0.1, (Mn, Mt, Ms)
+    cn = sep_check(Mn, bn, k, D, 8.0, "roller", 4, R, a, lim2)
+    assert cn["lim_elem"] == "пояс" and cn["n_row_lim"] == 1, cn
+    rf = sep_refs(sep, k, D, 8.0, "roller", 4, R, a, lim2)
+    assert rf["M_row"] == min(rf["M_row_b"], rf["M_row_H"]) > 0, rf
+    assert abs(rf["M_win"] - 4 * rf["M_row_H"]) < 0.5 and rf["M_win"] >= Ms - 0.1, (rf, Ms)
     return True

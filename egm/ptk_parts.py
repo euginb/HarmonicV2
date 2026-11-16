@@ -32,6 +32,30 @@ def separator(n, R, a, D, l, pitch, rows, lim, sep_k):
             "web": round(2 * r_in * math.sin(math.pi / n) - w, 3), "rows": win}
 
 
+def sep_band(sep, d_root, lim):
+    """Пояса сепаратора — кольца между окнами соседних рядов и у торцов (CP-98, Д-118, OQ-46).
+
+    h_mid — от окна ряда до окна следующего, h_end — от торца до окна; t — радиальная толщина.
+    Пояса в кинематике не участвуют: стенку ряда 2·SEP_K·a_ω не трогаем, пояс утолщается наружу
+    в осевой зоне шайб .05 (h_mid = h шайбы − sep_gap) до t_max = dвн шайбы/2 − sep_band_gap − r_in,
+    dвн = DВ + 2·spacer_gap. Пояс осесимметричен — балансировку не меняет; dm — добавка массы, г.
+    CAD пояса нет (ptk_sep) — до него sep_band_t не входит в хэш ID (OQ-46)."""
+    t = sep["r_out"] - sep["r_in"]
+    rw = sep["rows"]
+    h_end = round(rw[0]["z0"], 3) if rw else 0.0
+    h_mid = round(rw[1]["z0"] - rw[0]["z0"] - sep["h"], 3) if len(rw) > 1 else 0.0
+    t_max = d_root / 2 + lim.spacer_gap - lim.sep_band_gap - sep["r_in"]
+    tb = max(t, min(lim.sep_band_t or t, t_max))
+    warns = []
+    if lim.sep_band_t and lim.sep_band_t > t_max + 1e-9:
+        warns.append(f"сепаратор: пояс sep_band_t {lim.sep_band_t:g} > {t_max:.2f} мм до шайбы .05 "
+                     f"— принят {tb:.2f} мм (CP-98)")
+    H = h_mid * max(len(rw) - 1, 0) + 2 * h_end
+    dm = lim.rho * 1e-6 * math.pi * ((sep["r_in"] + tb) ** 2 - sep["r_out"] ** 2) * H
+    return {"t": round(tb, 3), "t_max": round(t_max, 3), "h_mid": h_mid, "h_end": h_end,
+            "dm": round(dm, 1), "warnings": warns}
+
+
 def _fit(N, d, a, Re, r_lo, w):
     """N отверстий Ø d у наружной кромки, перемычки w -> (r_h, [β, рад]) | None."""
     r = Re + a - w - d / 2
@@ -168,15 +192,19 @@ def _sp(s):
 
 
 def _msep(r):
-    """M_sep, Н·м (что задаёт: изгиб | контакт) — CP-94."""
+    """M_sep пакета / M_row одного ряда, Н·м; в скобках — механизм и элемент (CP-94, CP-98)."""
     c = r.get("sep_chk") or {}
-    return f"{r['M_sep']:g} ({c.get('by', '—')})" if r.get("M_sep") else "—"
+    if not r.get("M_sep"):
+        return "—"
+    return (f"{r['M_sep']:g} / {r.get('M_row') or 0:g} "
+            f"({c.get('by', '—')}, {c.get('lim_elem', '—')})")
 
 
 def table(rows):
     """SPEC-10: детали .02, .03 реализуемых исполнений."""
     L = ["| ID | Генератор | Dэ × t, мм | Пазы шпонки, ° | U, г·мм | Отв. балансировки | "
-         "Остаток, г·мм | Сепаратор dс / Dс × B | Окна w × h | Перемычка | M_sep, Н·м | "
+         "Остаток, г·мм | Сепаратор dс / Dс × B | Окна w × h | Перемычка | "
+         "M_sep пакет / ряд, Н·м | "
          "Шайбы .05 dвн / D, h торец / между |",
          "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
