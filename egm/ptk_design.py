@@ -57,7 +57,7 @@ def _mass(cfg, ecc, dsh, bore, rho, rows):
     m_e = q * (De ** 2 - dsh ** 2 - b["n"] * b["d"] ** 2)
     J_e = q * De ** 2 * (De ** 2 / 8 + a ** 2) - q * dsh ** 4 / 8
     J_e -= sum(q * b["d"] ** 2 * (b["d"] ** 2 / 8 + x * x + y * y) for x, y in b["holes"])
-    brg = cfg["geom"].get("bearing") if cfg["gen"] == "bearing" else None
+    brg = cfg["geom"].get("bearing") if cfg["gen"] in ("bearing", "rim") else None   # CP-96
     m_b = ecc["m_brg_g"] if brg else 0.0
     J_b = m_b * ((brg["D"] ** 2 + brg["d"] ** 2) / 8 + a ** 2) if brg else 0.0
     m_s = rho * math.pi / 4 * (dsh ** 2 - bore ** 2) * float(cfg["width"])
@@ -107,7 +107,9 @@ def design(cfg, d, lim, keys, extra=None, mat_src=None):
             "bal_drills": sorted(float(x) for x in bal.get("drills", [])) or None}
     L = SimpleNamespace(**{**vars(lim), **over})
     g = cfg["geom"]
-    ecc = ptk_parts.eccentric(int(cfg["n"]), cfg["a_w"], cfg["Drol"], g["roller"], g.get("bearing"),
+    gb = g.get("bearing")                                  # CP-96: масса обода .18 — к подшипнику
+    gb = {**gb, "m_rim": (cfg.get("rim") or {}).get("m_g", 0.0)} if gb else None
+    ecc = ptk_parts.eccentric(int(cfg["n"]), cfg["a_w"], cfg["Drol"], g["roller"], gb,
                               cfg["phasing"], L, cfg["gen"], cfg["R_sum"])
     warn += [w for w in ecc.pop("warnings") if "у паза" not in w]
     wb, kw = ecc["De"] / 2 - ecc["a"] - dsh / 2, min(x["key_wall"] for x in ecc["rows"])

@@ -103,10 +103,11 @@ def balance(U, a, Re, t, rho, r_lo, lim):
 def eccentric(n, a, D, rol, brg, rows, lim, gen, R):
     """Эксцентрик ряда: размеры, дисбаланс, отверстия балансировки, пазы шпонки рядов."""
     rho = lim.rho * 1e-6                                  # г/мм³
-    if gen == "bearing":
+    if gen in ("bearing", "rim"):                         # CP-96: rim — подшипник + обод
         De, t, est = brg["d"], brg["B"], not brg.get("m")
         m_b = (rho * lim.brg_mass_k * math.pi / 4 * (brg["D"] ** 2 - brg["d"] ** 2) * brg["B"]
                if est else brg["m"] * 1e3)
+        m_b += brg.get("m_rim", 0.0)                      # обод .18 на наружном кольце
     else:
         De, t, m_b, est = 2 * R - D, rol["l"], 0.0, False
     ball = rol.get("type", "roller") == "ball"
@@ -214,7 +215,8 @@ def table(rows):
         b = e["bal"]
         holes = f"{b['n']}×Ø{b['d']:g}, r {b['r']:g}" if b["n"] else "нет"
         keys = ", ".join(f"{x['key_angle']:g}" for x in e["rows"])
-        L.append(f"| {r['id']} | {r['bearing'] or 'эксцентрик'} | {e['De']:g} × {e['t']:g} | {keys} | "
+        gname = (r["bearing"] + (" + обод" if r.get("rim") else "")) if r["bearing"] else "эксцентрик"
+        L.append(f"| {r['id']} | {gname} | {e['De']:g} × {e['t']:g} | {keys} | "
                  f"{e['U']['sum']:g} | {holes} | {b['res']:g} | "
                  f"{2 * s['r_in']:g} / {2 * s['r_out']:g} × {s['length']:g} | "
                  f"{s['w']:g} × {s['h']:g} | {s['web']:g} | {_msep(r)} | {_sp(r.get('spacer'))} |")

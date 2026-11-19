@@ -90,7 +90,8 @@ def run_ptk(prices):
             excl.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['gen']} | {r['excluded']} |")
             continue
         m = f"{r['M']:g} ({r['M_by']})" if r["M"] else "—"
-        gen = (r["bearing"] or "—") if r["gen"] == "bearing" else "эксцентрик"
+        gen = ((r["bearing"] or "—") + (" + обод" if r["gen"] == "rim" else "")
+               if r["gen"] in ("bearing", "rim") else "эксцентрик")     # CP-96
         st = ("OK" if r["ok"] else "нет") + (f" ({', '.join(r['tech'])})" if r["tech"] else "")
         table.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['Drol']} | "
                      f"{r['Drol_max'] or '—'} | "
