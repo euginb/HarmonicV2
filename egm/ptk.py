@@ -19,7 +19,7 @@ from fractions import Fraction
 from egm import ptk_force, ptk_parts, ptk_profile
 
 SEP_K = 1.1    # полутолщина кольца сепаратора / a_ω (egm/calc_vptc.py: hc = 2.2·e)
-GEN_TYPES = ("bearing", "eccentric")   # Д-42: тела на наружном кольце подшипника | на эксцентрике
+GEN_TYPES = ("bearing", "eccentric", "rim")   # Д-42; CP-96: rim — малый подшипник + обод .18
 
 
 @dataclass
@@ -63,7 +63,12 @@ class PtkLimits:
     sep_band_gap: float = 0.2     # зазор утолщённого пояса до dвн шайбы .05, мм (CP-98)
     M_min: float = 0.0            # требуемый выходной момент, Н·м; 0 — не проверяется (Д-41)
     gen_types: tuple = ("bearing", "eccentric")   # генераторы для расчёта (Д-42)
-    dgen_step: float = 0.1        # округление вверх D_г эксцентрика без подшипника, мм (Д-42)
+    dgen_step: float = 0.1        # округление вверх D_г эксцентрика и обода, мм (Д-42)
+    rim_t_min: float = 2.0        # CP-96: наименьшая радиальная толщина обода .18, мм
+    rim_dfl_k: float = 0.05       # CP-96: допускаемая овализация обода / a_ω (OQ-48)
+    rim_k_ov: float = 0.0068      # CP-96: δ = k·P·r³/(E·I), 2-я гармоника нагрузки (OQ-48)
+    rim_fit_k: float = 0.0004     # CP-96: натяг обода на наружное кольцо, δ/D
+    rim_sigma_fit: float = 300.0  # CP-96: допускаемое σθ обода от натяга, МПа (OQ-48)
     groove_f: float = 0.52        # жёлоб под шарик на эксцентрике: r = groove_f·D_ш, > 0.5 (Д-45)
     sep_gap: float = 0.05         # зазор тела в окне сепаратора, мм (Д-46)
     rho: float = 7850.0           # плотность стали эксцентрика, тел, колец, кг/м³
@@ -140,6 +145,7 @@ class PtkResult:
     sep_chk: dict = field(default_factory=dict)   # проверка сепаратора при M (CP-94)
     ecc: dict = field(default_factory=dict)       # эксцентрик .03 (Д-46)
     spacer: dict = field(default_factory=dict)    # шайбы .05 (Д-53)
+    rim: dict = field(default_factory=dict)       # обод .18 при gen = rim (CP-96)
 
 
 def _load(cls, d):
@@ -264,6 +270,8 @@ def ring(d_root, holes, fast, lim, wall):
 
 # Д-80: маркировка. GEOM_REV повышается при смене формул геометрии — меняются все ID.
 GEOM_REV = 6                       # Д-42: тип генератора bearing | eccentric в хэше
+# CP-96: rim — новое значение gen, а gen уже входит в хэш, поэтому rev НЕ повышается (Д-80: номер
+# меняют при смене формул геометрии). ID bearing/eccentric остаются, у rim свои — Д-120.
 # Д-48: параметры эксцентрика (rho, brg_mass_k, shaft_key_*, key_angle, bal_*) — не в хэше;
 # эксцентрик в SPEC-10 предварительный по limits, окончательный — шаг 2 (egm/ptk_design.py)
 GEOM_LIMITS = ("a_k", "r_tip_min", "sep_web_min", "shaft_d_min", "ecc_wall_min", "wall_min",
@@ -294,6 +302,9 @@ TECH = {
            "M без проверки по скорости входа; η и износ не считаются",
            "скольжение ≈ ω·Dг/2: твёрдость эксцентрика не ниже тел, смазка; предел скорости — "
            "OQ-10 после калибровки OQ-08"),
+    "Т5": ("шарик / обод .18",
+           "исключено из результатов SPEC-10",
+           "жёлоб на ободе не заложен (CP-96, OQ-48); ролик катится по цилиндру обода"),
 }
 
 
@@ -382,6 +393,36 @@ def bearing(D, R_min, a, bears, lim):
     return (fit[0][2] if fit else None), need_D, need_d
 
 
+def rim_pick(Dg, l, a, MB1, need_d, bears, lim):
+    """CP-96: подшипник под обод .18 -> (ключ | None, обод). Кандидаты: d >= need_d,
+    D <= Dг - 2·rim_t_min, натяг по Ляме проходит; берётся наибольший min(M_B, M_ov).
+
+    MB1 — M_B пакета на 1 Н C0. Овализация: δ = rim_k_ov·P·r³/(E·I), I = l·t³/12,
+    P = 1000·M/(s0·MB1) — сила ряда на 1 Н·м пакета, Н; δ <= rim_dfl_k·a_ω -> M_ov (OQ-48).
+    Натяг (кольцо подшипника жёсткое): σθ = E·(δ/D)·k/(k + ν), k = (Dг²+D²)/(Dг²−D²)."""
+    best, allow = None, lim.rim_dfl_k * a
+    for k, b in bears.items():
+        if (k.startswith("_") or b["d"] < need_d - 1e-9
+                or b["D"] > Dg - 2 * lim.rim_t_min + 1e-9):
+            continue
+        t, rm = (Dg - b["D"]) / 2, (Dg + b["D"]) / 4
+        P1 = 1000.0 / (lim.s0_brg * MB1) if MB1 > 0 else 0.0      # Н на 1 Н·м
+        M_ov = (allow * lim.E_mod * l * t ** 3 / 12 / (lim.rim_k_ov * rm ** 3 * P1)
+                if P1 else 0.0)
+        kk = (Dg ** 2 + b["D"] ** 2) / (Dg ** 2 - b["D"] ** 2)
+        s_fit = lim.E_mod * lim.rim_fit_k * kk / (kk + lim.nu)
+        if s_fit > lim.rim_sigma_fit + 1e-9:
+            continue
+        key = (min(b["C0"] * MB1, M_ov), b["C0"], -b["D"])
+        if best is None or key > best[0]:
+            m = lim.rho * 1e-6 * math.pi / 4 * (Dg ** 2 - b["D"] ** 2) * l
+            best = (key, k, {"D": round(Dg, 3), "d": b["D"], "b": l, "t": round(t, 3),
+                             "fit": round(lim.rim_fit_k * b["D"], 4), "s_fit": round(s_fit, 1),
+                             "dfl_allow": round(allow, 4), "M_ov": math.floor(10 * M_ov) / 10,
+                             "m_g": round(m, 1)})
+    return (best[1], best[2]) if best else (None, {})
+
+
 def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
     """Расчёт одной конфигурации. rol = {'type','d','l'[, 'a_w', 'wall_min']};
     gen — bearing (тела на наружном кольце подшипника, Д-40) | eccentric (на эксцентрике, Д-42)."""
@@ -400,8 +441,9 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
     if u < 2:
         return r
     z, n = u + 1, u                                     # Д-31
-    if rol.get("type") == "ball" and gen == "bearing":   # Д-45: жёлоб на покупном кольце не сделать
-        r.n, r.z, r.excluded, r.tech = n, z, "Т1", ["Т1"]
+    if rol.get("type") == "ball" and gen in ("bearing", "rim"):  # Д-45; CP-96: жёлоба на ободе нет
+        x = "Т1" if gen == "bearing" else "Т5"
+        r.n, r.z, r.excluded, r.tech = n, z, x, [x]
         return r
     R, by = r_sum(u, D, a, lim)
     brg = None
@@ -420,6 +462,25 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
         if need_d > 2 * R - D + 1e-9:
             by = "вал"
         R = (_ceil(max(2 * R - D, need_d), lim.dgen_step) + D) / 2
+    if gen == "rim":                                    # CP-96: подшипник на min радиусе эксцентрика
+        fit = [b["D"] for k, b in bears.items() if not k.startswith("_")
+               and b["d"] >= need_d - 1e-9]
+        if fit and min(fit) + 2 * lim.rim_t_min > 2 * R - D + 1e-9:
+            R = (_ceil(min(fit) + 2 * lim.rim_t_min, lim.dgen_step) + D) / 2
+            by = "обод"
+        MB1 = ptk_force.torque(n, z, a, R, D, rol["l"], rol.get("type", "roller"),
+                               {"C0": 1000.0, "B": rol["l"]}, lim, lim.rows)["M_B"] / 1000
+        bk, r.rim = rim_pick(2 * R - D, rol["l"], a, MB1, need_d, bears, lim)
+        brg = bears.get(bk) if bk else None
+        if brg is None:
+            r.errors.append(f"обод .18: нет подшипника с d >= {need_d:.1f} и D <= "
+                            f"{2 * R - D - 2 * lim.rim_t_min:.1f} мм, проходящего натяг (CP-96)")
+        else:
+            r.bearing = bk
+            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen)
+            if rol["l"] > brg["B"] + 1e-9:                # CP-96: обод шире подшипника
+                r.warnings.append(f"обод .18 шире подшипника {bk}: {rol['l']:g} > {brg['B']:g} мм — "
+                                  f"консоль {((rol['l'] - brg['B']) / 2):.2f} мм на сторону (OQ-48)")
     rho_k = ptk_profile.curv_radius_min(a, R, z)
     d_root = 2 * (R + a) + D
     r.n, r.z, r.a_w, r.R_sum, r.R_by = n, z, round(a, 3), round(R, 3), by
@@ -452,21 +513,28 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
         r.sep = ptk_parts.separator(n, R, a, D, rol["l"], pitch, r.phasing, lim, SEP_K)
         r.sep["band"] = ptk_parts.sep_band(r.sep, d_root, lim)      # CP-98: пояса
         r.warnings += r.sep["band"].pop("warnings")
-        r.ecc = ptk_parts.eccentric(n, a, D, rol, brg, r.phasing, lim, gen, R)
+        eb = {**brg, "m_rim": r.rim["m_g"]} if r.rim else brg      # CP-96: масса обода
+        r.ecc = ptk_parts.eccentric(n, a, D, rol, eb, r.phasing, lim, gen, R)
         r.warnings += r.ecc.pop("warnings")
         r.parts += ptk_parts.parts(r.id, r.ecc)
+        if r.rim:                                        # CP-96: обод .18 — по одному на ряд
+            r.parts.append({"id": f"{r.id}.18", "name": "обод генератора", "variant": "",
+                            "rows": list(range(1, lim.rows + 1))})
         r.spacer = ptk_parts.spacers(d_root, r.d_out, r.d_bc, r.geom["fastener"]["d_clear"],
                                      rol["l"], pitch, lim.rows, lim)
         r.warnings += r.spacer.pop("warnings")
         r.parts += ptk_parts.spacer_parts(r.id, r.spacer, lim.rows)
     if (brg is not None or gen == "eccentric") and not r.errors:
-        t = ptk_force.torque(n, z, a, R, D, rol["l"], rol.get("type", "roller"), brg, lim,
+        bt = {**brg, "B": rol["l"]} if gen == "rim" else brg       # CP-96: дорожка обода = l
+        t = ptk_force.torque(n, z, a, R, D, rol["l"], rol.get("type", "roller"), bt, lim,
                              lim.rows)
         r.M_H, r.M_B = t["M_H"], t["M_B"] or 0.0
         r.M_body_gen, r.M_body_ring = t["M_g"], t["M_v"]             # CP-98
         cand = [(r.M_H, "контакт"), (round(r.t_hold / holes.safety, 1), "крепление")]
         if brg is not None:
             cand.append((r.M_B, "подшипник"))
+        if r.rim:                                        # CP-96: овализация обода — свой предел
+            cand.append((r.rim["M_ov"], "обод"))
         sep_in = (r.sep, t["k_sep"], D, rol["l"], rol.get("type", "roller"), lim.rows, R, a, lim)
         ref = {}
         if r.sep:                                        # Д-116, CP-94: предел сепаратора
@@ -475,6 +543,9 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
             r.M_row, r.M_body_win = ref["M_row"], ref["M_win"]
             cand.append((r.M_sep, "сепаратор"))
         r.M, r.M_by = min(cand)
+        if r.rim:                                        # CP-96: прогиб обода при принятом M, мм
+            r.rim["dfl"] = (round(r.rim["dfl_allow"] * r.M / r.rim["M_ov"], 4)
+                            if r.rim["M_ov"] else 0.0)
         body = [(r.M_body_gen, "генератор"), (r.M_body_ring, "венец")]
         r.M_by_body = min(body + ([(r.M_body_win, "окно")] if r.sep else []))[1]
         if r.sep:
@@ -634,6 +705,17 @@ def self_test():
     assert e.M_by in ("контакт", "крепление", "сепаратор") and e.id != r.id, (e.M_by, e.id)
     assert e.width == 4 * 8.0 + 5 * lim.row_gap
     assert "Т4" in e.tech and not r.tech, (e.tech, r.tech)
+    m = calc(19, "t", b, lim, holes, fast, bears, "rim")             # CP-96: обод .18
+    assert m.ok and m.bearing and m.gen == "rim" and m.rim, m.errors
+    assert bears[m.bearing]["D"] <= m.Dgen - 2 * lim.rim_t_min + 1e-9
+    assert m.Dgen >= e.Dgen - 1e-9 and m.id not in (e.id, r.id), (m.Dgen, e.Dgen)
+    assert bears[m.bearing]["d"] >= lim.shaft_d_min + 2 * (m.a_w + lim.ecc_wall_min) - 1e-9
+    assert m.M_B > 0 and m.rim["M_ov"] > 0 and m.M <= min(m.M_B, m.rim["M_ov"], m.M_H) + 0.1
+    assert m.rim["s_fit"] <= lim.rim_sigma_fit and m.rim["b"] == b["l"]
+    assert m.ecc["t"] == bears[m.bearing]["B"]            # эксцентрик несёт только подшипник
+    assert any(p["id"] == m.id + ".18" for p in m.parts), m.parts
+    assert calc(19, "t", {"type": "ball", "d": 3.0, "l": 3.0}, lim, holes, fast, bears,
+                "rim").excluded == "Т5"                           # CP-96: жёлоба на ободе нет
     bb = c(10, rol={"type": "ball", "d": 2.0, "l": 2.0})          # Д-45: шарик на подшипнике
     assert not bb.ok and bb.excluded == "Т1" and not bb.errors, bb
     be = calc(10, "t", {"type": "ball", "d": 2.0, "l": 2.0}, lim, holes, fast, {}, "eccentric")
