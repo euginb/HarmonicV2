@@ -67,6 +67,8 @@ class PtkLimits:
     M_req: dict = field(default_factory=dict)
     r_step: float = 1.0           # CP-95: шаг подъёма R_Σ, мм (время прогона ∝ r_up_max/r_step)
     r_up_max: float = 40.0        # CP-95: наибольший подъём R_Σ над R_Σ min, мм
+    # CP-95b: добавка к шагу ряда — высота пояса сепаратора, мм; перебор под M_req (в ID — hb)
+    band_h_list: tuple = (0.0, 2.0, 4.0, 6.0, 8.0)
     gen_types: tuple = ("bearing", "eccentric")   # генераторы для расчёта (Д-42)
     dgen_step: float = 0.1        # округление вверх D_г эксцентрика и обода, мм (Д-42)
     rim_t_min: float = 2.0        # CP-96: наименьшая радиальная толщина обода .18, мм
@@ -134,6 +136,8 @@ class PtkResult:
     M_by: str = ""                # что ограничивает M: контакт | подшипник | крепление | сепаратор
     M_req: float = 0.0            # CP-95: требуемый момент для u, Н·м; 0 — прямая постановка
     dR: float = 0.0              # CP-95: подъём R_Σ над R_Σ min, мм (у bearing — больший подшипник)
+    hb: float = 0.0               # CP-95b: добавка высоты пояса к шагу ряда, мм
+    band_fill: bool = False       # CP-95b: пояс сепаратора утолщён до t_max
     sep_why: str = ""             # причина M_sep: механизм, напряжения, [σ] (CP-94)
     M_body_gen: float = 0.0       # предел тела по контакту с генератором, Н·м (CP-98)
     M_body_ring: float = 0.0      # то же с венцом, Н·м
@@ -350,7 +354,7 @@ def holes_code(holes):
     return f"{holes.n}{holes.bolt}" + (f"P{holes.pins}" if holes.pins else "")
 
 
-def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0):
+def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0, hb=0.0, fill=False):
     """Все параметры, определяющие геометрию исполнения (вход хэша и CAD).
 
     CP-95: dR — подъём R_Σ у eccentric/rim. Ключ добавляется только при dR > 0, поэтому ID прямой
@@ -364,12 +368,16 @@ def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0):
          "fastener": {k: f.get(k) for k in ("d_clear", "dk")}}
     if dR > 1e-9 and gen != "bearing":                  # CP-95: D_г обода/эксцентрика задан dR
         g["dR"] = dR
+    if hb > 1e-9:                                       # CP-95b: шаг ряда, пакет, шайбы — другие
+        g["hb"] = hb
+    if fill:                                            # CP-95b: пояс до t_max (CAD пояса — OQ-46)
+        g["band_fill"] = True
     return _n(g)
 
 
-def config_id(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0):
+def config_id(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0, hb=0.0, fill=False):
     """ID исполнения PTK-<u>-<тело>-<отверстия>-<хэш> (Д-80) и снимок геометрии."""
-    g = geom_params(u, rol, lim, holes, fast, brg, gen, dR)
+    g = geom_params(u, rol, lim, holes, fast, brg, gen, dR, hb, fill)
     raw = json.dumps(g, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
     h = hashlib.sha1(raw.encode("ascii")).hexdigest()[:6].upper()
     return f"PTK-{u:03d}-{roller_code(rol)}-{holes_code(holes)}-{h}", g
@@ -443,7 +451,7 @@ def rim_pick(Dg, l, a, MB1, need_d, bears, lim):
     return (best[1], best[2]) if best else (None, {})
 
 
-def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0):
+def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fill=False):
     """Расчёт одной конфигурации. rol = {'type','d','l'[, 'a_w', 'wall_min']};
     gen — bearing (тела на наружном кольце подшипника, Д-40) | eccentric (на эксцентрике, Д-42).
     dR — подъём R_Σ над R_Σ min, мм (CP-95): у eccentric/rim — D_г больше на 2·dR,
@@ -451,8 +459,8 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0):
     D = rol["d"]
     wall = rol.get("wall_min", lim.wall_min)
     a = rol.get("a_w") or lim.a_k * D
-    r = PtkResult(u, rid, D, gen=gen, M_req=lim.M_req.get(u, 0.0), dR=dR)
-    r.id, r.geom = config_id(u, rol, lim, holes, fast, None, gen, dR)
+    r = PtkResult(u, rid, D, gen=gen, M_req=lim.M_req.get(u, 0.0), dR=dR, hb=hb, band_fill=fill)
+    r.id, r.geom = config_id(u, rol, lim, holes, fast, None, gen, dR, hb, fill)
     if u > lim.u_max:
         s = two_stage(u, lim)
         r.errors.append(f"u={u} > {lim.u_max}: одноступенчатый ПТК не считается; рекомендуется "
@@ -478,7 +486,7 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0):
         else:
             R = (brg["D"] + D) / 2
             r.bearing = bk
-            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen)
+            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen, 0.0, hb, fill)
     else:                                               # Д-42: D_г — наружный Ø эксцентрика
         need_d = lim.shaft_d_min + 2 * (a + lim.ecc_wall_min)
         if need_d > 2 * R - D + 1e-9:
@@ -499,7 +507,7 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0):
                             f"{2 * R - D - 2 * lim.rim_t_min:.1f} мм, проходящего натяг (CP-96)")
         else:
             r.bearing = bk
-            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen, dR)
+            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen, dR, hb, fill)
             if rol["l"] > brg["B"] + 1e-9:                # CP-96: обод шире подшипника
                 r.warnings.append(f"обод .18 шире подшипника {bk}: {rol['l']:g} > {brg['B']:g} мм — "
                                   f"консоль {((rol['l'] - brg['B']) / 2):.2f} мм на сторону (OQ-48)")
@@ -531,12 +539,14 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0):
     r.ring_variants, r.phasing = ph["variants"], ph["rows"]
     r.parts = ring_parts(r.id, ph)
     r.d_out = round(rg["d_out"], 2)
-    pitch = max(rol["l"], brg["B"]) if brg else rol["l"]          # Д-40: шаг ряда
+    pitch = (max(rol["l"], brg["B"]) if brg else rol["l"]) + hb   # Д-40; CP-95b: + высота пояса
     r.width = round(lim.rows * pitch + (lim.rows + 1) * lim.row_gap, 1)
     if not r.errors and (brg is not None or gen == "eccentric"):    # Д-46: детали .02, .03
         r.sep = ptk_parts.separator(n, R, a, D, rol["l"], pitch, r.phasing, lim, SEP_K)
-        r.sep["band"] = ptk_parts.sep_band(r.sep, d_root, lim)      # CP-98: пояса
+        r.sep["band"] = ptk_parts.sep_band(r.sep, d_root, lim, fill)   # CP-98; CP-95b: fill
         r.warnings += r.sep["band"].pop("warnings")
+        if fill:                                        # CP-95b: CAD утолщения пояса нет
+            r.warnings.append(f"сепаратор: пояс до t_max {r.sep['band']['t']:g} мм — CAD пояса нет (OQ-46)")
         eb = {**brg, "m_rim": r.rim["m_g"]} if r.rim else brg      # CP-96: масса обода
         r.ecc = ptk_parts.eccentric(n, a, D, rol, eb, r.phasing, lim, gen, R)
         r.warnings += r.ecc.pop("warnings")
@@ -585,36 +595,47 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0):
 
 
 def solve(u, rid, rol, gen, bears, lim, mounts, fast):
-    """CP-95 (Д-116 п. 2, Д-121): обратная постановка для (u, тело, генератор) при M_req.
+    """CP-95 (Д-116 п. 2, Д-121), CP-95b: обратная постановка для (u, тело, генератор) при M_req.
 
-    Для каждого крепления R_Σ поднимается от R_Σ min шагом r_step (до r_up_max или D > d_out_max):
-    первое dR, где исполнение проходит и M ≥ M_req, — кандидат этого крепления (D растёт с dR
-    монотонно). Из кандидатов берётся наименьший (D, B, −M): габарит, затем длина пакета; масса на
-    шаге 1 не считается (Д-48). Крепление подбирается по моменту, а не «первым из списка».
-    Нет кандидата — строка с наибольшим найденным M и ошибкой «M_req не достигнут»."""
-    M_req, best, top = lim.M_req[u], None, None
+    Переменные: крепление × dR (шаг r_step до r_up_max или D > d_out_max) × пояс (hb из
+    band_h_list, на каждом hb сначала без fill, затем fill — пояс до t_max). dR идёт вверх (D растёт
+    монотонно); пояс перебирается, только пока ограничивает сепаратор (иначе hb не поможет).
+    Первое dR с M ≥ M_req — кандидат крепления с наименьшим hb; из кандидатов — наименьший
+    (D, B, −M): габарит, затем длина пакета (масса на шаге 1 не считается, Д-48).
+    Нет кандидата — реализуемая строка с наибольшим M (при равном — меньшие D, B) и ошибкой
+    с потолками M_H, M_win, крепления, подшипника: что именно не пускает к M_req."""
+    M_req, best, top, first = lim.M_req[u], None, None, None
     n_up = int(round(lim.r_up_max / lim.r_step)) if lim.r_step > 0 else 0
+    tiers = [(hb, f) for hb in (lim.band_h_list or (0.0,)) for f in (False, True)]
     for key, h in mounts.items():
+        hit = False
         for i in range(n_up + 1):
-            r = calc(u, rid, rol, lim, h, fast, bears, gen, round(i * lim.r_step, 6))
-            r.mount = key
-            if r.excluded:                              # Т1/Т5 не зависят от dR и крепления
-                return r
-            if top is None or (r.M, r.ok) > (top.M, top.ok):
-                top = r
-            if r.ok and r.M >= M_req - 1e-9:
-                if best is None or (r.d_out, r.width, -r.M) < (best.d_out, best.width, -best.M):
-                    best = r
+            for hb, f in tiers:
+                r = calc(u, rid, rol, lim, h, fast, bears, gen, round(i * lim.r_step, 6), hb, f)
+                r.mount = key
+                if r.excluded:                          # Т1/Т5 не зависят от dR, пояса, крепления
+                    return r
+                first = first or r
+                if r.ok and (top is None or (r.M, -r.d_out, -r.width) > (top.M, -top.d_out, -top.width)):
+                    top = r
+                if r.ok and r.M >= M_req - 1e-9:
+                    if best is None or (r.d_out, r.width, -r.M) < (best.d_out, best.width, -best.M):
+                        best = r
+                    hit = True
+                    break
+                if not r.ok or r.M_by != "сепаратор":   # пояс не поможет: ошибка или предел не сепаратор
+                    break
+            if hit or (lim.d_out_max and r.d_out > lim.d_out_max):
                 break                                   # больший dR — больший D: дальше смысла нет
-            if lim.d_out_max and r.d_out > lim.d_out_max:
-                break
     if best is not None:
         return best
-    if top is None:
-        top = calc(u, rid, rol, lim, {"default": RingHoles()}, fast, bears, gen)
-    top.errors.append(f"M_req {M_req:g} Н·м не достигнут: наибольший M {top.M:g} "
-                      f"({top.M_by or '—'}) при dR ≤ {lim.r_up_max:g} мм и креплениях "
-                      f"{list(mounts)} (CP-95)")
+    top = top or first
+    sf = mounts[top.mount].safety if top.mount in mounts else 1.0
+    top.errors.append(f"M_req {M_req:g} Н·м не достигнут: наибольший M {top.M:g} ({top.M_by or '—'}); "
+                      f"потолки — контакт M_H {top.M_H:g}, тело/окно M_win {top.M_body_win:g}, "
+                      f"крепление {top.t_hold / sf:.1f}, подшипник {top.M_B:g} Н·м "
+                      f"(dR ≤ {lim.r_up_max:g}, hb ≤ {max(lim.band_h_list or (0.0,)):g} мм, "
+                      f"крепления {list(mounts)}; CP-95b)")
     top.ok = False
     return top
 
@@ -777,6 +798,11 @@ def self_test():
     rr = calc(19, "t", b, PtkLimits(sep_band_t=3.0), holes, fast, bears)
     assert r.sep_chk["lim_elem"] == "пояс" and rr.sep["band"]["t"] == 3.0, (r.sep_chk, rr.sep)
     assert rr.M_sep > 1.2 * r.M_sep and rr.id == r.id, (rr.M_sep, r.M_sep)
+    rh = calc(19, "t", b, lim, holes, fast, bears, "bearing", 0.0, 2.0, True)   # CP-95b: пояс
+    assert rh.width == r.width + 4 * 2.0, (rh.width, r.width)
+    assert rh.sep["band"]["h_mid"] == round(r.sep["band"]["h_mid"] + 2.0, 3), rh.sep["band"]
+    assert rh.sep["band"]["t"] == rh.sep["band"]["t_max"] and rh.id != r.id, rh.sep["band"]
+    assert rh.M_sep > r.M_sep, (rh.M_sep, r.M_sep)
     assert not calc(19, "t", b, PtkLimits(M_min=1e6), holes, fast, bears).ok
     assert not calc(19, "t", b, lim, holes, fast, {}).ok                         # нет подшипника
     assert c(19, rol={**b, "a_w": 0.5}).alpha_max < r.alpha_max   # меньше a_ω — меньше α

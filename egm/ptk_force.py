@@ -96,6 +96,20 @@ def torque(n, z, a, R, D, l, kind, brg, lim, rows):
             "F_g": round(Fg, 1), "F_v": round(Fv, 1), "k_sep": k_sep}
 
 
+def _strip(sep):
+    """CP-95b: ширина сплошной полосы стенки через окна всех рядов, мм. Окна ряда k — угловые
+    интервалы [cage_k, cage_k + w/r_in] в шаге 360/n; полоса — наибольший непокрытый промежуток
+    на r_in. 0 — окна рядов перекрывают шаг (K20), полосы нет."""
+    P = 360.0 / sep["n"]
+    w_win = sep.get("w") or 2 * sep["r_in"] * math.sin(math.pi / sep["n"]) - sep["web"]
+    ww = math.degrees(w_win / sep["r_in"])
+    st = sorted({round(w_["cage"] % P, 6) for w_ in sep.get("rows", [])})
+    if ww >= P or not st:
+        return 0.0
+    gap = max((st[i + 1] if i + 1 < len(st) else st[0] + P) - a0 - ww for i, a0 in enumerate(st))
+    return round(max(gap, 0.0) * math.pi / 180 * sep["r_in"], 3)
+
+
 def _sep(M, sep, k_sep, D, l, kind, rows, R, lim):
     """Сепаратор при моменте пакета M, Н·м (CP-94, CP-98; Д-116, Д-118) — без округления.
 
@@ -128,21 +142,35 @@ def _sep(M, sep, k_sep, D, l, kind, rows, R, lim):
     el = [(s_fr + s_row, "перемычка", 1)]
     s_bd = s_end = tau = 0.0
     bd = sep.get("band")
+    # CP-95b: узлы рамы — жёсткие зоны шириной перемычки; пояс гнётся на пролёте окна w из шага 2πR/n
+    w_win = sep.get("w") or 2 * sep["r_in"] * math.sin(math.pi / n) - sep["web"]
+    k_off = min(1.0, w_win * n / (2 * math.pi * R))
     if bd:                                                # CP-98: пояса
         tb = bd["t"]
         if rows > 1 and bd.get("h_mid"):
             mb = [(V[j] + V[j + 1]) * L / 4 + m_r for j in range(rows - 1)]
             j = max(range(rows - 1), key=mb.__getitem__)
-            s_bd = 6 * mb[j] / (tb * bd["h_mid"] ** 2)
+            s_bd = 6 * k_off * mb[j] / (tb * bd["h_mid"] ** 2)
             tau = 3 * mb[j] / (2 * math.pi * R / n) / (tb * bd["h_mid"])
             el.append((s_bd, "пояс", j + 1))
-        s_end = 6 * (V[0] * L / 2 + m_r) / 2 / (tb * bd["h_end"] ** 2)
+        s_end = 6 * k_off * (V[0] * L / 2 + m_r) / 2 / (tb * bd["h_end"] ** 2)
         el.append((s_end, "торец", 0))
     s_max, elem, j_lim = max(el)
+    u_fr = max(s_max / allow, tau / (0.58 * allow))
+    # CP-95b: вторая схема — сплошная полоса b_c через окна всех рядов, консоль от выходного торца,
+    # пояса не нагружены; рама и полоса — два статически допустимых поля, берётся меньшая загрузка
+    b_c, s_st = _strip(sep), 0.0
+    if b_c > 0:
+        arm = [w_["z0"] + L / 2 - sep["rows"][0]["z0"] for w_ in sep["rows"]]
+        m_st = q * sum(arm) + max(F - q, 0.0) * max(arm)
+        s_st = 6 * m_st / ((sep["r_out"] - sep["r_in"]) * b_c ** 2)
+    u_st = s_st / allow if b_c > 0 else math.inf
+    if u_st < u_fr:
+        elem, j_lim = "полоса", 0
     return {"V": V[0], "F": F, "sig_frame": s_fr, "sig_row": s_row, "sig_b": s_fr + s_row,
-            "sig_band": s_bd, "sig_end": s_end, "tau_band": tau,
+            "sig_band": s_bd, "sig_end": s_end, "tau_band": tau, "sig_strip": s_st, "b_strip": b_c,
             "sig_allow": allow, "sig_H": sH, "sigH_allow": lim.sep_sigma_H,
-            "u_b": max(s_max / allow, tau / (0.58 * allow)), "u_H": (sH / lim.sep_sigma_H) ** p,
+            "u_b": min(u_fr, u_st), "u_H": (sH / lim.sep_sigma_H) ** p,
             "lim_elem": elem, "n_row_lim": j_lim}
 
 
@@ -168,7 +196,11 @@ def sep_limit(sep, k_sep, D, l, kind, rows, R, a, lim):
         return 0.0, "сепаратор не нагружен (k_sep = 0) — проверка не выполнена"
     M = math.floor(10 / u) / 10
     s = _sep(M, sep, k_sep, D, l, kind, rows, R, lim)
-    if c["u_b"] >= c["u_H"] and c["lim_elem"] == "перемычка":
+    if c["u_b"] >= c["u_H"] and c["lim_elem"] == "полоса":       # CP-95b
+        why = (f"изгиб сплошной полосы через окна всех рядов (консоль от выходного торца), "
+               f"ширина {s['b_strip']:.1f} мм: σ {s['sig_strip']:.0f} МПа = [σ] "
+               f"{s['sig_allow']:.1f} МПа; пояса не догружены (CP-95b)")
+    elif c["u_b"] >= c["u_H"] and c["lim_elem"] == "перемычка":
         why = (f"изгиб перемычки ряда у выходного торца: σ рамы {s['sig_frame']:.0f} + σ ряда "
                f"{s['sig_row']:.0f} МПа = [σ] = σ₋₁/(K·S) = {lim.sep_sigma_m1:g}/"
                f"({lim.sep_K:g}·{lim.sep_S:g}) = {s['sig_allow']:.1f} МПа (CP-94)")
@@ -309,4 +341,8 @@ def self_test():
     rf = sep_refs(sep, k, D, 8.0, "roller", 4, R, a, lim2)
     assert rf["M_row"] == min(rf["M_row_b"], rf["M_row_H"]) > 0, rf
     assert abs(rf["M_win"] - 4 * rf["M_row_H"]) < 0.5 and rf["M_win"] >= Ms - 0.1, (rf, Ms)
+    st = {"n": 10, "w": 8.05, "r_in": 64.09, "rows": [{"cage": c} for c in (0.0, 18.0, 18.0, 0.0)]}
+    assert 11.9 < _strip(st) < 12.3, _strip(st)                  # CP-95b: u = 10, окна 0/18°
+    assert _strip({"n": 63, "w": 3.05, "r_in": 60.84,
+                   "rows": [{"cage": c} for c in (0.0, 4.2857, 2.8571, 1.4286)]}) == 0.0
     return True

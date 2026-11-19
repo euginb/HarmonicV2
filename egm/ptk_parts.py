@@ -32,20 +32,22 @@ def separator(n, R, a, D, l, pitch, rows, lim, sep_k):
             "web": round(2 * r_in * math.sin(math.pi / n) - w, 3), "rows": win}
 
 
-def sep_band(sep, d_root, lim):
+def sep_band(sep, d_root, lim, fill=False):
     """Пояса сепаратора — кольца между окнами соседних рядов и у торцов (CP-98, Д-118, OQ-46).
 
     h_mid — от окна ряда до окна следующего, h_end — от торца до окна; t — радиальная толщина.
     Пояса в кинематике не участвуют: стенку ряда 2·SEP_K·a_ω не трогаем, пояс утолщается наружу
     в осевой зоне шайб .05 (h_mid = h шайбы − sep_gap) до t_max = dвн шайбы/2 − sep_band_gap − r_in,
     dвн = DВ + 2·spacer_gap. Пояс осесимметричен — балансировку не меняет; dm — добавка массы, г.
-    CAD пояса нет (ptk_sep) — до него sep_band_t не входит в хэш ID (OQ-46)."""
+    CAD пояса нет (ptk_sep) — до него sep_band_t не входит в хэш ID (OQ-46).
+    CP-95b: fill — пояс до t_max под M_req (D и B не растут, растёт масса dm)."""
     t = sep["r_out"] - sep["r_in"]
     rw = sep["rows"]
     h_end = round(rw[0]["z0"], 3) if rw else 0.0
     h_mid = round(rw[1]["z0"] - rw[0]["z0"] - sep["h"], 3) if len(rw) > 1 else 0.0
     t_max = d_root / 2 + lim.spacer_gap - lim.sep_band_gap - sep["r_in"]
-    tb = max(t, min(lim.sep_band_t or t, t_max))
+    # CP-95b: fill — пояс до t_max под M_req; D и B не растут, растёт масса dm (осесимметрично)
+    tb = max(t, t_max) if fill else max(t, min(lim.sep_band_t or t, t_max))
     warns = []
     if lim.sep_band_t and lim.sep_band_t > t_max + 1e-9:
         warns.append(f"сепаратор: пояс sep_band_t {lim.sep_band_t:g} > {t_max:.2f} мм до шайбы .05 "
