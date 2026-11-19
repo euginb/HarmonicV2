@@ -62,6 +62,11 @@ class PtkLimits:
     sep_band_t: float = 0.0       # радиальная толщина поясов сепаратора, мм; 0 — = стенка (CP-98, OQ-46)
     sep_band_gap: float = 0.2     # зазор утолщённого пояса до dвн шайбы .05, мм (CP-98)
     M_min: float = 0.0            # требуемый выходной момент, Н·м; 0 — не проверяется (Д-41)
+    # CP-95, Д-121: обратная постановка — {u: M, Н·м}; для u из словаря калькулятор сам поднимает
+    # R_Σ (dR) и подбирает крепление. В ID не входит; в хэш попадает только dR (geom.dR).
+    M_req: dict = field(default_factory=dict)
+    r_step: float = 1.0           # CP-95: шаг подъёма R_Σ, мм (время прогона ∝ r_up_max/r_step)
+    r_up_max: float = 40.0        # CP-95: наибольший подъём R_Σ над R_Σ min, мм
     gen_types: tuple = ("bearing", "eccentric")   # генераторы для расчёта (Д-42)
     dgen_step: float = 0.1        # округление вверх D_г эксцентрика и обода, мм (Д-42)
     rim_t_min: float = 2.0        # CP-96: наименьшая радиальная толщина обода .18, мм
@@ -127,6 +132,8 @@ class PtkResult:
     M_row: float = 0.0            # референс: предел одного ряда окон, Н·м (CP-98, Д-118)
     M: float = 0.0                # допускаемый выходной момент, Н·м
     M_by: str = ""                # что ограничивает M: контакт | подшипник | крепление | сепаратор
+    M_req: float = 0.0            # CP-95: требуемый момент для u, Н·м; 0 — прямая постановка
+    dR: float = 0.0              # CP-95: подъём R_Σ над R_Σ min, мм (у bearing — больший подшипник)
     sep_why: str = ""             # причина M_sep: механизм, напряжения, [σ] (CP-94)
     M_body_gen: float = 0.0       # предел тела по контакту с генератором, Н·м (CP-98)
     M_body_ring: float = 0.0      # то же с венцом, Н·м
@@ -171,6 +178,13 @@ def load_config(cfg):
         raise ValueError(f"limits.gen_types: {list(lim.gen_types)} — допустимы {GEN_TYPES} (Д-42)")
     if lim.groove_f <= 0.5:
         raise ValueError(f"limits.groove_f = {lim.groove_f}: нужно > 0.5 — жёлоб шире шарика (Д-45)")
+    if lim.M_req:                                       # CP-95: ключ u — из u_list, M > 0
+        bad_u = [u for u, m in lim.M_req.items() if int(u) not in lim.u_list or not m > 0]
+        if bad_u:
+            raise ValueError(f"limits.M_req: u {bad_u} нет в u_list или M ≤ 0 (CP-95)")
+        lim.M_req = {int(u): float(m) for u, m in lim.M_req.items()}
+    if lim.r_step <= 0:
+        raise ValueError(f"limits.r_step = {lim.r_step}: шаг подъёма R_Σ должен быть > 0 (CP-95)")
     return lim, mounts, fast, cfg.get("mount_mode", "first_ok")
 
 
@@ -336,20 +350,26 @@ def holes_code(holes):
     return f"{holes.n}{holes.bolt}" + (f"P{holes.pins}" if holes.pins else "")
 
 
-def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing"):
-    """Все параметры, определяющие геометрию исполнения (вход хэша и CAD)."""
+def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0):
+    """Все параметры, определяющие геометрию исполнения (вход хэша и CAD).
+
+    CP-95: dR — подъём R_Σ у eccentric/rim. Ключ добавляется только при dR > 0, поэтому ID прямой
+    постановки не меняются; у bearing R_Σ задаёт подшипник, и он уже в хэше (Д-80, Д-120)."""
     f = fast.get(holes.bolt, {})
-    return _n({"rev": GEOM_REV, "u": u, "gen": gen,
-               "roller": {k: rol.get(k) for k in GEOM_ROLLER},
-               "bearing": {k: brg.get(k) for k in GEOM_BEARING} if brg else None,
-               "limits": {k: getattr(lim, k) for k in GEOM_LIMITS},
-               "ring_holes": {k: getattr(holes, k) for k in GEOM_HOLES},
-               "fastener": {k: f.get(k) for k in ("d_clear", "dk")}})
+    g = {"rev": GEOM_REV, "u": u, "gen": gen,
+         "roller": {k: rol.get(k) for k in GEOM_ROLLER},
+         "bearing": {k: brg.get(k) for k in GEOM_BEARING} if brg else None,
+         "limits": {k: getattr(lim, k) for k in GEOM_LIMITS},
+         "ring_holes": {k: getattr(holes, k) for k in GEOM_HOLES},
+         "fastener": {k: f.get(k) for k in ("d_clear", "dk")}}
+    if dR > 1e-9 and gen != "bearing":                  # CP-95: D_г обода/эксцентрика задан dR
+        g["dR"] = dR
+    return _n(g)
 
 
-def config_id(u, rol, lim, holes, fast, brg=None, gen="bearing"):
+def config_id(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0):
     """ID исполнения PTK-<u>-<тело>-<отверстия>-<хэш> (Д-80) и снимок геометрии."""
-    g = geom_params(u, rol, lim, holes, fast, brg, gen)
+    g = geom_params(u, rol, lim, holes, fast, brg, gen, dR)
     raw = json.dumps(g, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
     h = hashlib.sha1(raw.encode("ascii")).hexdigest()[:6].upper()
     return f"PTK-{u:03d}-{roller_code(rol)}-{holes_code(holes)}-{h}", g
@@ -423,14 +443,16 @@ def rim_pick(Dg, l, a, MB1, need_d, bears, lim):
     return (best[1], best[2]) if best else (None, {})
 
 
-def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
+def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0):
     """Расчёт одной конфигурации. rol = {'type','d','l'[, 'a_w', 'wall_min']};
-    gen — bearing (тела на наружном кольце подшипника, Д-40) | eccentric (на эксцентрике, Д-42)."""
+    gen — bearing (тела на наружном кольце подшипника, Д-40) | eccentric (на эксцентрике, Д-42).
+    dR — подъём R_Σ над R_Σ min, мм (CP-95): у eccentric/rim — D_г больше на 2·dR,
+    у bearing — подшипник с D ≥ 2(R_Σ min + dR) − D_ш."""
     D = rol["d"]
     wall = rol.get("wall_min", lim.wall_min)
     a = rol.get("a_w") or lim.a_k * D
-    r = PtkResult(u, rid, D, gen=gen)
-    r.id, r.geom = config_id(u, rol, lim, holes, fast, None, gen)
+    r = PtkResult(u, rid, D, gen=gen, M_req=lim.M_req.get(u, 0.0), dR=dR)
+    r.id, r.geom = config_id(u, rol, lim, holes, fast, None, gen, dR)
     if u > lim.u_max:
         s = two_stage(u, lim)
         r.errors.append(f"u={u} > {lim.u_max}: одноступенчатый ПТК не считается; рекомендуется "
@@ -448,7 +470,7 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
     R, by = r_sum(u, D, a, lim)
     brg = None
     if gen == "bearing":
-        bk, need_D, need_d = bearing(D, R, a, bears, lim)
+        bk, need_D, need_d = bearing(D, R + dR, a, bears, lim)     # CP-95: dR -> крупнее подшипник
         brg = bears.get(bk) if bk else None
         if brg is None:
             r.errors.append(f"нет подшипника генератора с D ≥ {need_D:.1f} и d ≥ {need_d:.1f} мм "
@@ -461,7 +483,7 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
         need_d = lim.shaft_d_min + 2 * (a + lim.ecc_wall_min)
         if need_d > 2 * R - D + 1e-9:
             by = "вал"
-        R = (_ceil(max(2 * R - D, need_d), lim.dgen_step) + D) / 2
+        R = (_ceil(max(2 * R - D, need_d) + 2 * dR, lim.dgen_step) + D) / 2   # CP-95: + 2·dR
     if gen == "rim":                                    # CP-96: подшипник на min радиусе эксцентрика
         fit = [b["D"] for k, b in bears.items() if not k.startswith("_")
                and b["d"] >= need_d - 1e-9]
@@ -477,10 +499,12 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
                             f"{2 * R - D - 2 * lim.rim_t_min:.1f} мм, проходящего натяг (CP-96)")
         else:
             r.bearing = bk
-            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen)
+            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen, dR)
             if rol["l"] > brg["B"] + 1e-9:                # CP-96: обод шире подшипника
                 r.warnings.append(f"обод .18 шире подшипника {bk}: {rol['l']:g} > {brg['B']:g} мм — "
                                   f"консоль {((rol['l'] - brg['B']) / 2):.2f} мм на сторону (OQ-48)")
+    if dR > 1e-9:                                       # CP-95: R_Σ поднят под требуемый момент
+        by = "M_req"
     rho_k = ptk_profile.curv_radius_min(a, R, z)
     d_root = 2 * (R + a) + D
     r.n, r.z, r.a_w, r.R_sum, r.R_by = n, z, round(a, 3), round(R, 3), by
@@ -560,14 +584,53 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing"):
     return r
 
 
+def solve(u, rid, rol, gen, bears, lim, mounts, fast):
+    """CP-95 (Д-116 п. 2, Д-121): обратная постановка для (u, тело, генератор) при M_req.
+
+    Для каждого крепления R_Σ поднимается от R_Σ min шагом r_step (до r_up_max или D > d_out_max):
+    первое dR, где исполнение проходит и M ≥ M_req, — кандидат этого крепления (D растёт с dR
+    монотонно). Из кандидатов берётся наименьший (D, B, −M): габарит, затем длина пакета; масса на
+    шаге 1 не считается (Д-48). Крепление подбирается по моменту, а не «первым из списка».
+    Нет кандидата — строка с наибольшим найденным M и ошибкой «M_req не достигнут»."""
+    M_req, best, top = lim.M_req[u], None, None
+    n_up = int(round(lim.r_up_max / lim.r_step)) if lim.r_step > 0 else 0
+    for key, h in mounts.items():
+        for i in range(n_up + 1):
+            r = calc(u, rid, rol, lim, h, fast, bears, gen, round(i * lim.r_step, 6))
+            r.mount = key
+            if r.excluded:                              # Т1/Т5 не зависят от dR и крепления
+                return r
+            if top is None or (r.M, r.ok) > (top.M, top.ok):
+                top = r
+            if r.ok and r.M >= M_req - 1e-9:
+                if best is None or (r.d_out, r.width, -r.M) < (best.d_out, best.width, -best.M):
+                    best = r
+                break                                   # больший dR — больший D: дальше смысла нет
+            if lim.d_out_max and r.d_out > lim.d_out_max:
+                break
+    if best is not None:
+        return best
+    if top is None:
+        top = calc(u, rid, rol, lim, {"default": RingHoles()}, fast, bears, gen)
+    top.errors.append(f"M_req {M_req:g} Н·м не достигнут: наибольший M {top.M:g} "
+                      f"({top.M_by or '—'}) при dR ≤ {lim.r_up_max:g} мм и креплениях "
+                      f"{list(mounts)} (CP-95)")
+    top.ok = False
+    return top
+
+
 def sweep(rollers, bears, lim, mounts, fast, mode="first_ok"):
-    """Д-33, Д-42: для (u, тело, генератор) — все крепления (all) или первое прошедшее (first_ok)."""
+    """Д-33, Д-42: для (u, тело, генератор) — все крепления (all) или первое прошедшее (first_ok).
+    CP-95: для u из limits.M_req — обратная постановка solve(), одна строка на тройку."""
     out = []
     for u in lim.u_list:
         for rid, rol in rollers.items():
             if rid.startswith("_"):
                 continue
             for gen in lim.gen_types:
+                if u in lim.M_req:                      # CP-95
+                    out.append(solve(u, rid, rol, gen, bears, lim, mounts, fast))
+                    continue
                 rs = []
                 for key, h in mounts.items():
                     r = calc(u, rid, rol, lim, h, fast, bears, gen)
@@ -654,8 +717,28 @@ def to_rows(results, mounts):
     return [asdict(r) for r in results]
 
 
+def mreq_table(rows, lim):
+    """CP-95: решение под M_req по u — наименьший (D, B, −M) среди реализуемых строк."""
+    if not lim.M_req:
+        return ("не задано (`limits.M_req` пуст) — прямая постановка: M есть следствие габарита, "
+                "а не вход.")
+    t = ["| u | M_req, Н·м | ID | Тело | Генератор | dR, мм | $R_\\Sigma$ | D | B | "
+         "M, Н·м (огр.) |", "|---|---|---|---|---|---|---|---|---|---|"]
+    for u, m in sorted(lim.M_req.items()):
+        ok = [r for r in rows if r["u"] == u and r["ok"] and not r["excluded"]]
+        if not ok:
+            t.append(f"| {u} | {m:g} | нет решения | — | — | — | — | — | — | — |")
+            continue
+        b = min(ok, key=lambda r: (r["d_out"], r["width"], -r["M"]))
+        gen = (b["bearing"] + (" + обод" if b["gen"] == "rim" else "")
+               if b["gen"] in ("bearing", "rim") else "эксцентрик")
+        t.append(f"| {u} | {m:g} | `{b['id']}` | {b['roller']} | {gen} | {b['dR']:g} | "
+                 f"{b['R_sum']:g} | {b['d_out']:g} | {b['width']:g} | {b['M']:g} ({b['M_by']}) |")
+    return "\n".join(t)
+
+
 def tech_md():
-    """Расшифровка технологических кодов (Д-45) для SPEC-10."""
+    """Расшифровка техкодов (Д-45) для SPEC-10."""
     L = ["| Код | Пара | Следствие для расчёта | Обоснование |", "|---|---|---|---|"]
     L += [f"| {k} | {p} | {e} | {w} |" for k, (p, e, w) in TECH.items()]
     return "\n".join(L)
@@ -792,6 +875,23 @@ def self_test():
     assert min(b20) > 0 and k20.M_H == min(b20[:2]) and k20.M <= min(b20), (b20, k20.M)
     assert k20.M_by_body in ("генератор", "венец", "окно") and s20["M_pack"] == k20.M_sep
     assert 0 < s20["eta_pack"] < 1, s20
+    # CP-95 (Д-121): обратная постановка — dR поднимает R_Σ, ID меняется только при dR > 0
+    e2 = calc(19, "t", b, lim, holes, fast, {}, "eccentric", 5.0)
+    assert abs(e2.R_sum - e.R_sum - 5.0) < 1e-9 and e2.R_by == "M_req", (e2.R_sum, e.R_sum)
+    assert e2.id != e.id and e2.d_out >= e.d_out and e2.geom.get("dR") == 5.0, (e2.geom, e.id)
+    assert calc(19, "t", b, lim, holes, fast, {}, "eccentric", 0.0).id == e.id   # dR = 0 — ID прежний
+    tgt = round(min(1.3 * e.M, 0.95 * e.M_H), 1)
+    lq = PtkLimits(d_out_max=None, M_req={19: tgt}, u_list=(10, 19, 63))
+    mts = {"a": holes, "b": RingHoles(bolt="M4", n=12)}
+    s = solve(19, "t", b, "eccentric", {}, lq, mts, fast)
+    assert s.ok and s.M >= tgt - 1e-9 and s.M_req == tgt and s.mount in mts, (s.M, s.dR, s.errors)
+    sx = solve(19, "t", b, "eccentric", {}, PtkLimits(M_req={19: 1e6}, u_list=(10, 19, 63)),
+               {"a": holes}, fast)
+    assert not sx.ok and "M_req" in sx.errors[-1], sx.errors
+    assert "нет решения" not in mreq_table([asdict(s)], lq) and "нет решения" in mreq_table(
+        [asdict(sx)], PtkLimits(M_req={19: 1e6}))
+    bb3 = calc(19, "t", b, lim, holes, fast, bears, "bearing", 3.0)   # bearing: dR -> больший подшипник
+    assert bb3.R_sum >= r.R_sum - 1e-9 and bb3.dR == 3.0 and "dR" not in bb3.geom, bb3.R_sum
     return True
 
 
