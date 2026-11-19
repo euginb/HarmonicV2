@@ -100,7 +100,7 @@ def run_ptk(prices):
                      f"{r['alpha_max'] or '—'} | "
                      f"{(r['holes'] + ' (' + r['mount'] + ')') if r['holes'] else '—'} | "
                      f"{r['ring_variants'] or '—'} | {r['d_bc']} | {r['d_out']} | "
-                     f"{r['width']} | {m} | {r['t_hold']} | {st} |")
+                     f"{r['width']} | {m} | {r['M_req'] or '—'} | {r['t_hold']} | {st} |")
         tag = f"- u={r['u']}, {r['roller']}, {r['gen']}: "
         errs += [tag + e for e in r["errors"]]
         warns += [tag + w for w in r["warnings"]]
@@ -118,7 +118,8 @@ def run_ptk(prices):
         parts=ptk_parts.table(rows),
         excluded=("| ID | u | Тело | Генератор | Код |\n|---|---|---|---|---|\n" + "\n".join(excl))
                  if excl else "нет",
-        two_stage=ptk.two_stage_table(lim), phasing=phasing)
+        two_stage=ptk.two_stage_table(lim), phasing=phasing,
+        mreq=ptk.mreq_table([r for r in rows if not r["excluded"]], lim))   # CP-95
     write("specs", "SPEC-10_PTK_CALC.md", text)
     bad = [f"SPEC-10: в шаблоне нет полей {missing}"] if missing else []
     ids = [r["id"] for r in rows]
