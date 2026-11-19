@@ -25,8 +25,6 @@ GEN_TYPES = ("bearing", "eccentric")   # Д-42: тела на наружном �
 @dataclass
 class PtkLimits:
     d_out_max: float = 110.0      # D max — наружный Ø редуктора, мм (Д-08); None — без предела (Д-43)
-    u_min: int = 10               # диапазон одноступенчатого u (Д-08, Д-11)
-    u_max: int = 100
     wall_min: float = 4.0         # стенка впадины–отверстие и отверстие–D, мм; у тела — своя
     a_k: float = 0.2              # a_ω = a_k·D_ш, если у тела нет a_w (calc_vptc.py: 0.2)
     r_tip_min: float = 0.05       # наименьший радиус вершины зуба венца, мм
@@ -38,7 +36,19 @@ class PtkLimits:
     row_gap: float = 1.0          # осевой зазор (шайба) между рядами, мм
     rows: int = 4
     row_phases: tuple = (0, 90, 180, 270)   # фазы эксцентриков рядов, град (Д-19)
-    u_list: tuple = (10, 16, 20, 25, 32, 40, 50, 63, 80, 100)
+    u_list: tuple = (10, 16, 20, 25, 32, 40, 50, 63)
+
+    # Д-119: границы одноступенчатого диапазона не задаются в ptk_input.yaml, а берутся
+    # из u_list — первый и последний элементы. В хэш ID не входят (заменяли u_min/u_max).
+    @property
+    def u_min(self) -> int:
+        """Нижняя граница одноступенчатого u — первый элемент u_list (Д-08)."""
+        return int(self.u_list[0])
+
+    @property
+    def u_max(self) -> int:
+        """Верхняя граница — последний элемент u_list; u > u_max — две ступени (Д-11)."""
+        return int(self.u_list[-1])
     E_mod: float = 210000.0       # модуль упругости тел, венца, колец подшипника, МПа (Д-41)
     nu: float = 0.3               # коэффициент Пуассона
     sigma_H_line: float = 2500.0  # допускаемое σ_H, линейный контакт (ролик), МПа (OQ-08)
@@ -147,6 +157,9 @@ def load_config(cfg):
     raw = cfg.get("ring_mounts") or {"default": cfg["ring_holes"]}
     mounts = {k: _load(RingHoles, v) for k, v in raw.items() if not k.startswith("_")}
     lim = _load(PtkLimits, cfg["limits"])
+    if list(lim.u_list) != sorted(lim.u_list):          # Д-119: диапазон = края списка
+        raise ValueError(f"limits.u_list = {list(lim.u_list)}: список должен быть по возрастанию — "
+                         f"первый и последний элементы задают u_min…u_max")
     bad = [g for g in lim.gen_types if g not in GEN_TYPES]
     if bad or not lim.gen_types:
         raise ValueError(f"limits.gen_types: {list(lim.gen_types)} — допустимы {GEN_TYPES} (Д-42)")
@@ -626,7 +639,8 @@ def self_test():
     be = calc(10, "t", {"type": "ball", "d": 2.0, "l": 2.0}, lim, holes, fast, {}, "eccentric")
     assert not be.excluded and be.tech == ["Т2", "Т3", "Т4"], be.tech
     assert tech_md().count("| Т") == len(TECH)
-    big = calc(100, "t", b, PtkLimits(d_out_max=None), holes, fast, {}, "eccentric")
+    big = calc(100, "t", b, PtkLimits(d_out_max=None, u_list=(10, 100)), holes, fast, {},  # Д-119: u=100 — свой список
+              "eccentric")
     assert big.ok and big.d_out > 110.0 and big.Drol_max == 0.0, big.errors   # Д-43
     try:
         load_config({"limits": {"gen_types": ["magnet"]}, "ring_mounts": {"x": {}}, "fasteners": {}})
@@ -641,6 +655,19 @@ def self_test():
     assert not r.ok and "двухступенчат" in r.errors[0]
     assert two_stage(200, lim)["u"] == 200 and two_stage(200, lim)["exact"]
     assert c(63).Drol_max < 5.0
+    assert (lim.u_min, lim.u_max) == (lim.u_list[0], lim.u_list[-1])   # Д-119: диапазон из u_list
+    assert (PtkLimits(u_list=(12, 30, 45)).u_min, PtkLimits(u_list=(12, 30, 45)).u_max) == (12, 45)
+    try:
+        load_config({"limits": {"u_min": 10, "u_list": [10, 20]}, "ring_mounts": {"x": {}},
+                     "fasteners": {}})
+        raise AssertionError("явный u_min в limits принят — диапазон задаётся только u_list (Д-119)")
+    except ValueError:
+        pass
+    try:
+        load_config({"limits": {"u_list": [20, 10]}, "ring_mounts": {"x": {}}, "fasteners": {}})
+        raise AssertionError("u_list не по возрастанию принят")
+    except ValueError:
+        pass
     assert c(20, RingHoles(n=6)).ok                       # кратность 4 не нужна (Д-19)
     assert not c(20, RingHoles(n=40)).ok
     assert not c(20, RingHoles(bolt="M99")).ok
