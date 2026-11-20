@@ -66,6 +66,7 @@ class PtkLimits:
     # таблица — прямая постановка; ключ внутренней — целевой момент M_req, Н·м. Состав ключей u
     # задаёт u_list. В ID не входят; в хэш попадают только dR, hb и band_fill (geom.*).
     u_calc: dict = field(default_factory=dict)
+    u_def: dict = field(default_factory=dict)   # CP-101: {u: параметры} — слои ALL.ALL + u.ALL
     r_step: float = 1.0           # CP-95: шаг подъёма R_Σ по умолчанию, мм (вариант может задать свой)
     r_up_max: float = 40.0        # CP-95: наибольший подъём R_Σ над R_Σ min по умолчанию, мм
     # CP-95b: добавка к шагу ряда — высота пояса сепаратора, мм; перебор под M_req (в ID — hb)
@@ -169,58 +170,173 @@ def _load(cls, d):
     return cls(**{k: tuple(v) if isinstance(v, list) else v for k, v in data.items()})
 
 
-def _parse_u_calc(raw):
-    """CP-99 (Д-123): {u: {M_req: {параметры}}} -> ({u: {M_req: params}}, u_list).
+# CP-101 (Д-124): параметры слоя u_calc → u → ALL → M_req
+NUM_KEYS = ("r_step", "r_up_max", "band_h_list")          # перебор
+LIST_KEYS = ("mounts", "rollers", "gen_types")            # перечни (пустой — без ограничения)
+VARIANT_KEYS = NUM_KEYS + LIST_KEYS
+VARIANT_RESERVED = ("materials",)                         # зарезервировано на доработку
 
-    Пустая таблица вариантов — прямая постановка для u; ключ внутренней таблицы — целевой момент
-    M_req, Н·м. Состав ключей u задаёт u_list и границы диапазона (Д-119)."""
+
+def _parse_params(where, prm):
+    """CP-101 (Д-124): параметры слоя u_calc — проверка и нормализация.
+
+    Проверяются только заданные ключи: перебор (r_step, r_up_max, band_h_list) и перечни
+    (mounts, rollers, gen_types). Пустой список перечня — без ограничения (все).
+    materials зарезервирован — пока не принимается."""
+    if prm is None:
+        return {}
+    if not isinstance(prm, dict):
+        raise ValueError(f"{where}: нужна таблица параметров {{ключ: значение}}, получено "
+                         f"{type(prm).__name__}")
+    bad = sorted(set(prm) - set(VARIANT_KEYS) - set(VARIANT_RESERVED))
+    if bad:
+        raise ValueError(f"{where}: неизвестные параметры {bad}; допустимы {list(VARIANT_KEYS)}")
+    res = sorted(set(prm) & set(VARIANT_RESERVED))
+    if res:
+        raise ValueError(f"{where}: {res} зарезервированы на дальнейшие доработки — пока не "
+                         f"принимаются (CP-101)")
+    out = {}
+    if "r_step" in prm:
+        v = float(prm["r_step"])
+        if not v > 0:
+            raise ValueError(f"{where}.r_step: шаг подъёма R_Σ должен быть > 0, мм")
+        out["r_step"] = v
+    if "r_up_max" in prm:
+        v = float(prm["r_up_max"])
+        if v < 0:
+            raise ValueError(f"{where}.r_up_max: наибольший подъём R_Σ должен быть ≥ 0, мм")
+        out["r_up_max"] = v
+    if "band_h_list" in prm:
+        hb = tuple(float(x) for x in prm["band_h_list"])
+        if not hb or list(hb) != sorted(hb) or hb[0] < 0:
+            raise ValueError(f"{where}.band_h_list: высоты пояса по возрастанию и ≥ 0, мм")
+        out["band_h_list"] = hb
+    for k, allowed, note in (("mounts", None, "ring_mounts"),
+                             ("rollers", None, "vendor_prices.yaml → rollers"),
+                             ("gen_types", GEN_TYPES, "типы генератора (Д-42)")):
+        if k not in prm or prm[k] is None:
+            continue
+        v = prm[k]
+        if isinstance(v, str) or not isinstance(v, (list, tuple)):
+            raise ValueError(f"{where}.{k}: нужен список, получено {type(v).__name__}; "
+                             f"пустой список — без ограничения")
+        lst = tuple(str(x) for x in v)
+        if allowed is not None:
+            badl = [x for x in lst if x not in allowed]
+            if badl:
+                raise ValueError(f"{where}.{k}: {badl} — допустимы {list(allowed)}")
+        out[k] = lst
+    return out
+
+
+def _all_layer(where, v):
+    """CP-101: слой ALL — {ALL: {параметры}}; возвращает параметры слоя ({} — не задан)."""
+    if v is None:
+        return {}
+    if not isinstance(v, dict):
+        raise ValueError(f"{where}: нужна таблица {{ALL: {{параметры}}}} или {{параметры}}, "
+                         f"получено {type(v).__name__}")
+    if "ALL" in v:                                    # полный вид: {ALL: {параметры}}
+        extra = sorted(set(v) - {"ALL"})
+        if extra:
+            raise ValueError(f"{where}: под ALL допустим только ключ ALL — параметры по умолчанию "
+                             f"для всех элементов уровня; найдено {extra}")
+        return v["ALL"]
+    return v                                          # сокращённый вид: {параметры}
+
+
+def _merge(*layers):
+    """CP-101: слои параметров — следующий перекрывает предыдущий, список заменяется целиком."""
+    out = {}
+    for l in layers:
+        out.update({k: v for k, v in (l or {}).items() if v is not None})
+    return out
+
+
+def _parse_u_calc(raw):
+    """CP-99/CP-101 (Д-123, Д-124): таблица расчёта по u -> (u_calc, u_def, u_list).
+
+    {ALL: {ALL: параметры}, u: {ALL: параметры, M_req: параметры}}. Слои: ALL.ALL — для всех u и
+    вариантов, u.ALL — для всех вариантов этого u, вариант — для себя (перекрывает, список
+    заменяется целиком). Пустая таблица вариантов (или только ALL) — прямая постановка для u.
+    Состав ключей u, кроме ALL, задаёт u_list и границы диапазона (Д-119)."""
     if not isinstance(raw, dict) or not raw:
         raise ValueError("limits.u_calc: нужна таблица {u: {M_req: {параметры}}} — состав ключей u "
                          "задаёт таблицу SPEC-10 и u_min…u_max (CP-99, Д-123)")
-    out = {}
+    base = _parse_params("limits.u_calc.ALL.ALL", _all_layer("limits.u_calc.ALL", raw.get("ALL")))
+    out, udef = {}, {}
     for k_u, var in raw.items():
-        u = int(k_u)
+        if k_u == "ALL":
+            continue
+        try:
+            u = int(k_u)
+        except (TypeError, ValueError):
+            raise ValueError(f"limits.u_calc: ключ {k_u!r} — нужен u (целое) или ALL")
         if u in out:
             raise ValueError(f"limits.u_calc: u = {k_u} задан дважды")
         if u < 2:
             raise ValueError(f"limits.u_calc[{u}]: u < 2 — вне одноступенчатого диапазона (Д-08)")
-        var = {} if var is None else var
+        if var is None:
+            var = {}
         if not isinstance(var, dict):
             raise ValueError(f"limits.u_calc[{u}]: нужно {{M_req: {{параметры}}}}, получено "
                              f"{type(var).__name__}")
+        u_all = _parse_params(f"limits.u_calc[{u}].ALL",
+                              _all_layer(f"limits.u_calc[{u}]", var.get("ALL")))
+        udef[u] = _merge(base, u_all)
         vs = {}
         for k_m, prm in var.items():
+            if k_m == "ALL":
+                continue
             m = float(k_m)
             if not m > 0:
                 raise ValueError(f"limits.u_calc[{u}]: M_req = {k_m} — нужен > 0, Н·м")
             if m in vs:
                 raise ValueError(f"limits.u_calc[{u}]: M_req = {m:g} задан дважды")
-            prm = {} if prm is None else dict(prm)
-            bad = sorted(set(prm) - set(VARIANT_KEYS))
-            if bad:
-                res = [k for k in bad if k in VARIANT_RESERVED]
-                if res:
-                    raise ValueError(f"limits.u_calc[{u}][{m:g}]: {res} зарезервированы на дальнейшие "
-                                     f"доработки — пока не принимаются (CP-99)")
-                raise ValueError(f"limits.u_calc[{u}][{m:g}]: неизвестные параметры {bad}; "
-                                 f"допустимы {list(VARIANT_KEYS)}")
-            if prm.get("r_step", 1.0) <= 0:
-                raise ValueError(f"limits.u_calc[{u}][{m:g}].r_step: должен быть > 0")
-            if prm.get("r_up_max", 0.0) < 0:
-                raise ValueError(f"limits.u_calc[{u}][{m:g}].r_up_max: должен быть ≥ 0")
-            if "band_h_list" in prm:
-                hb = tuple(float(x) for x in prm["band_h_list"])
-                if not hb or list(hb) != sorted(hb) or hb[0] < 0:
-                    raise ValueError(f"limits.u_calc[{u}][{m:g}].band_h_list: по возрастанию, ≥ 0")
-                prm["band_h_list"] = hb
-            vs[m] = prm
+            vs[m] = _merge(udef[u], _parse_params(f"limits.u_calc[{u}][{m:g}]", prm))
         out[u] = vs
-    return out, tuple(sorted(out))
+    if not out:
+        raise ValueError("limits.u_calc: нет ни одного u — ALL задаёт только параметры по умолчанию; "
+                         "нужен хотя бы один u (CP-99, Д-123)")
+    return out, udef, tuple(sorted(out))
+
+
+def u_params(lim):
+    """CP-101: все слои параметров u_calc — [(где, параметры)]; проверки и справка."""
+    out = [(f"u_calc[{u}].ALL", lim.u_def.get(u, {})) for u in lim.u_list]
+    out += [(f"u_calc[{u}][{m:g}]", prm) for u in lim.u_list
+            for m, prm in sorted((lim.u_calc.get(u) or {}).items())]
+    return out
+
+
+def _scope(prm, rollers, mounts, lim, where):
+    """CP-101: эффективные перечни тел качения, креплений и типов генератора для слоя.
+
+    Пустой или отсутствующий список — без ограничения (все). Неизвестное имя — ошибка: это
+    опечатка в конфиге, а не «нет такого варианта». Пустой результат — тоже ошибка, чтобы u не
+    выпал из таблицы молча."""
+    rl = prm.get("rollers") or ()
+    bad = [k for k in rl if k not in rollers]
+    if bad:
+        have = sorted(k for k in rollers if not k.startswith("_"))
+        raise ValueError(f"{where}.rollers: {bad} нет в vendor_prices.yaml → rollers (есть {have})")
+    mt = prm.get("mounts") or ()
+    bad = [k for k in mt if k not in mounts]
+    if bad:
+        raise ValueError(f"{where}.mounts: {bad} нет в ring_mounts (есть {list(mounts)})")
+    rs = {k: v for k, v in rollers.items() if not k.startswith("_") and (not rl or k in rl)}
+    ms = {k: v for k, v in mounts.items() if not mt or k in mt}
+    gs = tuple(prm.get("gen_types") or lim.gen_types)
+    if not rs or not ms or not gs:
+        raise ValueError(f"{where}: после ограничения перечней не осталось вариантов расчёта "
+                         f"(тел {len(rs)}, креплений {len(ms)}, генераторов {len(gs)}) — "
+                         f"проверьте mounts / rollers / gen_types (CP-101)")
+    return rs, ms, gs
 
 
 def _variant_limits(lim, params):
-    """CP-99: пределы перебора для варианта (u, M_req) — r_step, r_up_max, band_h_list."""
-    kw = {k: params[k] for k in VARIANT_KEYS if k in params}
+    """CP-99: пределы перебора варианта — только числовые ключи (r_step, r_up_max, band_h_list)."""
+    kw = {k: params[k] for k in NUM_KEYS if k in params}
     return replace(lim, **kw) if kw else lim
 
 
@@ -235,10 +351,14 @@ def load_config(cfg):
             raise ValueError(f"limits.{key}: устарело — расчёт по u задаётся таблицей limits.u_calc "
                              f"(CP-99, Д-123)")
     lim = _load(PtkLimits, raw_lim)
-    lim.u_calc, lim.u_list = _parse_u_calc(raw_lim.get("u_calc"))   # Д-119: u_min/u_max — края
+    lim.u_calc, lim.u_def, lim.u_list = _parse_u_calc(raw_lim.get("u_calc"))   # Д-119: края
     bad = [g for g in lim.gen_types if g not in GEN_TYPES]
     if bad or not lim.gen_types:
         raise ValueError(f"limits.gen_types: {list(lim.gen_types)} — допустимы {GEN_TYPES} (Д-42)")
+    for where, prm in u_params(lim):                    # CP-101: имена креплений — из ring_mounts
+        badm = [k for k in (prm.get("mounts") or ()) if k not in mounts]
+        if badm:
+            raise ValueError(f"limits.{where}.mounts: {badm} нет в ring_mounts (есть {list(mounts)})")
     if lim.groove_f <= 0.5:
         raise ValueError(f"limits.groove_f = {lim.groove_f}: нужно > 0.5 — жёлоб шире шарика (Д-45)")
     if lim.r_step <= 0:
@@ -351,9 +471,6 @@ GEOM_LIMITS = ("a_k", "r_tip_min", "sep_web_min", "shaft_d_min", "ecc_wall_min",
                "sep_gap")
 GEOM_HOLES = ("bolt", "n", "pins", "pin_d", "head_margin")
 GEOM_ROLLER = ("type", "d", "l", "a_w", "wall_min")
-# CP-99 (Д-123): параметры варианта расчёта u_calc[u][M_req] — реализованы / зарезервированы
-VARIANT_KEYS = ("r_step", "r_up_max", "band_h_list")
-VARIANT_RESERVED = ("mounts", "rollers", "materials", "gen_types")
 GEOM_BEARING = ("d", "D", "B")     # Д-40
 ROLLER_TYPES = {"roller": "R", "ball": "B"}
 
@@ -702,22 +819,24 @@ def solve(u, rid, rol, gen, bears, lim, mounts, fast, m_req):
 
 def sweep(rollers, bears, lim, mounts, fast, mode="first_ok"):
     """Д-33, Д-42: для (u, тело, генератор) — все крепления (all) или первое прошедшее (first_ok).
-    CP-99: для u с вариантами в limits.u_calc — обратная постановка solve() по каждому варианту
-    (u, M_req), по строке на тройку и вариант."""
+    CP-99/CP-101: перечни тел, креплений и генераторов берутся из слоя u_calc (ALL.ALL → u.ALL →
+    вариант); для u с вариантами — обратная постановка solve() по каждому варианту (u, M_req)."""
     out = []
     for u in lim.u_list:
         variants = lim.u_calc.get(u) or {}
-        for rid, rol in rollers.items():
-            if rid.startswith("_"):
-                continue
-            for gen in lim.gen_types:
-                if variants:                            # CP-99: обратная постановка по вариантам
-                    for m, prm in sorted(variants.items()):
-                        out.append(solve(u, rid, rol, gen, bears, _variant_limits(lim, prm),
-                                         mounts, fast, m))
-                    continue
+        if variants:                                    # CP-99: обратная постановка по вариантам
+            for m, prm in sorted(variants.items()):
+                rl, ms, gs = _scope(prm, rollers, mounts, lim, f"u_calc[{u}][{m:g}]")
+                vl = _variant_limits(lim, prm)
+                for rid, rol in rl.items():
+                    for gen in gs:
+                        out.append(solve(u, rid, rol, gen, bears, vl, ms, fast, m))
+            continue
+        rl, ms, gs = _scope(lim.u_def.get(u, {}), rollers, mounts, lim, f"u_calc[{u}].ALL")
+        for rid, rol in rl.items():
+            for gen in gs:
                 rs = []
-                for key, h in mounts.items():
+                for key, h in ms.items():
                     r = calc(u, rid, rol, lim, h, fast, bears, gen)
                     r.mount = key
                     rs.append(r)
@@ -983,21 +1102,38 @@ def self_test():
     assert not sx.ok and "M_req" in sx.errors[-1], sx.errors
     assert "нет решения" not in mreq_table([asdict(s)], lq) and "нет решения" in mreq_table(
         [asdict(sx)], lq)                                                   # CP-99: по вариантам
-    # CP-99 (Д-123): таблица u_calc — состав ключей u задаёт u_list, вариант несёт параметры
-    lc = load_config({"limits": {"u_calc": {20: {1000: {}}, 32: {}, 10: {500: {"r_step": 0.5}}}},
-                      "ring_mounts": {"x": {}}, "fasteners": {}})[0]
-    assert lc.u_list == (10, 20, 32) and sorted(lc.u_calc[10]) == [500.0], (lc.u_list, lc.u_calc)
-    assert lc.u_calc[32] == {} and _variant_limits(lc, lc.u_calc[10][500.0]).r_step == 0.5
-    assert _variant_limits(lc, {}).r_step == lc.r_step
-    for bad in ({"limits": {"u_calc": {}}}, {"limits": {"u_list": [10]}},
-                {"limits": {"M_req": {10: 100}}}, {"limits": {"u_calc": {10: {0: {}}}}},
-                {"limits": {"u_calc": {10: {100: {"mounts": ["M6x24P2"]}}}}},
-                {"limits": {"u_calc": {10: {100: {"nosuch": 1}}}}}):
+    # CP-101 (Д-124): слои ALL.ALL -> u.ALL -> вариант; перечни mounts/rollers/gen_types
+    lb, mb, _, _ = load_config({"limits": {"u_calc": {
+        "ALL": {"ALL": {"mounts": ["M6x24P2"], "r_step": 2.0}},
+        10: {"ALL": {"rollers": ["R_D8x16"]}, 500: {}, 700: {"mounts": ["M5x12P2"], "r_step": 0.5}},
+        20: {}}}, "ring_mounts": {"M6x24P2": {}, "M5x12P2": {}}, "fasteners": {}})
+    assert lb.u_list == (10, 20) and lb.u_calc[10][500.0]["r_step"] == 2.0, (lb.u_list, lb.u_calc)
+    assert lb.u_calc[10][500.0]["rollers"] == ("R_D8x16",), lb.u_calc[10]
+    assert lb.u_calc[10][700.0]["mounts"] == ("M5x12P2",) and lb.u_calc[10][700.0]["r_step"] == 0.5
+    assert lb.u_calc[10][700.0]["rollers"] == ("R_D8x16",)      # слой u.ALL унаследован вариантом
+    assert lb.u_def[20] == {"mounts": ("M6x24P2",), "r_step": 2.0}, lb.u_def[20]   # только ALL.ALL
+    assert _scope(lb.u_calc[10][500.0], {"R_D8x16": {}}, mb, lb, "t")[0] == {"R_D8x16": {}}
+    for badc in ({},                                    # пустая таблица
+                 {"ALL": {"ALL": {}}},                  # только ALL — нет ни одного u
+                 {"ALL": {"10": {}}, 10: {}},           # лишний ключ под ALL
+                 {10: {100: {"mounts": ["НЕТ"]}}},      # крепления нет в ring_mounts
+                 {10: {100: {"gen_types": ["nosuch"]}}},
+                 {10: {100: {"materials": ["40Х"]}}},   # зарезервировано
+                 {10: {100: {"mounts": "M6x24P2"}}},    # не список
+                 {10: {100: {"nosuch": 1}}},            # неизвестный параметр
+                 {10: {0: {}}}):                        # M_req <= 0
         try:
-            load_config({"ring_mounts": {"x": {}}, "fasteners": {}, **bad})
+            load_config({"limits": {"u_calc": badc}, "ring_mounts": {"M6x24P2": {}},
+                         "fasteners": {}})
         except ValueError:
             continue
-        raise AssertionError(f"u_calc принял {bad}")
+        raise AssertionError(f"u_calc принял {badc}")
+    try:                                                # rollers вне каталога — ошибка sweep
+        sweep({"R_D3x8": {"type": "roller", "d": 3.0, "l": 8.0}}, {}, lb, mb, fast)
+    except ValueError as e:
+        assert "rollers" in str(e), e
+    else:
+        raise AssertionError("rollers вне каталога принят")
     bb3 = calc(19, "t", b, lim, holes, fast, bears, "bearing", 3.0)   # bearing: dR -> больший подшипник
     assert bb3.R_sum >= r.R_sum - 1e-9 and bb3.dR == 3.0 and "dR" not in bb3.geom, bb3.R_sum
     return True
