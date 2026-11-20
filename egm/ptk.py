@@ -13,7 +13,7 @@ zg = i + 1, zsh = i). 4 ряда 0/90/180/270° (Д-08). Отверстия ве
 import hashlib
 import json
 import math
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields, replace
 from fractions import Fraction
 
 from egm import ptk_force, ptk_parts, ptk_profile
@@ -62,11 +62,12 @@ class PtkLimits:
     sep_band_t: float = 0.0       # радиальная толщина поясов сепаратора, мм; 0 — = стенка (CP-98, OQ-46)
     sep_band_gap: float = 0.2     # зазор утолщённого пояса до dвн шайбы .05, мм (CP-98)
     M_min: float = 0.0            # требуемый выходной момент, Н·м; 0 — не проверяется (Д-41)
-    # CP-95, Д-121: обратная постановка — {u: M, Н·м}; для u из словаря калькулятор сам поднимает
-    # R_Σ (dR) и подбирает крепление. В ID не входит; в хэш попадает только dR (geom.dR).
-    M_req: dict = field(default_factory=dict)
-    r_step: float = 1.0           # CP-95: шаг подъёма R_Σ, мм (время прогона ∝ r_up_max/r_step)
-    r_up_max: float = 40.0        # CP-95: наибольший подъём R_Σ над R_Σ min, мм
+    # CP-99, Д-123: таблица расчёта по u — {u: {M_req: {параметры варианта}}}. Пустая внутренняя
+    # таблица — прямая постановка; ключ внутренней — целевой момент M_req, Н·м. Состав ключей u
+    # задаёт u_list. В ID не входят; в хэш попадают только dR, hb и band_fill (geom.*).
+    u_calc: dict = field(default_factory=dict)
+    r_step: float = 1.0           # CP-95: шаг подъёма R_Σ по умолчанию, мм (вариант может задать свой)
+    r_up_max: float = 40.0        # CP-95: наибольший подъём R_Σ над R_Σ min по умолчанию, мм
     # CP-95b: добавка к шагу ряда — высота пояса сепаратора, мм; перебор под M_req (в ID — hb)
     band_h_list: tuple = (0.0, 2.0, 4.0, 6.0, 8.0)
     gen_types: tuple = ("bearing", "eccentric")   # генераторы для расчёта (Д-42)
@@ -168,25 +169,78 @@ def _load(cls, d):
     return cls(**{k: tuple(v) if isinstance(v, list) else v for k, v in data.items()})
 
 
+def _parse_u_calc(raw):
+    """CP-99 (Д-123): {u: {M_req: {параметры}}} -> ({u: {M_req: params}}, u_list).
+
+    Пустая таблица вариантов — прямая постановка для u; ключ внутренней таблицы — целевой момент
+    M_req, Н·м. Состав ключей u задаёт u_list и границы диапазона (Д-119)."""
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError("limits.u_calc: нужна таблица {u: {M_req: {параметры}}} — состав ключей u "
+                         "задаёт таблицу SPEC-10 и u_min…u_max (CP-99, Д-123)")
+    out = {}
+    for k_u, var in raw.items():
+        u = int(k_u)
+        if u in out:
+            raise ValueError(f"limits.u_calc: u = {k_u} задан дважды")
+        if u < 2:
+            raise ValueError(f"limits.u_calc[{u}]: u < 2 — вне одноступенчатого диапазона (Д-08)")
+        var = {} if var is None else var
+        if not isinstance(var, dict):
+            raise ValueError(f"limits.u_calc[{u}]: нужно {{M_req: {{параметры}}}}, получено "
+                             f"{type(var).__name__}")
+        vs = {}
+        for k_m, prm in var.items():
+            m = float(k_m)
+            if not m > 0:
+                raise ValueError(f"limits.u_calc[{u}]: M_req = {k_m} — нужен > 0, Н·м")
+            if m in vs:
+                raise ValueError(f"limits.u_calc[{u}]: M_req = {m:g} задан дважды")
+            prm = {} if prm is None else dict(prm)
+            bad = sorted(set(prm) - set(VARIANT_KEYS))
+            if bad:
+                res = [k for k in bad if k in VARIANT_RESERVED]
+                if res:
+                    raise ValueError(f"limits.u_calc[{u}][{m:g}]: {res} зарезервированы на дальнейшие "
+                                     f"доработки — пока не принимаются (CP-99)")
+                raise ValueError(f"limits.u_calc[{u}][{m:g}]: неизвестные параметры {bad}; "
+                                 f"допустимы {list(VARIANT_KEYS)}")
+            if prm.get("r_step", 1.0) <= 0:
+                raise ValueError(f"limits.u_calc[{u}][{m:g}].r_step: должен быть > 0")
+            if prm.get("r_up_max", 0.0) < 0:
+                raise ValueError(f"limits.u_calc[{u}][{m:g}].r_up_max: должен быть ≥ 0")
+            if "band_h_list" in prm:
+                hb = tuple(float(x) for x in prm["band_h_list"])
+                if not hb or list(hb) != sorted(hb) or hb[0] < 0:
+                    raise ValueError(f"limits.u_calc[{u}][{m:g}].band_h_list: по возрастанию, ≥ 0")
+                prm["band_h_list"] = hb
+            vs[m] = prm
+        out[u] = vs
+    return out, tuple(sorted(out))
+
+
+def _variant_limits(lim, params):
+    """CP-99: пределы перебора для варианта (u, M_req) — r_step, r_up_max, band_h_list."""
+    kw = {k: params[k] for k in VARIANT_KEYS if k in params}
+    return replace(lim, **kw) if kw else lim
+
+
 def load_config(cfg):
     """specs/ptk_input.yaml -> (PtkLimits, {ключ: RingHoles}, fasteners, mount_mode) (Д-33)."""
     fast = {k: v for k, v in cfg["fasteners"].items() if not k.startswith("_")}
     raw = cfg.get("ring_mounts") or {"default": cfg["ring_holes"]}
     mounts = {k: _load(RingHoles, v) for k, v in raw.items() if not k.startswith("_")}
-    lim = _load(PtkLimits, cfg["limits"])
-    if list(lim.u_list) != sorted(lim.u_list):          # Д-119: диапазон = края списка
-        raise ValueError(f"limits.u_list = {list(lim.u_list)}: список должен быть по возрастанию — "
-                         f"первый и последний элементы задают u_min…u_max")
+    raw_lim = dict(cfg["limits"])
+    for key in ("u_list", "M_req"):                     # CP-99: упразднены, см. limits.u_calc
+        if key in raw_lim:
+            raise ValueError(f"limits.{key}: устарело — расчёт по u задаётся таблицей limits.u_calc "
+                             f"(CP-99, Д-123)")
+    lim = _load(PtkLimits, raw_lim)
+    lim.u_calc, lim.u_list = _parse_u_calc(raw_lim.get("u_calc"))   # Д-119: u_min/u_max — края
     bad = [g for g in lim.gen_types if g not in GEN_TYPES]
     if bad or not lim.gen_types:
         raise ValueError(f"limits.gen_types: {list(lim.gen_types)} — допустимы {GEN_TYPES} (Д-42)")
     if lim.groove_f <= 0.5:
         raise ValueError(f"limits.groove_f = {lim.groove_f}: нужно > 0.5 — жёлоб шире шарика (Д-45)")
-    if lim.M_req:                                       # CP-95: ключ u — из u_list, M > 0
-        bad_u = [u for u, m in lim.M_req.items() if int(u) not in lim.u_list or not m > 0]
-        if bad_u:
-            raise ValueError(f"limits.M_req: u {bad_u} нет в u_list или M ≤ 0 (CP-95)")
-        lim.M_req = {int(u): float(m) for u, m in lim.M_req.items()}
     if lim.r_step <= 0:
         raise ValueError(f"limits.r_step = {lim.r_step}: шаг подъёма R_Σ должен быть > 0 (CP-95)")
     return lim, mounts, fast, cfg.get("mount_mode", "first_ok")
@@ -297,6 +351,9 @@ GEOM_LIMITS = ("a_k", "r_tip_min", "sep_web_min", "shaft_d_min", "ecc_wall_min",
                "sep_gap")
 GEOM_HOLES = ("bolt", "n", "pins", "pin_d", "head_margin")
 GEOM_ROLLER = ("type", "d", "l", "a_w", "wall_min")
+# CP-99 (Д-123): параметры варианта расчёта u_calc[u][M_req] — реализованы / зарезервированы
+VARIANT_KEYS = ("r_step", "r_up_max", "band_h_list")
+VARIANT_RESERVED = ("mounts", "rollers", "materials", "gen_types")
 GEOM_BEARING = ("d", "D", "B")     # Д-40
 ROLLER_TYPES = {"roller": "R", "ball": "B"}
 
@@ -451,7 +508,8 @@ def rim_pick(Dg, l, a, MB1, need_d, bears, lim):
     return (best[1], best[2]) if best else (None, {})
 
 
-def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fill=False):
+def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fill=False,
+         m_req=0.0):
     """Расчёт одной конфигурации. rol = {'type','d','l'[, 'a_w', 'wall_min']};
     gen — bearing (тела на наружном кольце подшипника, Д-40) | eccentric (на эксцентрике, Д-42).
     dR — подъём R_Σ над R_Σ min, мм (CP-95): у eccentric/rim — D_г больше на 2·dR,
@@ -459,7 +517,7 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
     D = rol["d"]
     wall = rol.get("wall_min", lim.wall_min)
     a = rol.get("a_w") or lim.a_k * D
-    r = PtkResult(u, rid, D, gen=gen, M_req=lim.M_req.get(u, 0.0), dR=dR, hb=hb, band_fill=fill)
+    r = PtkResult(u, rid, D, gen=gen, M_req=m_req, dR=dR, hb=hb, band_fill=fill)
     r.id, r.geom = config_id(u, rol, lim, holes, fast, None, gen, dR, hb, fill)
     if u > lim.u_max:
         s = two_stage(u, lim)
@@ -594,8 +652,9 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
     return r
 
 
-def solve(u, rid, rol, gen, bears, lim, mounts, fast):
-    """CP-95 (Д-116 п. 2, Д-121), CP-95b: обратная постановка для (u, тело, генератор) при M_req.
+def solve(u, rid, rol, gen, bears, lim, mounts, fast, m_req):
+    """CP-95 (Д-116 п. 2, Д-121), CP-95b, CP-99: обратная постановка для (u, тело, генератор)
+    при целевом моменте m_req (вариант limits.u_calc → u → M_req).
 
     Переменные: крепление × dR (шаг r_step до r_up_max или D > d_out_max) × пояс (hb из
     band_h_list, на каждом hb сначала без fill, затем fill — пояс до t_max). dR идёт вверх (D растёт
@@ -604,14 +663,15 @@ def solve(u, rid, rol, gen, bears, lim, mounts, fast):
     (D, B, −M): габарит, затем длина пакета (масса на шаге 1 не считается, Д-48).
     Нет кандидата — реализуемая строка с наибольшим M (при равном — меньшие D, B) и ошибкой
     с потолками M_H, M_win, крепления, подшипника: что именно не пускает к M_req."""
-    M_req, best, top, first = lim.M_req[u], None, None, None
+    M_req, best, top, first = float(m_req), None, None, None
     n_up = int(round(lim.r_up_max / lim.r_step)) if lim.r_step > 0 else 0
     tiers = [(hb, f) for hb in (lim.band_h_list or (0.0,)) for f in (False, True)]
     for key, h in mounts.items():
         hit = False
         for i in range(n_up + 1):
             for hb, f in tiers:
-                r = calc(u, rid, rol, lim, h, fast, bears, gen, round(i * lim.r_step, 6), hb, f)
+                r = calc(u, rid, rol, lim, h, fast, bears, gen, round(i * lim.r_step, 6), hb, f,
+                         m_req)
                 r.mount = key
                 if r.excluded:                          # Т1/Т5 не зависят от dR, пояса, крепления
                     return r
@@ -642,15 +702,19 @@ def solve(u, rid, rol, gen, bears, lim, mounts, fast):
 
 def sweep(rollers, bears, lim, mounts, fast, mode="first_ok"):
     """Д-33, Д-42: для (u, тело, генератор) — все крепления (all) или первое прошедшее (first_ok).
-    CP-95: для u из limits.M_req — обратная постановка solve(), одна строка на тройку."""
+    CP-99: для u с вариантами в limits.u_calc — обратная постановка solve() по каждому варианту
+    (u, M_req), по строке на тройку и вариант."""
     out = []
     for u in lim.u_list:
+        variants = lim.u_calc.get(u) or {}
         for rid, rol in rollers.items():
             if rid.startswith("_"):
                 continue
             for gen in lim.gen_types:
-                if u in lim.M_req:                      # CP-95
-                    out.append(solve(u, rid, rol, gen, bears, lim, mounts, fast))
+                if variants:                            # CP-99: обратная постановка по вариантам
+                    for m, prm in sorted(variants.items()):
+                        out.append(solve(u, rid, rol, gen, bears, _variant_limits(lim, prm),
+                                         mounts, fast, m))
                     continue
                 rs = []
                 for key, h in mounts.items():
@@ -739,14 +803,17 @@ def to_rows(results, mounts):
 
 
 def mreq_table(rows, lim):
-    """CP-95: решение под M_req по u — наименьший (D, B, −M) среди реализуемых строк."""
-    if not lim.M_req:
-        return ("не задано (`limits.M_req` пуст) — прямая постановка: M есть следствие габарита, "
-                "а не вход.")
+    """CP-95, CP-99: решение под M_req по вариантам (u, M_req) — наименьший (D, B, −M) среди
+    реализуемых строк; варианты — limits.u_calc → u → M_req."""
+    pairs = sorted({(r["u"], round(float(r["M_req"]), 6)) for r in rows if r.get("M_req")})
+    if not pairs:
+        return ("не задано (`limits.u_calc` без вариантов `M_req`) — прямая постановка: M есть "
+                "следствие габарита, а не вход.")
     t = ["| u | M_req, Н·м | ID | Тело | Генератор | dR, мм | $R_\\Sigma$ | D | B | "
          "M, Н·м (огр.) |", "|---|---|---|---|---|---|---|---|---|---|"]
-    for u, m in sorted(lim.M_req.items()):
-        ok = [r for r in rows if r["u"] == u and r["ok"] and not r["excluded"]]
+    for u, m in pairs:
+        ok = [r for r in rows if r["u"] == u and r["ok"] and not r["excluded"]
+              and abs(float(r["M_req"]) - m) < 1e-9]
         if not ok:
             t.append(f"| {u} | {m:g} | нет решения | — | — | — | — | — | — | — |")
             continue
@@ -907,15 +974,30 @@ def self_test():
     assert e2.id != e.id and e2.d_out >= e.d_out and e2.geom.get("dR") == 5.0, (e2.geom, e.id)
     assert calc(19, "t", b, lim, holes, fast, {}, "eccentric", 0.0).id == e.id   # dR = 0 — ID прежний
     tgt = round(min(1.3 * e.M, 0.95 * e.M_H), 1)
-    lq = PtkLimits(d_out_max=None, M_req={19: tgt}, u_list=(10, 19, 63))
+    lq = PtkLimits(d_out_max=None, u_calc={19: {tgt: {}}, 10: {}, 63: {}},
+                   u_list=(10, 19, 63))                                  # CP-99: таблица по u
     mts = {"a": holes, "b": RingHoles(bolt="M4", n=12)}
-    s = solve(19, "t", b, "eccentric", {}, lq, mts, fast)
+    s = solve(19, "t", b, "eccentric", {}, lq, mts, fast, tgt)
     assert s.ok and s.M >= tgt - 1e-9 and s.M_req == tgt and s.mount in mts, (s.M, s.dR, s.errors)
-    sx = solve(19, "t", b, "eccentric", {}, PtkLimits(M_req={19: 1e6}, u_list=(10, 19, 63)),
-               {"a": holes}, fast)
+    sx = solve(19, "t", b, "eccentric", {}, lq, {"a": holes}, fast, 1e6)
     assert not sx.ok and "M_req" in sx.errors[-1], sx.errors
     assert "нет решения" not in mreq_table([asdict(s)], lq) and "нет решения" in mreq_table(
-        [asdict(sx)], PtkLimits(M_req={19: 1e6}))
+        [asdict(sx)], lq)                                                   # CP-99: по вариантам
+    # CP-99 (Д-123): таблица u_calc — состав ключей u задаёт u_list, вариант несёт параметры
+    lc = load_config({"limits": {"u_calc": {20: {1000: {}}, 32: {}, 10: {500: {"r_step": 0.5}}}},
+                      "ring_mounts": {"x": {}}, "fasteners": {}})[0]
+    assert lc.u_list == (10, 20, 32) and sorted(lc.u_calc[10]) == [500.0], (lc.u_list, lc.u_calc)
+    assert lc.u_calc[32] == {} and _variant_limits(lc, lc.u_calc[10][500.0]).r_step == 0.5
+    assert _variant_limits(lc, {}).r_step == lc.r_step
+    for bad in ({"limits": {"u_calc": {}}}, {"limits": {"u_list": [10]}},
+                {"limits": {"M_req": {10: 100}}}, {"limits": {"u_calc": {10: {0: {}}}}},
+                {"limits": {"u_calc": {10: {100: {"mounts": ["M6x24P2"]}}}}},
+                {"limits": {"u_calc": {10: {100: {"nosuch": 1}}}}}):
+        try:
+            load_config({"ring_mounts": {"x": {}}, "fasteners": {}, **bad})
+        except ValueError:
+            continue
+        raise AssertionError(f"u_calc принял {bad}")
     bb3 = calc(19, "t", b, lim, holes, fast, bears, "bearing", 3.0)   # bearing: dR -> больший подшипник
     assert bb3.R_sum >= r.R_sum - 1e-9 and bb3.dR == 3.0 and "dR" not in bb3.geom, bb3.R_sum
     return True
