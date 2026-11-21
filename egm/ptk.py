@@ -11,12 +11,14 @@ zg = i + 1, zsh = i). 4 ряда 0/90/180/270° (Д-08). Отверстия ве
 значения по умолчанию в dataclass — только для self_test() (Д-79).
 """
 import hashlib
+import yaml
+from pathlib import Path as _Path
 import json
 import math
 from dataclasses import asdict, dataclass, field, fields, replace
 from fractions import Fraction
 
-from egm import ptk_force, ptk_parts, ptk_profile
+from egm import materials, ptk_force, ptk_parts, ptk_profile
 
 SEP_K = 1.1    # полутолщина кольца сепаратора / a_ω (egm/calc_vptc.py: hc = 2.2·e)
 GEN_TYPES = ("bearing", "eccentric", "rim")   # Д-42; CP-96: rim — малый подшипник + обод .18
@@ -59,6 +61,11 @@ class PtkLimits:
     sep_S: float = 2.5            # запас многоцикловой усталости перемычки (OQ-44)
     sep_sigma_H: float = 880.0    # допускаемое σ_H тело/сторона окна сепаратора, МПа (OQ-44)
     sep_k_edge: float = 1.2       # рост σ_H у кромки стенки окна — кромочный контакт (OQ-44)
+    # CP-102 (Д-125): материал сепаратора — марка materials.yaml и её состояние
+    # ("38Х2МЮА" + "nitr" -> ссылка "38Х2МЮА:nitr"). Пусто — σ₋₁ и [σ_H] берутся из
+    # sep_sigma_m1 / sep_sigma_H, как до CP-102. Вариант u_calc может задать перечень materials.
+    sep_grade: str = ""          # марка сепаратора; "" — числа sep_sigma_* из limits
+    sep_state: str = ""          # состояние марки (materials.yaml → states)
     sep_band_t: float = 0.0       # радиальная толщина поясов сепаратора, мм; 0 — = стенка (CP-98, OQ-46)
     sep_band_gap: float = 0.2     # зазор утолщённого пояса до dвн шайбы .05, мм (CP-98)
     M_min: float = 0.0            # требуемый выходной момент, Н·м; 0 — не проверяется (Д-41)
@@ -140,6 +147,7 @@ class PtkResult:
     dR: float = 0.0              # CP-95: подъём R_Σ над R_Σ min, мм (у bearing — больший подшипник)
     hb: float = 0.0               # CP-95b: добавка высоты пояса к шагу ряда, мм
     band_fill: bool = False       # CP-95b: пояс сепаратора утолщён до t_max
+    sep_mat: dict = field(default_factory=dict)   # CP-102: материал сепаратора (в хэше ID)
     sep_why: str = ""             # причина M_sep: механизм, напряжения, [σ] (CP-94)
     M_body_gen: float = 0.0       # предел тела по контакту с генератором, Н·м (CP-98)
     M_body_ring: float = 0.0      # то же с венцом, Н·м
@@ -172,9 +180,9 @@ def _load(cls, d):
 
 # CP-101 (Д-124): параметры слоя u_calc → u → ALL → M_req
 NUM_KEYS = ("r_step", "r_up_max", "band_h_list")          # перебор
-LIST_KEYS = ("mounts", "rollers", "gen_types")            # перечни (пустой — без ограничения)
+LIST_KEYS = ("mounts", "rollers", "gen_types", "materials")   # перечни (пустой — без ограничения)
 VARIANT_KEYS = NUM_KEYS + LIST_KEYS
-VARIANT_RESERVED = ("materials",)                         # зарезервировано на доработку
+VARIANT_RESERVED = ()                         # зарезервировано на доработку
 
 
 def _parse_params(where, prm):
@@ -461,7 +469,10 @@ def ring(d_root, holes, fast, lim, wall):
 
 
 # Д-80: маркировка. GEOM_REV повышается при смене формул геометрии — меняются все ID.
-GEOM_REV = 6                       # Д-42: тип генератора bearing | eccentric в хэше
+GEOM_REV = 7                       # Д-42: тип генератора bearing | eccentric в хэше
+# Д-125 (CP-102): в хэш входит материал сепаратора (марка[:состояние] и σ₋₁/[σ_H], по которым
+# считается M_sep). Смена материала меняет пределы, а с ними подбор dR/hb — значит и геометрию,
+# поэтому номер повышен: все ID меняются один раз, дальше материал в них зафиксирован.
 # CP-96: rim — новое значение gen, а gen уже входит в хэш, поэтому rev НЕ повышается (Д-80: номер
 # меняют при смене формул геометрии). ID bearing/eccentric остаются, у rim свои — Д-120.
 # Д-48: параметры эксцентрика (rho, brg_mass_k, shaft_key_*, key_angle, bal_*) — не в хэше;
@@ -517,6 +528,49 @@ def _num(x):
     return f"{float(x):g}".replace(".", "_")   # точка занята разделителем детали
 
 
+_MATS = {}                              # CP-102: кэш materials.yaml для марки сепаратора
+
+
+def _mats_catalog(mats=None):
+    """CP-102: справочник материалов — переданный или specs/materials.yaml (кэш)."""
+    if mats is not None:
+        return mats
+    if not _MATS:
+        p = _Path(__file__).resolve().parents[1] / "specs" / "materials.yaml"
+        _MATS.update(yaml.safe_load(p.read_text(encoding="utf-8")) if p.exists() else {})
+    return _MATS
+
+
+def _mat(lim, ref="", mats=None):
+    """CP-102 (Д-125): материал сепаратора -> параметры расчёта и хэша.
+
+    ref = "<марка>[:<состояние>]"; пусто — числа limits.sep_sigma_m1 / sep_sigma_H, как до
+    CP-102 (src = "limits"). Свойства марки/состояния — materials.yaml; нет sigma_H у марки —
+    остаётся limits.sep_sigma_H с src_H = "limits" (видно в SPEC-10 и в предупреждениях)."""
+    d = {"ref": str(ref or ""), "sigma_m1": round(float(lim.sep_sigma_m1), 6),
+         "sigma_H": round(float(lim.sep_sigma_H), 6), "src_m1": "limits", "src_H": "limits"}
+    if not d["ref"]:
+        return d
+    p = materials.sep_props(_mats_catalog(mats), d["ref"])
+    if p is None:
+        raise ValueError(f"u_calc.materials: {d['ref']!r} — нет такой марки или состояния в "
+                         f"specs/materials.yaml (CP-102)")
+    if p.get("sigma_m1") is not None:
+        d["sigma_m1"], d["src_m1"] = round(float(p["sigma_m1"]), 6), "materials"
+    if p.get("sigma_H") is not None:
+        d["sigma_H"], d["src_H"] = round(float(p["sigma_H"]), 6), "materials"
+    return d
+
+
+def _mat_scope(prm, lim):
+    """CP-102: перечень материалов варианта; пусто — марка по умолчанию limits."""
+    refs = tuple(str(x) for x in (prm.get("materials") or ()) if str(x).strip())
+    if refs:
+        return refs
+    d = f"{lim.sep_grade}:{lim.sep_state}" if lim.sep_state else lim.sep_grade
+    return (d if lim.sep_grade else "",)
+
+
 def roller_code(rol):
     t = ROLLER_TYPES.get(rol.get("type"), "X")
     if t == "B":
@@ -528,7 +582,8 @@ def holes_code(holes):
     return f"{holes.n}{holes.bolt}" + (f"P{holes.pins}" if holes.pins else "")
 
 
-def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0, hb=0.0, fill=False):
+def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0, hb=0.0, fill=False,
+                mat=None):
     """Все параметры, определяющие геометрию исполнения (вход хэша и CAD).
 
     CP-95: dR — подъём R_Σ у eccentric/rim. Ключ добавляется только при dR > 0, поэтому ID прямой
@@ -546,12 +601,15 @@ def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0, hb=0.
         g["hb"] = hb
     if fill:                                            # CP-95b: пояс до t_max (CAD пояса — OQ-46)
         g["band_fill"] = True
+    if mat is not None:                                 # CP-102 (Д-125): материал сепаратора
+        g["material"] = dict(mat)                       # ref + σ₋₁ + [σ_H] + откуда взяты
     return _n(g)
 
 
-def config_id(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0, hb=0.0, fill=False):
+def config_id(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0, hb=0.0, fill=False,
+              mat=None):
     """ID исполнения PTK-<u>-<тело>-<отверстия>-<хэш> (Д-80) и снимок геометрии."""
-    g = geom_params(u, rol, lim, holes, fast, brg, gen, dR, hb, fill)
+    g = geom_params(u, rol, lim, holes, fast, brg, gen, dR, hb, fill, mat)
     raw = json.dumps(g, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
     h = hashlib.sha1(raw.encode("ascii")).hexdigest()[:6].upper()
     return f"PTK-{u:03d}-{roller_code(rol)}-{holes_code(holes)}-{h}", g
@@ -626,16 +684,22 @@ def rim_pick(Dg, l, a, MB1, need_d, bears, lim):
 
 
 def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fill=False,
-         m_req=0.0):
+         m_req=0.0, mat=None):
     """Расчёт одной конфигурации. rol = {'type','d','l'[, 'a_w', 'wall_min']};
     gen — bearing (тела на наружном кольце подшипника, Д-40) | eccentric (на эксцентрике, Д-42).
     dR — подъём R_Σ над R_Σ min, мм (CP-95): у eccentric/rim — D_г больше на 2·dR,
     у bearing — подшипник с D ≥ 2(R_Σ min + dR) − D_ш."""
     D = rol["d"]
+    mat = mat or _mat(lim)                           # CP-102: материал сепаратора
+    if mat["ref"]:                                   # свойства марки заменяют числа limits
+        lim = replace(lim, sep_sigma_m1=mat["sigma_m1"], sep_sigma_H=mat["sigma_H"])
     wall = rol.get("wall_min", lim.wall_min)
     a = rol.get("a_w") or lim.a_k * D
-    r = PtkResult(u, rid, D, gen=gen, M_req=m_req, dR=dR, hb=hb, band_fill=fill)
-    r.id, r.geom = config_id(u, rol, lim, holes, fast, None, gen, dR, hb, fill)
+    r = PtkResult(u, rid, D, gen=gen, M_req=m_req, dR=dR, hb=hb, band_fill=fill, sep_mat=mat)
+    if mat["ref"] and mat["src_H"] == "limits":
+        r.warnings.append(f"сепаратор {mat['ref']}: [σ_H] из limits ({mat['sigma_H']:g} МПа) — "
+                          f"у марки нет sigma_H в materials.yaml (OQ-44)")
+    r.id, r.geom = config_id(u, rol, lim, holes, fast, None, gen, dR, hb, fill, mat)
     if u > lim.u_max:
         s = two_stage(u, lim)
         r.errors.append(f"u={u} > {lim.u_max}: одноступенчатый ПТК не считается; рекомендуется "
@@ -661,7 +725,7 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
         else:
             R = (brg["D"] + D) / 2
             r.bearing = bk
-            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen, 0.0, hb, fill)
+            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen, 0.0, hb, fill, mat)
     else:                                               # Д-42: D_г — наружный Ø эксцентрика
         need_d = lim.shaft_d_min + 2 * (a + lim.ecc_wall_min)
         if need_d > 2 * R - D + 1e-9:
@@ -682,7 +746,7 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
                             f"{2 * R - D - 2 * lim.rim_t_min:.1f} мм, проходящего натяг (CP-96)")
         else:
             r.bearing = bk
-            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen, dR, hb, fill)
+            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen, dR, hb, fill, mat)
             if rol["l"] > brg["B"] + 1e-9:                # CP-96: обод шире подшипника
                 r.warnings.append(f"обод .18 шире подшипника {bk}: {rol['l']:g} > {brg['B']:g} мм — "
                                   f"консоль {((rol['l'] - brg['B']) / 2):.2f} мм на сторону (OQ-48)")
@@ -769,7 +833,7 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
     return r
 
 
-def solve(u, rid, rol, gen, bears, lim, mounts, fast, m_req):
+def solve(u, rid, rol, gen, bears, lim, mounts, fast, m_req, mat=None):
     """CP-95 (Д-116 п. 2, Д-121), CP-95b, CP-99: обратная постановка для (u, тело, генератор)
     при целевом моменте m_req (вариант limits.u_calc → u → M_req).
 
@@ -788,7 +852,7 @@ def solve(u, rid, rol, gen, bears, lim, mounts, fast, m_req):
         for i in range(n_up + 1):
             for hb, f in tiers:
                 r = calc(u, rid, rol, lim, h, fast, bears, gen, round(i * lim.r_step, 6), hb, f,
-                         m_req)
+                         m_req, mat)
                 r.mount = key
                 if r.excluded:                          # Т1/Т5 не зависят от dR, пояса, крепления
                     return r
@@ -817,7 +881,7 @@ def solve(u, rid, rol, gen, bears, lim, mounts, fast, m_req):
     return top
 
 
-def sweep(rollers, bears, lim, mounts, fast, mode="first_ok"):
+def sweep(rollers, bears, lim, mounts, fast, mode="first_ok", mats=None):
     """Д-33, Д-42: для (u, тело, генератор) — все крепления (all) или первое прошедшее (first_ok).
     CP-99/CP-101: перечни тел, креплений и генераторов берутся из слоя u_calc (ALL.ALL → u.ALL →
     вариант); для u с вариантами — обратная постановка solve() по каждому варианту (u, M_req)."""
@@ -828,19 +892,24 @@ def sweep(rollers, bears, lim, mounts, fast, mode="first_ok"):
             for m, prm in sorted(variants.items()):
                 rl, ms, gs = _scope(prm, rollers, mounts, lim, f"u_calc[{u}][{m:g}]")
                 vl = _variant_limits(lim, prm)
-                for rid, rol in rl.items():
-                    for gen in gs:
-                        out.append(solve(u, rid, rol, gen, bears, vl, ms, fast, m))
+                for ref in _mat_scope(prm, vl):        # CP-102: материалы варианта
+                    mt = _mat(vl, ref, mats)
+                    for rid, rol in rl.items():
+                        for gen in gs:
+                            out.append(solve(u, rid, rol, gen, bears, vl, ms, fast, m, mt))
             continue
-        rl, ms, gs = _scope(lim.u_def.get(u, {}), rollers, mounts, lim, f"u_calc[{u}].ALL")
-        for rid, rol in rl.items():
-            for gen in gs:
-                rs = []
-                for key, h in ms.items():
-                    r = calc(u, rid, rol, lim, h, fast, bears, gen)
-                    r.mount = key
-                    rs.append(r)
-                out += rs if mode == "all" else [next((r for r in rs if r.ok), rs[0])]
+        prm = lim.u_def.get(u, {})
+        rl, ms, gs = _scope(prm, rollers, mounts, lim, f"u_calc[{u}].ALL")
+        for ref in _mat_scope(prm, lim):                # CP-102: материалы слоя u
+            mt = _mat(lim, ref, mats)
+            for rid, rol in rl.items():
+                for gen in gs:
+                    rs = []
+                    for key, h in ms.items():
+                        r = calc(u, rid, rol, lim, h, fast, bears, gen, mat=mt)
+                        r.mount = key
+                        rs.append(r)
+                    out += rs if mode == "all" else [next((r for r in rs if r.ok), rs[0])]
     return out
 
 
@@ -903,7 +972,7 @@ def phasing_table(lim, holes):
             f"порядок симметрии сверловки N = {order} (σ = {360 / order:g}°). "
             "Не зависит от тела качения, поэтому дана по u.")
     rows = ["| u (z = u + 1) | p, ° | g, ° | Венцов | Ряд | φ, ° | δ/p | s, ° | Сепаратор, ° | Вариант |",
-            "|---|---|---|---|---|---|---|---|---|---|"]
+            "|---|---|---|---|---|---|---|---|---|---|---|"]
     for u in lim.u_list:
         if not 2 <= u <= lim.u_max:
             continue
@@ -928,18 +997,18 @@ def mreq_table(rows, lim):
     if not pairs:
         return ("не задано (`limits.u_calc` без вариантов `M_req`) — прямая постановка: M есть "
                 "следствие габарита, а не вход.")
-    t = ["| u | M_req, Н·м | ID | Тело | Генератор | dR, мм | $R_\\Sigma$ | D | B | "
-         "M, Н·м (огр.) |", "|---|---|---|---|---|---|---|---|---|---|"]
+    t = ["| u | M_req, Н·м | ID | Тело | Генератор | Сепаратор | dR, мм | $R_\\Sigma$ | D | B | "
+         "M, Н·м (огр.) |", "|---|---|---|---|---|---|---|---|---|---|---|"]
     for u, m in pairs:
         ok = [r for r in rows if r["u"] == u and r["ok"] and not r["excluded"]
               and abs(float(r["M_req"]) - m) < 1e-9]
         if not ok:
-            t.append(f"| {u} | {m:g} | нет решения | — | — | — | — | — | — | — |")
+            t.append(f"| {u} | {m:g} | нет решения | — | — | — | — | — | — | — | — |")
             continue
         b = min(ok, key=lambda r: (r["d_out"], r["width"], -r["M"]))
         gen = (b["bearing"] + (" + обод" if b["gen"] == "rim" else "")
                if b["gen"] in ("bearing", "rim") else "эксцентрик")
-        t.append(f"| {u} | {m:g} | `{b['id']}` | {b['roller']} | {gen} | {b['dR']:g} | "
+        t.append(f"| {u} | {m:g} | `{b['id']}` | {b['roller']} | {gen} | {(b.get('sep_mat') or {}).get('ref') or '—'} | {b['dR']:g} | "
                  f"{b['R_sum']:g} | {b['d_out']:g} | {b['width']:g} | {b['M']:g} ({b['M_by']}) |")
     return "\n".join(t)
 
@@ -1067,13 +1136,13 @@ def self_test():
     assert [p["id"] for p in c(62).parts if ".01" in p["id"]] == [c(62).id + ".01A", c(62).id + ".01B"]
     rows = [asdict(c(20)), asdict(c(62))]
     assert find(rows, c(62).id + ".01B")["u"] == 62
-    # CP-94: K20 = PTK-063-R3X8-22M6P2-BDBB72 (SPEC-10: 61819, 22×M6+2×Ø6, D ≤ 200) —
+    # CP-94: K20 = PTK-063-R3X8-22M6P2-1935FE (SPEC-10: 61819, 22×M6+2×Ø6, D ≤ 200) —
     # сепаратор ограничивает M: σ перемычки ≤ [σ], M_sep < M_H, M_by «сепаратор» (Д-116)
     k20 = calc(63, "R_D3x8", {"type": "roller", "d": 3.0, "l": 8.0}, PtkLimits(d_out_max=200.0),
                RingHoles(bolt="M6", n=22, pins=2, pin_d=6.0),
                {"M6": {"d_clear": 6.6, "dk": 10.0, "F_M": 9.3}},
                {"61819": {"d": 95.0, "D": 120.0, "B": 13.0, "C": 19.9, "C0": 18.8}})
-    assert k20.ok and k20.id == "PTK-063-R3X8-22M6P2-BDBB72", (k20.id, k20.errors)
+    assert k20.ok and k20.id == "PTK-063-R3X8-22M6P2-1935FE", (k20.id, k20.errors)
     assert abs(k20.t_hold - 1740.7) < 0.1 and k20.sep["web"] == 3.015, (k20.t_hold, k20.sep)
     assert k20.M_by == "сепаратор" and k20.M == k20.M_sep < k20.M_H, (k20.M, k20.M_sep, k20.M_H)
     s20 = k20.sep_chk
@@ -1112,13 +1181,11 @@ def self_test():
     assert lb.u_calc[10][700.0]["mounts"] == ("M5x12P2",) and lb.u_calc[10][700.0]["r_step"] == 0.5
     assert lb.u_calc[10][700.0]["rollers"] == ("R_D8x16",)      # слой u.ALL унаследован вариантом
     assert lb.u_def[20] == {"mounts": ("M6x24P2",), "r_step": 2.0}, lb.u_def[20]   # только ALL.ALL
-    assert _scope(lb.u_calc[10][500.0], {"R_D8x16": {}}, mb, lb, "t")[0] == {"R_D8x16": {}}
     for badc in ({},                                    # пустая таблица
                  {"ALL": {"ALL": {}}},                  # только ALL — нет ни одного u
                  {"ALL": {"10": {}}, 10: {}},           # лишний ключ под ALL
                  {10: {100: {"mounts": ["НЕТ"]}}},      # крепления нет в ring_mounts
                  {10: {100: {"gen_types": ["nosuch"]}}},
-                 {10: {100: {"materials": ["40Х"]}}},   # зарезервировано
                  {10: {100: {"mounts": "M6x24P2"}}},    # не список
                  {10: {100: {"nosuch": 1}}},            # неизвестный параметр
                  {10: {0: {}}}):                        # M_req <= 0
@@ -1128,6 +1195,17 @@ def self_test():
         except ValueError:
             continue
         raise AssertionError(f"u_calc принял {badc}")
+    lm, _, _, _ = load_config({"limits": {"u_calc": {10: {100: {"materials": ["40Х:nitr"]}}}},
+                               "ring_mounts": {"M6x24P2": {}}, "fasteners": {}})
+    assert _mat_scope({"materials": ["40Х:nitr"]}, lm) == ("40Х:nitr",), "materials — не перечень"
+    assert _mat_scope({}, lm) == ("",), "марки по умолчанию нет — ожидался пустой ref"
+    assert _mat(lm, "40Х")["sigma_m1"] == 509.0 and _mat(lm, "40Х")["src_m1"] == "materials"
+    try:                                        # CP-102: марки/состояния нет — ошибка
+        _mat(lm, "НетТакой")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("нет ошибки на неизвестную марку в materials (CP-102)")
     try:                                                # rollers вне каталога — ошибка sweep
         sweep({"R_D3x8": {"type": "roller", "d": 3.0, "l": 8.0}}, {}, lb, mb, fast)
     except ValueError as e:

@@ -40,15 +40,70 @@ def part_materials(prods, code, nn):
     return [str(m) for m in (it.get("material") or [])]
 
 
-def props(mats, grade):
-    """Механические свойства марки (Д-110, OQ-36) -> {sigma_v, sigma_t, sigma_m1, state,
-    d_range} | None — марки нет в справочнике. Отсутствующие поля — None (не ошибка)."""
+SEP = ":"                      # CP-102: разделитель марки и состояния — "38Х2МЮА:nitr"
+
+
+def split_ref(ref):
+    """CP-102: ссылка "марка[:состояние]" -> (марка, состояние | None)."""
+    s = str(ref or "").strip()
+    if not s:
+        return "", None
+    g, _, st = s.partition(SEP)
+    return g.strip(), (st.strip() or None)
+
+
+def states(mats, grade):
+    """CP-102: именованные состояния марки (materials.yaml → <марка>.states) или {}."""
+    g, _ = split_ref(grade)
+    return {str(k): (v or {}) for k, v in ((grades(mats).get(g) or {}).get("states") or {}).items()}
+
+
+def state_props(mats, grade, state):
+    """CP-102: свойства состояния -> {sigma_m1, sigma_H, depth, hrc, heat, for} | None.
+    Нет состояния — None (марка считается в состоянии поставки)."""
+    st = states(mats, grade).get(str(state)) if state else None
+    if st is None:
+        return None
+    out = {k: st.get(k) for k in ("sigma_m1", "sigma_H", "depth", "hrc", "for")}
+    out["heat"] = st.get("heat")
+    for k, v in (st.get("case") or {}).items():
+        if v is not None:
+            out[k] = v
+    return out
+
+
+def props(mats, grade, state=None):
+    """Механические свойства марки (Д-110, OQ-36; CP-102: состояние) -> {sigma_v, sigma_t,
+    sigma_m1, sigma_H, rho, state, d_range} | None — марки нет в справочнике. Отсутствующие
+    поля — None (не ошибка). state — ключ materials.yaml → <марка>.states: свойства слоя/ядра
+    состояния накладываются на плоские поля марки."""
     if grade is None:
         return None
     g = grades(mats)
-    if str(grade) not in g:
+    gname, _ = split_ref(grade)
+    if gname not in g:
         return None
-    return {k: g[str(grade)].get(k) for k in ("sigma_v", "sigma_t", "sigma_m1", "state", "d_range")}
+    it = g[gname]
+    out = {k: it.get(k) for k in ("sigma_v", "sigma_t", "sigma_m1", "sigma_H", "rho",
+                                  "state", "d_range")}
+    if state:
+        sp = state_props(mats, gname, state)
+        if sp is None:
+            return None
+        for k in ("sigma_m1", "sigma_H"):
+            if sp.get(k) is not None:
+                out[k] = sp[k]
+        out["state"] = sp.get("heat") or out["state"]
+    return out
+
+
+def sep_props(mats, ref):
+    """CP-102: материал сепаратора по ссылке "марка[:состояние]" -> свойства | None.
+    None — марки или состояния нет в справочнике (вход неверный, а не «нет данных»)."""
+    gname, st = split_ref(ref)
+    if not gname:
+        return None
+    return props(mats, gname, st)
 
 
 def check(mats, prods, stock):
