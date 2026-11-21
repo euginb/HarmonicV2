@@ -122,8 +122,8 @@ def run_ptk(prices):
         mreq=ptk.mreq_table([r for r in rows if not r["excluded"]], lim))   # CP-95
     write("specs", "SPEC-10_PTK_CALC.md", text)
     bad = [f"SPEC-10: в шаблоне нет полей {missing}"] if missing else []
-    ids = [r["id"] for r in rows]
-    dup = sorted({i for i in ids if ids.count(i) > 1})
+    keys = [(r["id"], round(float(r["M_req"] or 0), 6)) for r in rows]   # CP-99: по вариантам u
+    dup = sorted({k[0] for k in keys if keys.count(k) > 1})
     if dup:
         bad.append(f"ptk: одинаковые ID {dup} — одно тело под разными ключами "
                    "vendor_prices.yaml → rollers (Д-80)")

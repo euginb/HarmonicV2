@@ -13,7 +13,7 @@ zg = i + 1, zsh = i). 4 ряда 0/90/180/270° (Д-08). Отверстия ве
 import hashlib
 import json
 import math
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields, replace
 from fractions import Fraction
 
 from egm import ptk_force, ptk_parts, ptk_profile
@@ -62,11 +62,13 @@ class PtkLimits:
     sep_band_t: float = 0.0       # радиальная толщина поясов сепаратора, мм; 0 — = стенка (CP-98, OQ-46)
     sep_band_gap: float = 0.2     # зазор утолщённого пояса до dвн шайбы .05, мм (CP-98)
     M_min: float = 0.0            # требуемый выходной момент, Н·м; 0 — не проверяется (Д-41)
-    # CP-95, Д-121: обратная постановка — {u: M, Н·м}; для u из словаря калькулятор сам поднимает
-    # R_Σ (dR) и подбирает крепление. В ID не входит; в хэш попадает только dR (geom.dR).
-    M_req: dict = field(default_factory=dict)
-    r_step: float = 1.0           # CP-95: шаг подъёма R_Σ, мм (время прогона ∝ r_up_max/r_step)
-    r_up_max: float = 40.0        # CP-95: наибольший подъём R_Σ над R_Σ min, мм
+    # CP-99, Д-123: таблица расчёта по u — {u: {M_req: {параметры варианта}}}. Пустая внутренняя
+    # таблица — прямая постановка; ключ внутренней — целевой момент M_req, Н·м. Состав ключей u
+    # задаёт u_list. В ID не входят; в хэш попадают только dR, hb и band_fill (geom.*).
+    u_calc: dict = field(default_factory=dict)
+    u_def: dict = field(default_factory=dict)   # CP-101: {u: параметры} — слои ALL.ALL + u.ALL
+    r_step: float = 1.0           # CP-95: шаг подъёма R_Σ по умолчанию, мм (вариант может задать свой)
+    r_up_max: float = 40.0        # CP-95: наибольший подъём R_Σ над R_Σ min по умолчанию, мм
     # CP-95b: добавка к шагу ряда — высота пояса сепаратора, мм; перебор под M_req (в ID — hb)
     band_h_list: tuple = (0.0, 2.0, 4.0, 6.0, 8.0)
     gen_types: tuple = ("bearing", "eccentric")   # генераторы для расчёта (Д-42)
@@ -168,25 +170,197 @@ def _load(cls, d):
     return cls(**{k: tuple(v) if isinstance(v, list) else v for k, v in data.items()})
 
 
+# CP-101 (Д-124): параметры слоя u_calc → u → ALL → M_req
+NUM_KEYS = ("r_step", "r_up_max", "band_h_list")          # перебор
+LIST_KEYS = ("mounts", "rollers", "gen_types")            # перечни (пустой — без ограничения)
+VARIANT_KEYS = NUM_KEYS + LIST_KEYS
+VARIANT_RESERVED = ("materials",)                         # зарезервировано на доработку
+
+
+def _parse_params(where, prm):
+    """CP-101 (Д-124): параметры слоя u_calc — проверка и нормализация.
+
+    Проверяются только заданные ключи: перебор (r_step, r_up_max, band_h_list) и перечни
+    (mounts, rollers, gen_types). Пустой список перечня — без ограничения (все).
+    materials зарезервирован — пока не принимается."""
+    if prm is None:
+        return {}
+    if not isinstance(prm, dict):
+        raise ValueError(f"{where}: нужна таблица параметров {{ключ: значение}}, получено "
+                         f"{type(prm).__name__}")
+    bad = sorted(set(prm) - set(VARIANT_KEYS) - set(VARIANT_RESERVED))
+    if bad:
+        raise ValueError(f"{where}: неизвестные параметры {bad}; допустимы {list(VARIANT_KEYS)}")
+    res = sorted(set(prm) & set(VARIANT_RESERVED))
+    if res:
+        raise ValueError(f"{where}: {res} зарезервированы на дальнейшие доработки — пока не "
+                         f"принимаются (CP-101)")
+    out = {}
+    if "r_step" in prm:
+        v = float(prm["r_step"])
+        if not v > 0:
+            raise ValueError(f"{where}.r_step: шаг подъёма R_Σ должен быть > 0, мм")
+        out["r_step"] = v
+    if "r_up_max" in prm:
+        v = float(prm["r_up_max"])
+        if v < 0:
+            raise ValueError(f"{where}.r_up_max: наибольший подъём R_Σ должен быть ≥ 0, мм")
+        out["r_up_max"] = v
+    if "band_h_list" in prm:
+        hb = tuple(float(x) for x in prm["band_h_list"])
+        if not hb or list(hb) != sorted(hb) or hb[0] < 0:
+            raise ValueError(f"{where}.band_h_list: высоты пояса по возрастанию и ≥ 0, мм")
+        out["band_h_list"] = hb
+    for k, allowed, note in (("mounts", None, "ring_mounts"),
+                             ("rollers", None, "vendor_prices.yaml → rollers"),
+                             ("gen_types", GEN_TYPES, "типы генератора (Д-42)")):
+        if k not in prm or prm[k] is None:
+            continue
+        v = prm[k]
+        if isinstance(v, str) or not isinstance(v, (list, tuple)):
+            raise ValueError(f"{where}.{k}: нужен список, получено {type(v).__name__}; "
+                             f"пустой список — без ограничения")
+        lst = tuple(str(x) for x in v)
+        if allowed is not None:
+            badl = [x for x in lst if x not in allowed]
+            if badl:
+                raise ValueError(f"{where}.{k}: {badl} — допустимы {list(allowed)}")
+        out[k] = lst
+    return out
+
+
+def _all_layer(where, v):
+    """CP-101: слой ALL — {ALL: {параметры}}; возвращает параметры слоя ({} — не задан)."""
+    if v is None:
+        return {}
+    if not isinstance(v, dict):
+        raise ValueError(f"{where}: нужна таблица {{ALL: {{параметры}}}} или {{параметры}}, "
+                         f"получено {type(v).__name__}")
+    if "ALL" in v:                                    # полный вид: {ALL: {параметры}}
+        extra = sorted(set(v) - {"ALL"})
+        if extra:
+            raise ValueError(f"{where}: под ALL допустим только ключ ALL — параметры по умолчанию "
+                             f"для всех элементов уровня; найдено {extra}")
+        return v["ALL"]
+    return v                                          # сокращённый вид: {параметры}
+
+
+def _merge(*layers):
+    """CP-101: слои параметров — следующий перекрывает предыдущий, список заменяется целиком."""
+    out = {}
+    for l in layers:
+        out.update({k: v for k, v in (l or {}).items() if v is not None})
+    return out
+
+
+def _parse_u_calc(raw):
+    """CP-99/CP-101 (Д-123, Д-124): таблица расчёта по u -> (u_calc, u_def, u_list).
+
+    {ALL: {ALL: параметры}, u: {ALL: параметры, M_req: параметры}}. Слои: ALL.ALL — для всех u и
+    вариантов, u.ALL — для всех вариантов этого u, вариант — для себя (перекрывает, список
+    заменяется целиком). Пустая таблица вариантов (или только ALL) — прямая постановка для u.
+    Состав ключей u, кроме ALL, задаёт u_list и границы диапазона (Д-119)."""
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError("limits.u_calc: нужна таблица {u: {M_req: {параметры}}} — состав ключей u "
+                         "задаёт таблицу SPEC-10 и u_min…u_max (CP-99, Д-123)")
+    base = _parse_params("limits.u_calc.ALL.ALL", _all_layer("limits.u_calc.ALL", raw.get("ALL")))
+    out, udef = {}, {}
+    for k_u, var in raw.items():
+        if k_u == "ALL":
+            continue
+        try:
+            u = int(k_u)
+        except (TypeError, ValueError):
+            raise ValueError(f"limits.u_calc: ключ {k_u!r} — нужен u (целое) или ALL")
+        if u in out:
+            raise ValueError(f"limits.u_calc: u = {k_u} задан дважды")
+        if u < 2:
+            raise ValueError(f"limits.u_calc[{u}]: u < 2 — вне одноступенчатого диапазона (Д-08)")
+        if var is None:
+            var = {}
+        if not isinstance(var, dict):
+            raise ValueError(f"limits.u_calc[{u}]: нужно {{M_req: {{параметры}}}}, получено "
+                             f"{type(var).__name__}")
+        u_all = _parse_params(f"limits.u_calc[{u}].ALL",
+                              _all_layer(f"limits.u_calc[{u}]", var.get("ALL")))
+        udef[u] = _merge(base, u_all)
+        vs = {}
+        for k_m, prm in var.items():
+            if k_m == "ALL":
+                continue
+            m = float(k_m)
+            if not m > 0:
+                raise ValueError(f"limits.u_calc[{u}]: M_req = {k_m} — нужен > 0, Н·м")
+            if m in vs:
+                raise ValueError(f"limits.u_calc[{u}]: M_req = {m:g} задан дважды")
+            vs[m] = _merge(udef[u], _parse_params(f"limits.u_calc[{u}][{m:g}]", prm))
+        out[u] = vs
+    if not out:
+        raise ValueError("limits.u_calc: нет ни одного u — ALL задаёт только параметры по умолчанию; "
+                         "нужен хотя бы один u (CP-99, Д-123)")
+    return out, udef, tuple(sorted(out))
+
+
+def u_params(lim):
+    """CP-101: все слои параметров u_calc — [(где, параметры)]; проверки и справка."""
+    out = [(f"u_calc[{u}].ALL", lim.u_def.get(u, {})) for u in lim.u_list]
+    out += [(f"u_calc[{u}][{m:g}]", prm) for u in lim.u_list
+            for m, prm in sorted((lim.u_calc.get(u) or {}).items())]
+    return out
+
+
+def _scope(prm, rollers, mounts, lim, where):
+    """CP-101: эффективные перечни тел качения, креплений и типов генератора для слоя.
+
+    Пустой или отсутствующий список — без ограничения (все). Неизвестное имя — ошибка: это
+    опечатка в конфиге, а не «нет такого варианта». Пустой результат — тоже ошибка, чтобы u не
+    выпал из таблицы молча."""
+    rl = prm.get("rollers") or ()
+    bad = [k for k in rl if k not in rollers]
+    if bad:
+        have = sorted(k for k in rollers if not k.startswith("_"))
+        raise ValueError(f"{where}.rollers: {bad} нет в vendor_prices.yaml → rollers (есть {have})")
+    mt = prm.get("mounts") or ()
+    bad = [k for k in mt if k not in mounts]
+    if bad:
+        raise ValueError(f"{where}.mounts: {bad} нет в ring_mounts (есть {list(mounts)})")
+    rs = {k: v for k, v in rollers.items() if not k.startswith("_") and (not rl or k in rl)}
+    ms = {k: v for k, v in mounts.items() if not mt or k in mt}
+    gs = tuple(prm.get("gen_types") or lim.gen_types)
+    if not rs or not ms or not gs:
+        raise ValueError(f"{where}: после ограничения перечней не осталось вариантов расчёта "
+                         f"(тел {len(rs)}, креплений {len(ms)}, генераторов {len(gs)}) — "
+                         f"проверьте mounts / rollers / gen_types (CP-101)")
+    return rs, ms, gs
+
+
+def _variant_limits(lim, params):
+    """CP-99: пределы перебора варианта — только числовые ключи (r_step, r_up_max, band_h_list)."""
+    kw = {k: params[k] for k in NUM_KEYS if k in params}
+    return replace(lim, **kw) if kw else lim
+
+
 def load_config(cfg):
     """specs/ptk_input.yaml -> (PtkLimits, {ключ: RingHoles}, fasteners, mount_mode) (Д-33)."""
     fast = {k: v for k, v in cfg["fasteners"].items() if not k.startswith("_")}
     raw = cfg.get("ring_mounts") or {"default": cfg["ring_holes"]}
     mounts = {k: _load(RingHoles, v) for k, v in raw.items() if not k.startswith("_")}
-    lim = _load(PtkLimits, cfg["limits"])
-    if list(lim.u_list) != sorted(lim.u_list):          # Д-119: диапазон = края списка
-        raise ValueError(f"limits.u_list = {list(lim.u_list)}: список должен быть по возрастанию — "
-                         f"первый и последний элементы задают u_min…u_max")
+    raw_lim = dict(cfg["limits"])
+    for key in ("u_list", "M_req"):                     # CP-99: упразднены, см. limits.u_calc
+        if key in raw_lim:
+            raise ValueError(f"limits.{key}: устарело — расчёт по u задаётся таблицей limits.u_calc "
+                             f"(CP-99, Д-123)")
+    lim = _load(PtkLimits, raw_lim)
+    lim.u_calc, lim.u_def, lim.u_list = _parse_u_calc(raw_lim.get("u_calc"))   # Д-119: края
     bad = [g for g in lim.gen_types if g not in GEN_TYPES]
     if bad or not lim.gen_types:
         raise ValueError(f"limits.gen_types: {list(lim.gen_types)} — допустимы {GEN_TYPES} (Д-42)")
+    for where, prm in u_params(lim):                    # CP-101: имена креплений — из ring_mounts
+        badm = [k for k in (prm.get("mounts") or ()) if k not in mounts]
+        if badm:
+            raise ValueError(f"limits.{where}.mounts: {badm} нет в ring_mounts (есть {list(mounts)})")
     if lim.groove_f <= 0.5:
         raise ValueError(f"limits.groove_f = {lim.groove_f}: нужно > 0.5 — жёлоб шире шарика (Д-45)")
-    if lim.M_req:                                       # CP-95: ключ u — из u_list, M > 0
-        bad_u = [u for u, m in lim.M_req.items() if int(u) not in lim.u_list or not m > 0]
-        if bad_u:
-            raise ValueError(f"limits.M_req: u {bad_u} нет в u_list или M ≤ 0 (CP-95)")
-        lim.M_req = {int(u): float(m) for u, m in lim.M_req.items()}
     if lim.r_step <= 0:
         raise ValueError(f"limits.r_step = {lim.r_step}: шаг подъёма R_Σ должен быть > 0 (CP-95)")
     return lim, mounts, fast, cfg.get("mount_mode", "first_ok")
@@ -451,7 +625,8 @@ def rim_pick(Dg, l, a, MB1, need_d, bears, lim):
     return (best[1], best[2]) if best else (None, {})
 
 
-def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fill=False):
+def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fill=False,
+         m_req=0.0):
     """Расчёт одной конфигурации. rol = {'type','d','l'[, 'a_w', 'wall_min']};
     gen — bearing (тела на наружном кольце подшипника, Д-40) | eccentric (на эксцентрике, Д-42).
     dR — подъём R_Σ над R_Σ min, мм (CP-95): у eccentric/rim — D_г больше на 2·dR,
@@ -459,7 +634,7 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
     D = rol["d"]
     wall = rol.get("wall_min", lim.wall_min)
     a = rol.get("a_w") or lim.a_k * D
-    r = PtkResult(u, rid, D, gen=gen, M_req=lim.M_req.get(u, 0.0), dR=dR, hb=hb, band_fill=fill)
+    r = PtkResult(u, rid, D, gen=gen, M_req=m_req, dR=dR, hb=hb, band_fill=fill)
     r.id, r.geom = config_id(u, rol, lim, holes, fast, None, gen, dR, hb, fill)
     if u > lim.u_max:
         s = two_stage(u, lim)
@@ -594,8 +769,9 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
     return r
 
 
-def solve(u, rid, rol, gen, bears, lim, mounts, fast):
-    """CP-95 (Д-116 п. 2, Д-121), CP-95b: обратная постановка для (u, тело, генератор) при M_req.
+def solve(u, rid, rol, gen, bears, lim, mounts, fast, m_req):
+    """CP-95 (Д-116 п. 2, Д-121), CP-95b, CP-99: обратная постановка для (u, тело, генератор)
+    при целевом моменте m_req (вариант limits.u_calc → u → M_req).
 
     Переменные: крепление × dR (шаг r_step до r_up_max или D > d_out_max) × пояс (hb из
     band_h_list, на каждом hb сначала без fill, затем fill — пояс до t_max). dR идёт вверх (D растёт
@@ -604,14 +780,15 @@ def solve(u, rid, rol, gen, bears, lim, mounts, fast):
     (D, B, −M): габарит, затем длина пакета (масса на шаге 1 не считается, Д-48).
     Нет кандидата — реализуемая строка с наибольшим M (при равном — меньшие D, B) и ошибкой
     с потолками M_H, M_win, крепления, подшипника: что именно не пускает к M_req."""
-    M_req, best, top, first = lim.M_req[u], None, None, None
+    M_req, best, top, first = float(m_req), None, None, None
     n_up = int(round(lim.r_up_max / lim.r_step)) if lim.r_step > 0 else 0
     tiers = [(hb, f) for hb in (lim.band_h_list or (0.0,)) for f in (False, True)]
     for key, h in mounts.items():
         hit = False
         for i in range(n_up + 1):
             for hb, f in tiers:
-                r = calc(u, rid, rol, lim, h, fast, bears, gen, round(i * lim.r_step, 6), hb, f)
+                r = calc(u, rid, rol, lim, h, fast, bears, gen, round(i * lim.r_step, 6), hb, f,
+                         m_req)
                 r.mount = key
                 if r.excluded:                          # Т1/Т5 не зависят от dR, пояса, крепления
                     return r
@@ -642,18 +819,24 @@ def solve(u, rid, rol, gen, bears, lim, mounts, fast):
 
 def sweep(rollers, bears, lim, mounts, fast, mode="first_ok"):
     """Д-33, Д-42: для (u, тело, генератор) — все крепления (all) или первое прошедшее (first_ok).
-    CP-95: для u из limits.M_req — обратная постановка solve(), одна строка на тройку."""
+    CP-99/CP-101: перечни тел, креплений и генераторов берутся из слоя u_calc (ALL.ALL → u.ALL →
+    вариант); для u с вариантами — обратная постановка solve() по каждому варианту (u, M_req)."""
     out = []
     for u in lim.u_list:
-        for rid, rol in rollers.items():
-            if rid.startswith("_"):
-                continue
-            for gen in lim.gen_types:
-                if u in lim.M_req:                      # CP-95
-                    out.append(solve(u, rid, rol, gen, bears, lim, mounts, fast))
-                    continue
+        variants = lim.u_calc.get(u) or {}
+        if variants:                                    # CP-99: обратная постановка по вариантам
+            for m, prm in sorted(variants.items()):
+                rl, ms, gs = _scope(prm, rollers, mounts, lim, f"u_calc[{u}][{m:g}]")
+                vl = _variant_limits(lim, prm)
+                for rid, rol in rl.items():
+                    for gen in gs:
+                        out.append(solve(u, rid, rol, gen, bears, vl, ms, fast, m))
+            continue
+        rl, ms, gs = _scope(lim.u_def.get(u, {}), rollers, mounts, lim, f"u_calc[{u}].ALL")
+        for rid, rol in rl.items():
+            for gen in gs:
                 rs = []
-                for key, h in mounts.items():
+                for key, h in ms.items():
                     r = calc(u, rid, rol, lim, h, fast, bears, gen)
                     r.mount = key
                     rs.append(r)
@@ -739,14 +922,17 @@ def to_rows(results, mounts):
 
 
 def mreq_table(rows, lim):
-    """CP-95: решение под M_req по u — наименьший (D, B, −M) среди реализуемых строк."""
-    if not lim.M_req:
-        return ("не задано (`limits.M_req` пуст) — прямая постановка: M есть следствие габарита, "
-                "а не вход.")
+    """CP-95, CP-99: решение под M_req по вариантам (u, M_req) — наименьший (D, B, −M) среди
+    реализуемых строк; варианты — limits.u_calc → u → M_req."""
+    pairs = sorted({(r["u"], round(float(r["M_req"]), 6)) for r in rows if r.get("M_req")})
+    if not pairs:
+        return ("не задано (`limits.u_calc` без вариантов `M_req`) — прямая постановка: M есть "
+                "следствие габарита, а не вход.")
     t = ["| u | M_req, Н·м | ID | Тело | Генератор | dR, мм | $R_\\Sigma$ | D | B | "
          "M, Н·м (огр.) |", "|---|---|---|---|---|---|---|---|---|---|"]
-    for u, m in sorted(lim.M_req.items()):
-        ok = [r for r in rows if r["u"] == u and r["ok"] and not r["excluded"]]
+    for u, m in pairs:
+        ok = [r for r in rows if r["u"] == u and r["ok"] and not r["excluded"]
+              and abs(float(r["M_req"]) - m) < 1e-9]
         if not ok:
             t.append(f"| {u} | {m:g} | нет решения | — | — | — | — | — | — | — |")
             continue
@@ -907,15 +1093,47 @@ def self_test():
     assert e2.id != e.id and e2.d_out >= e.d_out and e2.geom.get("dR") == 5.0, (e2.geom, e.id)
     assert calc(19, "t", b, lim, holes, fast, {}, "eccentric", 0.0).id == e.id   # dR = 0 — ID прежний
     tgt = round(min(1.3 * e.M, 0.95 * e.M_H), 1)
-    lq = PtkLimits(d_out_max=None, M_req={19: tgt}, u_list=(10, 19, 63))
+    lq = PtkLimits(d_out_max=None, u_calc={19: {tgt: {}}, 10: {}, 63: {}},
+                   u_list=(10, 19, 63))                                  # CP-99: таблица по u
     mts = {"a": holes, "b": RingHoles(bolt="M4", n=12)}
-    s = solve(19, "t", b, "eccentric", {}, lq, mts, fast)
+    s = solve(19, "t", b, "eccentric", {}, lq, mts, fast, tgt)
     assert s.ok and s.M >= tgt - 1e-9 and s.M_req == tgt and s.mount in mts, (s.M, s.dR, s.errors)
-    sx = solve(19, "t", b, "eccentric", {}, PtkLimits(M_req={19: 1e6}, u_list=(10, 19, 63)),
-               {"a": holes}, fast)
+    sx = solve(19, "t", b, "eccentric", {}, lq, {"a": holes}, fast, 1e6)
     assert not sx.ok and "M_req" in sx.errors[-1], sx.errors
     assert "нет решения" not in mreq_table([asdict(s)], lq) and "нет решения" in mreq_table(
-        [asdict(sx)], PtkLimits(M_req={19: 1e6}))
+        [asdict(sx)], lq)                                                   # CP-99: по вариантам
+    # CP-101 (Д-124): слои ALL.ALL -> u.ALL -> вариант; перечни mounts/rollers/gen_types
+    lb, mb, _, _ = load_config({"limits": {"u_calc": {
+        "ALL": {"ALL": {"mounts": ["M6x24P2"], "r_step": 2.0}},
+        10: {"ALL": {"rollers": ["R_D8x16"]}, 500: {}, 700: {"mounts": ["M5x12P2"], "r_step": 0.5}},
+        20: {}}}, "ring_mounts": {"M6x24P2": {}, "M5x12P2": {}}, "fasteners": {}})
+    assert lb.u_list == (10, 20) and lb.u_calc[10][500.0]["r_step"] == 2.0, (lb.u_list, lb.u_calc)
+    assert lb.u_calc[10][500.0]["rollers"] == ("R_D8x16",), lb.u_calc[10]
+    assert lb.u_calc[10][700.0]["mounts"] == ("M5x12P2",) and lb.u_calc[10][700.0]["r_step"] == 0.5
+    assert lb.u_calc[10][700.0]["rollers"] == ("R_D8x16",)      # слой u.ALL унаследован вариантом
+    assert lb.u_def[20] == {"mounts": ("M6x24P2",), "r_step": 2.0}, lb.u_def[20]   # только ALL.ALL
+    assert _scope(lb.u_calc[10][500.0], {"R_D8x16": {}}, mb, lb, "t")[0] == {"R_D8x16": {}}
+    for badc in ({},                                    # пустая таблица
+                 {"ALL": {"ALL": {}}},                  # только ALL — нет ни одного u
+                 {"ALL": {"10": {}}, 10: {}},           # лишний ключ под ALL
+                 {10: {100: {"mounts": ["НЕТ"]}}},      # крепления нет в ring_mounts
+                 {10: {100: {"gen_types": ["nosuch"]}}},
+                 {10: {100: {"materials": ["40Х"]}}},   # зарезервировано
+                 {10: {100: {"mounts": "M6x24P2"}}},    # не список
+                 {10: {100: {"nosuch": 1}}},            # неизвестный параметр
+                 {10: {0: {}}}):                        # M_req <= 0
+        try:
+            load_config({"limits": {"u_calc": badc}, "ring_mounts": {"M6x24P2": {}},
+                         "fasteners": {}})
+        except ValueError:
+            continue
+        raise AssertionError(f"u_calc принял {badc}")
+    try:                                                # rollers вне каталога — ошибка sweep
+        sweep({"R_D3x8": {"type": "roller", "d": 3.0, "l": 8.0}}, {}, lb, mb, fast)
+    except ValueError as e:
+        assert "rollers" in str(e), e
+    else:
+        raise AssertionError("rollers вне каталога принят")
     bb3 = calc(19, "t", b, lim, holes, fast, bears, "bearing", 3.0)   # bearing: dR -> больший подшипник
     assert bb3.R_sum >= r.R_sum - 1e-9 and bb3.dR == 3.0 and "dR" not in bb3.geom, bb3.R_sum
     return True
