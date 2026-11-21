@@ -189,8 +189,8 @@ def _parse_params(where, prm):
     """CP-101 (Д-124): параметры слоя u_calc — проверка и нормализация.
 
     Проверяются только заданные ключи: перебор (r_step, r_up_max, band_h_list) и перечни
-    (mounts, rollers, gen_types). Пустой список перечня — без ограничения (все).
-    materials зарезервирован — пока не принимается."""
+    (mounts, rollers, gen_types, materials). Пустой список перечня — без ограничения (все).
+    Имена материалов проверяются в load_config по materials.yaml (CP-102, CP-103)."""
     if prm is None:
         return {}
     if not isinstance(prm, dict):
@@ -221,7 +221,8 @@ def _parse_params(where, prm):
         out["band_h_list"] = hb
     for k, allowed, note in (("mounts", None, "ring_mounts"),
                              ("rollers", None, "vendor_prices.yaml → rollers"),
-                             ("gen_types", GEN_TYPES, "типы генератора (Д-42)")):
+                             ("gen_types", GEN_TYPES, "типы генератора (Д-42)"),
+                             ("materials", None, "materials.yaml (марка:состояние, CP-102)")):
         if k not in prm or prm[k] is None:
             continue
         v = prm[k]
@@ -371,6 +372,11 @@ def load_config(cfg):
         raise ValueError(f"limits.groove_f = {lim.groove_f}: нужно > 0.5 — жёлоб шире шарика (Д-45)")
     if lim.r_step <= 0:
         raise ValueError(f"limits.r_step = {lim.r_step}: шаг подъёма R_Σ должен быть > 0 (CP-95)")
+    refs = [lim.sep_grade] if lim.sep_grade else []      # CP-103 (A-1): марки проверяются здесь,
+    for _, prm in u_params(lim):                        # а не в середине sweep
+        refs += list(prm.get("materials") or ())
+    for ref in refs:
+        _mat(lim, ref)                                  # ValueError: марки/состояния нет
     return lim, mounts, fast, cfg.get("mount_mode", "first_ok")
 
 
@@ -1195,9 +1201,11 @@ def self_test():
         except ValueError:
             continue
         raise AssertionError(f"u_calc принял {badc}")
-    lm, _, _, _ = load_config({"limits": {"u_calc": {10: {100: {"materials": ["40Х:nitr"]}}}},
+    lm, _, _, _ = load_config({"limits": {"u_calc": {10: {100: {"materials": ["38Х2МЮА:nitr"]}}}},
                                "ring_mounts": {"M6x24P2": {}}, "fasteners": {}})
-    assert _mat_scope({"materials": ["40Х:nitr"]}, lm) == ("40Х:nitr",), "materials — не перечень"
+    assert _parse_params("t", {"materials": ["40Х"]})["materials"] == ("40Х",), \
+        "materials теряется в _parse_params (A-1)"
+    assert _mat_scope({"materials": ["38Х2МЮА:nitr"]}, lm) == ("38Х2МЮА:nitr",), "materials — не перечень"
     assert _mat_scope({}, lm) == ("",), "марки по умолчанию нет — ожидался пустой ref"
     assert _mat(lm, "40Х")["sigma_m1"] == 509.0 and _mat(lm, "40Х")["src_m1"] == "materials"
     try:                                        # CP-102: марки/состояния нет — ошибка
