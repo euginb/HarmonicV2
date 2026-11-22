@@ -1166,6 +1166,9 @@ def self_test():
     # CP-98: пояс K20 5.95 мм не лимитирует — M_sep как в CP-94 (188.1), предел — перемычка ряда 1
     assert abs(k20.M_sep - 188.1) < 0.2 and s20["lim_elem"] == "перемычка", (k20.M_sep, s20)
     assert s20["n_row_lim"] == 1 and k20.sep["band"]["h_mid"] == 5.95, (s20, k20.sep["band"])
+    # CP-111: M_by = сепаратор — max(u_b, u_H) = 1 по определению (обе загрузки линейны по M);
+    # расхождение — только округление M сепаратора до 0.1 в sep_check
+    assert abs(max(s20["u_b"], s20["u_H"]) - 1.0) < 1e-3, (s20["u_b"], s20["u_H"])
     assert 0 < k20.M_row < k20.M_sep < 4 * s20["M_row_b"], (k20.M_row, k20.M_sep, s20)
     b20 = (k20.M_body_gen, k20.M_body_ring, k20.M_body_win)
     assert min(b20) > 0 and k20.M_H == min(b20[:2]) and k20.M <= min(b20), (b20, k20.M)
