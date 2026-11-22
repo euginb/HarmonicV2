@@ -120,6 +120,25 @@ def _hertz(F, D, l, kind, Es):
     return b, 0.786 * b
 
 
+def _k_depth(lim, d):
+    """CP-112 (OQ-44): концентрация на границе слоя K_δ -> (K_δ, откуда).
+
+    Задан числом `sep_K_depth` — он и берётся (консервативный пин до МКЭ). `null` — по затуханию:
+    концентрация от скругления углов окон радиусом r затухает на глубине порядка r, поэтому у
+    границы слоя δ от неё остаётся доля (r/(r+δ))² (Кирш, масштабированный на K), то есть
+    K_δ = 1 + (K − 1)·(r/(r+δ))². При r = 0.3 и δ = 0.4 — 1.18 против 2.0: [σ] ядра растёт на
+    треть, и азотирование перестаёт проигрывать улучшенной марке по изгибу. Прежнее обоснование
+    «при r ≲ δ концентрация не затухает» неверно (CP-112, ответ модели по валидации rev14.9)."""
+    kd = getattr(lim, "sep_K_depth", None)
+    if kd:
+        return float(kd), "sep_K_depth"
+    r = float(getattr(lim, "sep_r_corner", 0.0) or 0.0)
+    K = float(lim.sep_K)
+    if d <= 0 or r <= 0:
+        return K, "sep_K (нет r или δ)"
+    return 1.0 + (K - 1.0) * (r / (r + d)) ** 2, "затухание (r/(r+δ))²"
+
+
 def _allow(mat, lim, b):
     """CP-103 (Д-126): [σ] изгиба в двух точках для сечения глубиной b, мм ->
     (allow, где: слой | ядро, allow_core). Нет слоя или 2δ ≥ b — только ядро."""
@@ -129,7 +148,7 @@ def _allow(mat, lim, b):
         a = core / (lim.sep_K * lim.sep_S)
         return a, "ядро", a
     a_s = mat["m1_case"] / (lim.sep_K * lim.sep_S)
-    a_c = core / (lim.sep_K_depth * lim.sep_S * (1 - 2 * d / b))
+    a_c = core / (_k_depth(lim, d)[0] * lim.sep_S * (1 - 2 * d / b))       # CP-112
     return (a_s, "слой", a_c) if a_s <= a_c else (a_c, "ядро", a_c)
 
 
@@ -222,6 +241,8 @@ def _sep(M, sep, k_sep, D, l, kind, rows, R, lim, mat=None):
             "b_strip": b_c, "sig_allow": allow, "allow_where": a_where, "allow_core": a_core,
             "sig_core": (s_max * (1 - 2 * d_c / b_lim) if 0 < 2 * d_c < b_lim else s_max),
             "sig_H": sH, "sigH_allow": sH_allow, "z_tau": z_tau, "b_H": bH, "depth": d_c,
+            "k_depth": _k_depth(lim, d_c)[0],                    # CP-112: K_δ, которым считан
+            "k_depth_src": _k_depth(lim, d_c)[1],
             "H_layer": "слой" if layer else "ядро",
             "u_b": u_fr, "u_fr": u_fr, "u_st": u_st if b_c > 0 else 0.0, "b_strip_raw": b_raw,
             "u_H": (sH / sH_allow) ** p,
@@ -405,6 +426,13 @@ def self_test():
     assert w_ == "ядро" and abs(a - 90.7) < 0.1, a                # R6X6
     assert _allow({**m, "depth": 3.0}, L3, 5.894)[1] == "ядро"
     assert _allow({**m, "m1_core": 2000.0, "depth": 0.4}, L3, 5.894)[1] == "слой"
+    # CP-112: K_δ из sep_r_corner — при r = 0.3, δ = 0.4 даёт 1.184, и предел R6X6 задаёт слой
+    L4 = SimpleNamespace(sep_K=2.0, sep_S=2.5, sep_K_depth=None, sep_r_corner=0.3)
+    kd, src = _k_depth(L4, 0.4)
+    assert abs(kd - 1.1837) < 1e-3 and "затухан" in src, (kd, src)
+    a4, w4, _ = _allow({"m1_case": 608.0, "m1_core": 392.0, "depth": 0.4}, L4, 5.894)
+    assert w4 == "слой" and abs(a4 - 121.6) < 0.1, (a4, w4)
+    assert _k_depth(SimpleNamespace(sep_K=2.0, sep_K_depth=2.0, sep_r_corner=0.3), 0.4)[0] == 2.0
     bh, zt = _hertz(263.5, 6.0, 6.0, "roller", Es)
     assert abs(bh - 0.0381) < 5e-4 and abs(zt - 0.030) < 1e-3, (bh, zt)
     # CP-104: C-1 — R6X6 s_bd ~ 71.0 МПа (было 33.55), tau ~ 29.0;
