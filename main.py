@@ -100,7 +100,8 @@ def run_ptk(prices):
                      f"{r['alpha_max'] or '—'} | "
                      f"{(r['holes'] + ' (' + r['mount'] + ')') if r['holes'] else '—'} | "
                      f"{r['ring_variants'] or '—'} | {r['d_bc']} | {r['d_out']} | "
-                     f"{r['width']} | {m} | {r['M_req'] or '—'} | {r['t_hold']} | {st} |")
+                     f"{r['width']} | {m} | {r['M_req'] or '—'} | {r['t_hold']} | "
+                     f"{(r['sep_mat'] or {}).get('ref') or '—'} | {st} |")
         tag = f"- u={r['u']}, {r['roller']}, {r['gen']}: "
         errs += [tag + e for e in r["errors"]]
         warns += [tag + w for w in r["warnings"]]
