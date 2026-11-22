@@ -136,7 +136,7 @@ def run_ptk(prices):
         parts=ptk_parts.table(rows),
         excluded=("| ID | u | Тело | Генератор | Код |\n|---|---|---|---|---|\n" + "\n".join(excl))
                  if excl else "нет",
-        two_stage=ptk.two_stage_table(lim), phasing=phasing,
+        phasing=phasing,
         mreq=ptk.mreq_table([r for r in rows if not r["excluded"]], lim))   # CP-95
     write("specs", "SPEC-10_PTK_CALC.md", text)
     bad = [f"SPEC-10: в шаблоне нет полей {missing}"] if missing else []
