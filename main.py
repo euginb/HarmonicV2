@@ -138,9 +138,9 @@ def run_ptk(prices):
                  if excl else "нет",
         two_stage=ptk.two_stage_table(lim), phasing=phasing,
         mreq=ptk.mreq_table([r for r in rows if not r["excluded"]], lim))   # CP-95
-    bad += _table_check(text)          # CP-106: разъехавшиеся таблицы — в checks.md
     write("specs", "SPEC-10_PTK_CALC.md", text)
     bad = [f"SPEC-10: в шаблоне нет полей {missing}"] if missing else []
+    bad += _table_check(text)          # CP-106: таблицы, где разделитель не совпал с шапкой
     keys = [(r["id"], round(float(r["M_req"] or 0), 6)) for r in rows]   # CP-99: по вариантам u
     dup = sorted({k[0] for k in keys if keys.count(k) > 1})
     if dup:
