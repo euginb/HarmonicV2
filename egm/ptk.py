@@ -39,18 +39,19 @@ class PtkLimits:
     rows: int = 4
     row_phases: tuple = (0, 90, 180, 270)   # фазы эксцентриков рядов, град (Д-19)
     u_list: tuple = (10, 16, 20, 25, 32, 40, 50, 63)
+    u_range: tuple = ()           # CP-103 (A-5): [u_min, u_max] явно; () — края u_list (Д-119)
 
     # Д-119: границы одноступенчатого диапазона не задаются в ptk_input.yaml, а берутся
     # из u_list — первый и последний элементы. В хэш ID не входят (заменяли u_min/u_max).
     @property
     def u_min(self) -> int:
         """Нижняя граница одноступенчатого u — первый элемент u_list (Д-08)."""
-        return int(self.u_list[0])
+        return int(self.u_range[0]) if self.u_range else int(self.u_list[0])
 
     @property
     def u_max(self) -> int:
         """Верхняя граница — последний элемент u_list; u > u_max — две ступени (Д-11)."""
-        return int(self.u_list[-1])
+        return int(self.u_range[-1]) if self.u_range else int(self.u_list[-1])
     E_mod: float = 210000.0       # модуль упругости тел, венца, колец подшипника, МПа (Д-41)
     nu: float = 0.3               # коэффициент Пуассона
     sigma_H_line: float = 2500.0  # допускаемое σ_H, линейный контакт (ролик), МПа (OQ-08)
@@ -59,7 +60,11 @@ class PtkLimits:
     sep_sigma_m1: float = 509.0   # σ₋₁ материала сепаратора, МПа (40Х, materials.yaml; CP-94)
     sep_K: float = 2.0            # концентрация напряжений в углах окон сепаратора (OQ-44)
     sep_S: float = 2.5            # запас многоцикловой усталости перемычки (OQ-44)
-    sep_sigma_H: float = 880.0    # допускаемое σ_H тело/сторона окна сепаратора, МПа (OQ-44)
+    sep_sigma_Hlim: float = 1056.0  # CP-103: σ_Hlim при sep_grade = "" (запасной путь), МПа
+    sep_S_H: float = 1.2          # CP-103 (Д-126): запас контактной выносливости
+    sep_Z_N: float = 1.0          # CP-103: коэффициент долговечности
+    sep_K_depth: float = 2.0      # CP-103: концентрация на границе слоя (OQ-44)
+    sep_case_k: float = 3.0       # CP-103: слой держит контакт при δ >= k·z_t (OQ-49)
     sep_k_edge: float = 1.2       # рост σ_H у кромки стенки окна — кромочный контакт (OQ-44)
     # CP-102 (Д-125): материал сепаратора — марка materials.yaml и её состояние
     # ("38Х2МЮА" + "nitr" -> ссылка "38Х2МЮА:nitr"). Пусто — σ₋₁ и [σ_H] берутся из
@@ -359,6 +364,13 @@ def load_config(cfg):
         if key in raw_lim:
             raise ValueError(f"limits.{key}: устарело — расчёт по u задаётся таблицей limits.u_calc "
                              f"(CP-99, Д-123)")
+    if "sep_sigma_H" in raw_lim:                        # CP-103 (Д-126)
+        raise ValueError("limits.sep_sigma_H: устарело — допускаемое считается из предела: "
+                         "sep_sigma_Hlim (только при пустом sep_grade) и sep_S_H, sep_Z_N (CP-103)")
+    if raw_lim.get("u_range"):
+        raw_lim["u_range"] = tuple(raw_lim["u_range"])
+        if len(raw_lim["u_range"]) != 2 or raw_lim["u_range"][0] >= raw_lim["u_range"][1]:
+            raise ValueError("limits.u_range: нужно [u_min, u_max] по возрастанию (CP-103, A-5)")
     lim = _load(PtkLimits, raw_lim)
     lim.u_calc, lim.u_def, lim.u_list = _parse_u_calc(raw_lim.get("u_calc"))   # Д-119: края
     bad = [g for g in lim.gen_types if g not in GEN_TYPES]
@@ -475,10 +487,10 @@ def ring(d_root, holes, fast, lim, wall):
 
 
 # Д-80: маркировка. GEOM_REV повышается при смене формул геометрии — меняются все ID.
-GEOM_REV = 7                       # Д-42: тип генератора bearing | eccentric в хэше
-# Д-125 (CP-102): в хэш входит материал сепаратора (марка[:состояние] и σ₋₁/[σ_H], по которым
-# считается M_sep). Смена материала меняет пределы, а с ними подбор dR/hb — значит и геометрию,
-# поэтому номер повышен: все ID меняются один раз, дальше материал в них зафиксирован.
+GEOM_REV = 8                       # Д-42: тип генератора bearing | eccentric в хэше
+# Д-125/Д-126 (CP-103): в хэш входит только ссылка на материал сепаратора "марка[:состояние]" —
+# она попадает на чертёж .02 (графа 3, ТТ). Числа σ — справка в sep_mat: их уточнение меняет M,
+# но не ID; влияние на подбор уже в хэше через dR, hb, band_fill. Номер 8 — один разрыв.
 # CP-96: rim — новое значение gen, а gen уже входит в хэш, поэтому rev НЕ повышается (Д-80: номер
 # меняют при смене формул геометрии). ID bearing/eccentric остаются, у rim свои — Д-120.
 # Д-48: параметры эксцентрика (rho, brg_mass_k, shaft_key_*, key_angle, bal_*) — не в хэше;
@@ -548,24 +560,31 @@ def _mats_catalog(mats=None):
 
 
 def _mat(lim, ref="", mats=None):
-    """CP-102 (Д-125): материал сепаратора -> параметры расчёта и хэша.
-
-    ref = "<марка>[:<состояние>]"; пусто — числа limits.sep_sigma_m1 / sep_sigma_H, как до
-    CP-102 (src = "limits"). Свойства марки/состояния — materials.yaml; нет sigma_H у марки —
-    остаётся limits.sep_sigma_H с src_H = "limits" (видно в SPEC-10 и в предупреждениях)."""
-    d = {"ref": str(ref or ""), "sigma_m1": round(float(lim.sep_sigma_m1), 6),
-         "sigma_H": round(float(lim.sep_sigma_H), 6), "src_m1": "limits", "src_H": "limits"}
-    if not d["ref"]:
-        return d
-    p = materials.sep_props(_mats_catalog(mats), d["ref"])
+    """CP-103 (Д-126): материал сепаратора -> {ref, m1_case, m1_core, Hlim_case, Hlim_core,
+    depth, src_m1, src_H}. Пределы — materials.yaml; у заданной марки нет σ₋₁ ядра или
+    σ_Hlim ядра — ValueError (метка на чертеже не должна расходиться с расчётом). ref = "" —
+    запасной путь limits.sep_sigma_m1 / sep_sigma_Hlim без слоя (src = "limits", устарел)."""
+    r = str(ref or "")
+    if not r:
+        m1, H = float(lim.sep_sigma_m1), float(lim.sep_sigma_Hlim)
+        return {"ref": "", "m1_case": None, "m1_core": m1, "Hlim_case": None, "Hlim_core": H,
+                "depth": 0.0, "src_m1": "limits", "src_H": "limits"}
+    p = materials.sep_props(_mats_catalog(mats), r)
     if p is None:
-        raise ValueError(f"u_calc.materials: {d['ref']!r} — нет такой марки или состояния в "
+        raise ValueError(f"u_calc.materials: {r!r} — нет такой марки или состояния в "
                          f"specs/materials.yaml (CP-102)")
-    if p.get("sigma_m1") is not None:
-        d["sigma_m1"], d["src_m1"] = round(float(p["sigma_m1"]), 6), "materials"
-    if p.get("sigma_H") is not None:
-        d["sigma_H"], d["src_H"] = round(float(p["sigma_H"]), 6), "materials"
-    return d
+    c, cs = p["core"], p["case"] or {}
+    miss = [k for k, v in (("sigma_m1", c["sigma_m1"]), ("sigma_Hlim | hb", c["sigma_Hlim"]))
+            if v is None]
+    if p["case"] is not None:
+        miss += [f"case.{k}" for k in ("sigma_m1", "sigma_Hlim", "depth") if cs.get(k) is None]
+    if miss:
+        raise ValueError(f"материал сепаратора {r}: нет {miss} в specs/materials.yaml (CP-103, Д-126)")
+    f = lambda x: None if x is None else round(float(x), 6)
+    return {"ref": p["ref"], "m1_case": f(cs.get("sigma_m1")), "m1_core": f(c["sigma_m1"]),
+            "Hlim_case": f(cs.get("sigma_Hlim")), "Hlim_core": f(c["sigma_Hlim"]),
+            "depth": f(p["depth"]), "src_m1": "materials",
+            "src_H": "materials" if p["src_Hcore"] == "sigma_Hlim" else p["src_Hcore"]}
 
 
 def _mat_scope(prm, lim):
@@ -607,8 +626,8 @@ def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0, hb=0.
         g["hb"] = hb
     if fill:                                            # CP-95b: пояс до t_max (CAD пояса — OQ-46)
         g["band_fill"] = True
-    if mat is not None:                                 # CP-102 (Д-125): материал сепаратора
-        g["material"] = dict(mat)                       # ref + σ₋₁ + [σ_H] + откуда взяты
+    if mat is not None:                                 # CP-103 (Д-126): только ссылка
+        g["material"] = {"ref": mat["ref"]}
     return _n(g)
 
 
@@ -696,15 +715,13 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
     dR — подъём R_Σ над R_Σ min, мм (CP-95): у eccentric/rim — D_г больше на 2·dR,
     у bearing — подшипник с D ≥ 2(R_Σ min + dR) − D_ш."""
     D = rol["d"]
-    mat = mat or _mat(lim)                           # CP-102: материал сепаратора
-    if mat["ref"]:                                   # свойства марки заменяют числа limits
-        lim = replace(lim, sep_sigma_m1=mat["sigma_m1"], sep_sigma_H=mat["sigma_H"])
+    mat = mat or _mat(lim)                           # CP-102/CP-103: материал сепаратора
     wall = rol.get("wall_min", lim.wall_min)
     a = rol.get("a_w") or lim.a_k * D
     r = PtkResult(u, rid, D, gen=gen, M_req=m_req, dR=dR, hb=hb, band_fill=fill, sep_mat=mat)
-    if mat["ref"] and mat["src_H"] == "limits":
-        r.warnings.append(f"сепаратор {mat['ref']}: [σ_H] из limits ({mat['sigma_H']:g} МПа) — "
-                          f"у марки нет sigma_H в materials.yaml (OQ-44)")
+    if not mat["ref"]:                                   # CP-103: запасной путь
+        r.warnings.append("сепаратор: материал не из справочника — σ₋₁/σ_Hlim из limits "
+                          "(sep_grade пуст; устарело, CP-103)")
     r.id, r.geom = config_id(u, rol, lim, holes, fast, None, gen, dR, hb, fill, mat)
     if u > lim.u_max:
         s = two_stage(u, lim)
@@ -814,7 +831,8 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
             cand.append((r.M_B, "подшипник"))
         if r.rim:                                        # CP-96: овализация обода — свой предел
             cand.append((r.rim["M_ov"], "обод"))
-        sep_in = (r.sep, t["k_sep"], D, rol["l"], rol.get("type", "roller"), lim.rows, R, a, lim)
+        sep_in = (r.sep, t["k_sep"], D, rol["l"], rol.get("type", "roller"), lim.rows, R, a, lim,
+                  mat)
         ref = {}
         if r.sep:                                        # Д-116, CP-94: предел сепаратора
             r.M_sep, r.sep_why = ptk_force.sep_limit(*sep_in)
@@ -1142,13 +1160,13 @@ def self_test():
     assert [p["id"] for p in c(62).parts if ".01" in p["id"]] == [c(62).id + ".01A", c(62).id + ".01B"]
     rows = [asdict(c(20)), asdict(c(62))]
     assert find(rows, c(62).id + ".01B")["u"] == 62
-    # CP-94: K20 = PTK-063-R3X8-22M6P2-1935FE (SPEC-10: 61819, 22×M6+2×Ø6, D ≤ 200) —
+    # CP-94: K20 = PTK-063-R3X8-22M6P2-C068EC (SPEC-10: 61819, 22×M6+2×Ø6, D ≤ 200) —
     # сепаратор ограничивает M: σ перемычки ≤ [σ], M_sep < M_H, M_by «сепаратор» (Д-116)
     k20 = calc(63, "R_D3x8", {"type": "roller", "d": 3.0, "l": 8.0}, PtkLimits(d_out_max=200.0),
                RingHoles(bolt="M6", n=22, pins=2, pin_d=6.0),
                {"M6": {"d_clear": 6.6, "dk": 10.0, "F_M": 9.3}},
                {"61819": {"d": 95.0, "D": 120.0, "B": 13.0, "C": 19.9, "C0": 18.8}})
-    assert k20.ok and k20.id == "PTK-063-R3X8-22M6P2-1935FE", (k20.id, k20.errors)
+    assert k20.ok and k20.id == "PTK-063-R3X8-22M6P2-C068EC", (k20.id, k20.errors)
     assert abs(k20.t_hold - 1740.7) < 0.1 and k20.sep["web"] == 3.015, (k20.t_hold, k20.sep)
     assert k20.M_by == "сепаратор" and k20.M == k20.M_sep < k20.M_H, (k20.M, k20.M_sep, k20.M_H)
     s20 = k20.sep_chk
@@ -1207,7 +1225,19 @@ def self_test():
         "materials теряется в _parse_params (A-1)"
     assert _mat_scope({"materials": ["38Х2МЮА:nitr"]}, lm) == ("38Х2МЮА:nitr",), "materials — не перечень"
     assert _mat_scope({}, lm) == ("",), "марки по умолчанию нет — ожидался пустой ref"
-    assert _mat(lm, "40Х")["sigma_m1"] == 509.0 and _mat(lm, "40Х")["src_m1"] == "materials"
+    assert _mat(lm, "40Х")["m1_core"] == 509.0 and _mat(lm, "40Х")["src_m1"] == "materials"
+    # CP-103 (Д-126): пределы слоя/ядра раздельно; в хэше только ref; смена σ не меняет ID
+    m40 = _mat(lm, "40Х")
+    assert m40["m1_core"] == 509.0 and m40["m1_case"] is None and m40["Hlim_core"] == 640.0, m40
+    mn = _mat(lm, "38Х2МЮА:nitr")
+    assert (mn["m1_case"], mn["m1_core"], mn["Hlim_case"], mn["depth"]) == \
+        (608.0, 392.0, 1050.0, 0.4), mn
+    g1 = geom_params(10, {"d": 3.0}, lm, RingHoles(), {}, mat=mn)
+    g2 = geom_params(10, {"d": 3.0}, lm, RingHoles(), {}, mat={**mn, "m1_case": 700.0})
+    assert g1 == g2 and g1["material"] == {"ref": "38Х2МЮА:nitr"}, g1
+    assert _mat(PtkLimits(), "")["src_m1"] == "limits"
+    lr = replace(PtkLimits(u_list=(32,)), u_range=(10, 63))
+    assert (lr.u_min, lr.u_max) == (10, 63)
     try:                                        # CP-102: марки/состояния нет — ошибка
         _mat(lm, "НетТакой")
     except ValueError:

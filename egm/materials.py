@@ -59,24 +59,31 @@ def states(mats, grade):
 
 
 def state_props(mats, grade, state):
-    """CP-102: свойства состояния -> {sigma_m1, sigma_H, depth, hrc, heat, for} | None.
+    """CP-102/CP-103 (Д-126): состояние марки -> {heat, for, core, case, depth} | None.
+    core — переопределения свойств ядра ({} — ядро не меняется: азотирование ниже отпуска);
+    case — пределы поверхностного слоя {sigma_m1, sigma_Hlim, depth, hv} | None. Слой НЕ
+    сливается в плоские поля марки (A-4): слой и ядро считаются раздельно (egm/ptk_force.py).
     Нет состояния — None (марка считается в состоянии поставки)."""
     st = states(mats, grade).get(str(state)) if state else None
     if st is None:
         return None
-    out = {k: st.get(k) for k in ("sigma_m1", "sigma_H", "depth", "hrc", "for")}
-    out["heat"] = st.get("heat")
-    for k, v in (st.get("case") or {}).items():
-        if v is not None:
-            out[k] = v
-    return out
+    case = {k: v for k, v in (st.get("case") or {}).items() if v is not None} or None
+    core = {k: v for k, v in (st.get("core") or {}).items() if v is not None}
+    return {"heat": st.get("heat"), "for": st.get("for"), "core": core, "case": case,
+            "depth": float((case or {}).get("depth") or 0.0)}
+
+
+# Ключи props(): прежний набор (Д-110) + CP-103. sigma_H — устарело (Д-126), остаётся в наборе
+# ради совместимости вызовов (egm/shafts.py его не читает); контакт — sigma_Hlim / hb.
+PROPS = ("sigma_v", "sigma_t", "sigma_m1", "sigma_H", "sigma_Hlim", "hb", "rho", "state",
+         "d_range")
 
 
 def props(mats, grade, state=None):
-    """Механические свойства марки (Д-110, OQ-36; CP-102: состояние) -> {sigma_v, sigma_t,
-    sigma_m1, sigma_H, rho, state, d_range} | None — марки нет в справочнике. Отсутствующие
-    поля — None (не ошибка). state — ключ materials.yaml → <марка>.states: свойства слоя/ядра
-    состояния накладываются на плоские поля марки."""
+    """Механические свойства марки (Д-110, OQ-36; CP-102: состояние) -> {PROPS} | None — марки
+    нет в справочнике. Отсутствующие поля — None (не ошибка). state — ключ materials.yaml →
+    <марка>.states: на плоские поля накладываются только переопределения ЯДРА (states.<k>.core);
+    свойства слоя (case) — только в sep_props (CP-103, A-4)."""
     if grade is None:
         return None
     g = grades(mats)
@@ -84,26 +91,43 @@ def props(mats, grade, state=None):
     if gname not in g:
         return None
     it = g[gname]
-    out = {k: it.get(k) for k in ("sigma_v", "sigma_t", "sigma_m1", "sigma_H", "rho",
-                                  "state", "d_range")}
+    out = {k: it.get(k) for k in PROPS}
     if state:
         sp = state_props(mats, gname, state)
         if sp is None:
             return None
-        for k in ("sigma_m1", "sigma_H"):
-            if sp.get(k) is not None:
-                out[k] = sp[k]
+        out.update({k: v for k, v in sp["core"].items() if k in out})
         out["state"] = sp.get("heat") or out["state"]
     return out
 
 
+def hlim_core(p):
+    """σ_Hlim ядра, МПа -> (σ | None, источник): поле sigma_Hlim, иначе 2·HB + 70
+    (ГОСТ 21354-87, улучшение — сверить, OQ-49)."""
+    if p.get("sigma_Hlim") is not None:
+        return float(p["sigma_Hlim"]), "sigma_Hlim"
+    if p.get("hb") is not None:
+        return 2.0 * float(p["hb"]) + 70.0, "2·HB+70"
+    return None, None
+
+
 def sep_props(mats, ref):
-    """CP-102: материал сепаратора по ссылке "марка[:состояние]" -> свойства | None.
-    None — марки или состояния нет в справочнике (вход неверный, а не «нет данных»)."""
+    """CP-103 (Д-126): материал сепаратора по ссылке "марка[:состояние]" -> {ref, grade, state,
+    core: {sigma_m1, sigma_Hlim}, case: {sigma_m1, sigma_Hlim, depth, hv} | None, depth,
+    src_Hcore} | None — марки или состояния нет (вход неверный). Только ПРЕДЕЛЫ: запасы —
+    limits (egm/ptk.py). Нет числа — None в поле; ошибку «нет данных» пишет ptk._mat."""
     gname, st = split_ref(ref)
     if not gname:
         return None
-    return props(mats, gname, st)
+    p = props(mats, gname, st)
+    if p is None:
+        return None
+    H, src = hlim_core(p)
+    c = state_props(mats, gname, st)["case"] if st else None
+    case = {k: c.get(k) for k in ("sigma_m1", "sigma_Hlim", "depth", "hv")} if c else None
+    return {"ref": f"{gname}{SEP}{st}" if st else gname, "grade": gname, "state": st,
+            "core": {"sigma_m1": p.get("sigma_m1"), "sigma_Hlim": H}, "case": case,
+            "depth": float((case or {}).get("depth") or 0.0), "src_Hcore": src}
 
 
 def check(mats, prods, stock):
@@ -164,4 +188,22 @@ def self_test():
     assert part_materials(prods, "PTK", "09") == [] and part_materials(prods, "HD", "01") == []
     assert props(mats, "40Х")["sigma_v"] is None and props(mats, 45)["state"] is None
     assert props(mats, "Х") is None and props(mats, None) is None
+    # CP-103 (Д-126; A-4, A6): слой не сливается в props; набор ключей не сужается
+    m2 = {"materials": {"38Х2МЮА": {
+        "sigma_v": 980, "sigma_t": 835, "sigma_m1": 392, "hb": 285,
+        "states": {"nitr": {"heat": "азот.", "core": {},
+                            "case": {"sigma_m1": 608, "sigma_Hlim": 1050, "depth": 0.4,
+                                     "hv": 650}}}}}}
+    old = {"sigma_v", "sigma_t", "sigma_m1", "sigma_H", "rho", "state", "d_range"}
+    p0, p1 = props(m2, "38Х2МЮА"), props(m2, "38Х2МЮА", "nitr")
+    assert set(p0) >= old and set(p1) >= old, (set(p0), set(p1))
+    assert p1["sigma_m1"] == 392 and p1["state"] == "азот.", p1
+    s1 = sep_props(m2, "38Х2МЮА:nitr")
+    assert s1["core"] == {"sigma_m1": 392, "sigma_Hlim": 640.0}, s1
+    assert s1["src_Hcore"] == "2·HB+70", s1
+    assert s1["case"]["sigma_m1"] == 608 and s1["depth"] == 0.4, s1
+    assert s1["ref"] == "38Х2МЮА:nitr", s1
+    s0 = sep_props(m2, "38Х2МЮА")
+    assert s0["case"] is None and s0["depth"] == 0.0, s0
+    assert sep_props(m2, "38Х2МЮА:нет") is None and sep_props(m2, "") is None
     return True

@@ -110,35 +110,71 @@ def _strip(sep):
     return round(max(gap, 0.0) * math.pi / 180 * sep["r_in"], 3)
 
 
-def _sep(M, sep, k_sep, D, l, kind, rows, R, lim):
+def _hertz(F, D, l, kind, Es):
+    """CP-103: полуширина (ролик) или радиус (шарик) площадки тело/плоскость, мм, и глубина
+    наибольшего касательного напряжения: ролик z = 0.786·b, шарик z = 0.48·a."""
+    if kind == "ball":
+        a = (3 * F * (D / 2) / (4 * Es)) ** (1 / 3) if F > 0 else 0.0
+        return a, 0.48 * a
+    b = math.sqrt(4 * F * (D / 2) / (math.pi * l * Es)) if F > 0 else 0.0
+    return b, 0.786 * b
+
+
+def _allow(mat, lim, b):
+    """CP-103 (Д-126): [σ] изгиба в двух точках для сечения глубиной b, мм ->
+    (allow, где: слой | ядро, allow_core). Нет слоя или 2δ ≥ b — только ядро."""
+    d = mat.get("depth") or 0.0
+    core = mat["m1_core"]
+    if not mat.get("m1_case") or d <= 0 or 2 * d >= b:
+        a = core / (lim.sep_K * lim.sep_S)
+        return a, "ядро", a
+    a_s = mat["m1_case"] / (lim.sep_K * lim.sep_S)
+    a_c = core / (lim.sep_K_depth * lim.sep_S * (1 - 2 * d / b))
+    return (a_s, "слой", a_c) if a_s <= a_c else (a_c, "ядро", a_c)
+
+
+def _mat_default(lim):
+    """CP-103: материал без справочника (вызовы с sep_grade = "") — ядро из limits."""
+    return {"ref": "", "m1_case": None, "m1_core": lim.sep_sigma_m1, "Hlim_case": None,
+            "Hlim_core": getattr(lim, "sep_sigma_Hlim", 1056.0), "depth": 0.0}
+
+
+def _sep(M, sep, k_sep, D, l, kind, rows, R, lim, mat=None):
     """Сепаратор при моменте пакета M, Н·м (CP-94, CP-98; Д-116, Д-118) — без округления.
 
     Ряды j = 1…rows — от выходного торца. Рама Виренделя по окружности периодична: точки
     перегиба — в серединах перемычек и участков поясов. Перемычка ряда j несёт сдвиг
-    V_j = q·(rows − j + ½), q = M_ряд/(n·R_Σ) — момент дальних рядов и половина своего,
+    V_j = q·(rows − j + ½), q = M_ряд/(n·R_Σ) — сила на шаг окон от одного ряда,
     у торца перемычки V_j·L/2; свой ряд — тело давит на сторону окна силой F = k_sep·M_ряд,
     балка с заделкой F·L/12 — у того же торца. Перемычка: σ = (V_1·L/2 + F·L/12)/W, W = t·b²/6.
     Пояс между рядами j, j+1 (CP-98): узел уравновешивает две перемычки, на пояс
     M_п = (V_j + V_j+1)·L/4 + F·L/12, W_п = t_п·h_п²/6, срез τ = 3·M_п/(s·t_п·h_п), s = 2πR_Σ/n;
     пояс у выходного торца — M_т = (V_1·L/2 + F·L/12)/2, h_т. Нет sep["band"] — пояса не
-    проверяются (как CP-94). Жёсткость поясов на σ перемычки не влияет (периодичность): усиление
-    пояса поднимает M_sep, только если лимитирует пояс. Контакт — Герц тело/плоскость на
-    min(l, L), × sep_k_edge. u_b, u_H — загрузка в долях момента: M_sep = M/max(u_b, u_H)."""
+    проверяются (как CP-94). Контакт — Герц тело/плоскость на min(l, L), × sep_k_edge.
+    CP-103 (Д-126): [σ] изгиба — двухточечно по сечению глубиной b (слой и граница слоя), у поясов
+    и полосы своя глубина; [σ_H] = σ_Hlim·Z_N/S_H, слой или ядро по z_τ против δ. Напряжения
+    поясов и полосы приводятся к [σ] перемычки (× allow/al) для общего max. u_b, u_H — загрузка
+    в долях момента: M_sep = M/max(u_b, u_H)."""
+    mat = mat or _mat_default(lim)
     n, L, b = sep["n"], sep["h"], sep["web"]
     W = (sep["r_out"] - sep["r_in"]) * b * b / 6
     Mr = M * 1000 / rows                                  # момент ряда, Н·мм
     q = Mr / (n * R)
     V = [q * (rows - j + 0.5) for j in range(1, rows + 1)]
     F = k_sep * Mr
-    m_r = F * L / 12
+    m_r = F * L / (8 if kind == "ball" else 12)         # CP-104 (C-4): шарик — F·L/8
     Es = e_star(lim.E_mod, lim.nu)
     if kind == "ball":                                    # шарик/плоскость: σ ∝ F^(1/3)
         sH, p = sigma_point(F, _k(D / 2), _k(D / 2), Es), 3
     else:                                                 # ролик/плоскость: σ ∝ F^(1/2)
         sH, p = sigma_line(F, min(l, L), D / 2, math.inf, Es), 2
     sH *= lim.sep_k_edge
+    bH, z_tau = _hertz(F, D, min(l, L), kind, Es)         # CP-103: площадка и глубина max τ
+    d_c = mat.get("depth") or 0.0
+    layer = bool(mat.get("Hlim_case")) and d_c >= lim.sep_case_k * z_tau
+    sH_allow = (mat["Hlim_case"] if layer else mat["Hlim_core"]) * lim.sep_Z_N / lim.sep_S_H
+    allow, a_where, a_core = _allow(mat, lim, b)
     s_fr, s_row = V[0] * L / 2 / W, m_r / W
-    allow = lim.sep_sigma_m1 / (lim.sep_K * lim.sep_S)
     el = [(s_fr + s_row, "перемычка", 1)]
     s_bd = s_end = tau = 0.0
     bd = sep.get("band")
@@ -148,81 +184,84 @@ def _sep(M, sep, k_sep, D, l, kind, rows, R, lim):
     if bd:                                                # CP-98: пояса
         tb = bd["t"]
         if rows > 1 and bd.get("h_mid"):
-            mb = [(V[j] + V[j + 1]) * L / 4 + m_r for j in range(rows - 1)]
+            h = bd["h_mid"]      # CP-104 (C-1): момент в центре узла, плечо (L + h)/2;
+            #   поперечная сила тела F/2 переносится на h/2 -> F·h/4
+            mb = [(V[j] + V[j + 1]) * (L + h) / 4 + m_r + F * h / 4 for j in range(rows - 1)]
             j = max(range(rows - 1), key=mb.__getitem__)
             s_bd = 6 * k_off * mb[j] / (tb * bd["h_mid"] ** 2)
             tau = 3 * mb[j] / (2 * math.pi * R / n) / (tb * bd["h_mid"])
-            el.append((s_bd, "пояс", j + 1))
-        s_end = 6 * k_off * (V[0] * L / 2 + m_r) / 2 / (tb * bd["h_end"] ** 2)
-        el.append((s_end, "торец", 0))
+            el.append((s_bd * allow / _allow(mat, lim, bd["h_mid"])[0], "пояс", j + 1))
+        he = bd["h_end"]     # CP-104 (C-1): то же плечо у торцевого пояса
+        s_end = 6 * k_off * (V[0] * (L + he) / 2 + m_r + F * he / 4) / 2 / (tb * he ** 2)
+        el.append((s_end * allow / _allow(mat, lim, bd["h_end"])[0], "торец", 0))
     s_max, elem, j_lim = max(el)
     u_fr = max(s_max / allow, tau / (0.58 * allow))
     # CP-95b: вторая схема — сплошная полоса b_c через окна всех рядов, консоль от выходного торца,
     # пояса не нагружены; рама и полоса — два статически допустимых поля, берётся меньшая загрузка
-    b_c, s_st = _strip(sep), 0.0
+    b_raw, s_st = _strip(sep), 0.0
+    b_c = b_raw if b_raw >= lim.sep_web_min else 0.0     # CP-104 (C-2): уже перемычки — не полоса
     if b_c > 0:
         arm = [w_["z0"] + L / 2 - sep["rows"][0]["z0"] for w_ in sep["rows"]]
         m_st = q * sum(arm) + max(F - q, 0.0) * max(arm)
         s_st = 6 * m_st / ((sep["r_out"] - sep["r_in"]) * b_c ** 2)
-    u_st = s_st / allow if b_c > 0 else math.inf
-    if u_st < u_fr:
-        elem, j_lim = "полоса", 0
+        s_st *= allow / _allow(mat, lim, b_c)[0]          # CP-103: своя глубина сечения
+    u_st = s_st / allow if b_c > 0 else math.inf         # CP-104 (A-2): только справка
     return {"V": V[0], "F": F, "sig_frame": s_fr, "sig_row": s_row, "sig_b": s_fr + s_row,
-            "sig_band": s_bd, "sig_end": s_end, "tau_band": tau, "sig_strip": s_st, "b_strip": b_c,
-            "sig_allow": allow, "sig_H": sH, "sigH_allow": lim.sep_sigma_H,
-            "u_b": min(u_fr, u_st), "u_H": (sH / lim.sep_sigma_H) ** p,
+            "sig_band": s_bd, "sig_end": s_end, "tau_band": tau, "sig_strip": s_st,
+            "b_strip": b_c, "sig_allow": allow, "allow_where": a_where, "allow_core": a_core,
+            "sig_core": (s_max * (1 - 2 * d_c / b) if 0 < 2 * d_c < b else s_max),
+            "sig_H": sH, "sigH_allow": sH_allow, "z_tau": z_tau, "b_H": bH, "depth": d_c,
+            "H_layer": "слой" if layer else "ядро",
+            "u_b": u_fr, "u_fr": u_fr, "u_st": u_st if b_c > 0 else 0.0, "b_strip_raw": b_raw,
+            "u_H": (sH / sH_allow) ** p,
             "lim_elem": elem, "n_row_lim": j_lim}
 
 
-def sep_check(M, sep, k_sep, D, l, kind, rows, R, a, lim):
+def sep_check(M, sep, k_sep, D, l, kind, rows, R, a, lim, mat=None):
     """Проверка сепаратора при принятом M, Н·м -> ptk_configs.yaml → sep_chk (CP-94).
     edge — запас от линии контакта до кромки стенки при крайнем ходе тела (SEP_K − 1)·a_ω;
-    b_H — полуширина площадки Герца ролика: при b_H ~ edge контакт кромочный (sep_k_edge)."""
-    c = _sep(M, sep, k_sep, D, l, kind, rows, R, lim)
+    b_H (полуширина площадки Герца) и z_tau даёт _sep (CP-103); H_layer — слой | ядро."""
+    c = _sep(M, sep, k_sep, D, l, kind, rows, R, lim, mat)
     c["by"] = "изгиб" if c["u_b"] >= c["u_H"] else "контакт"
     c["edge"] = (sep["r_out"] - sep["r_in"]) / 2 - a
-    c["b_H"] = (math.sqrt(4 * c["F"] * D / 2 / (math.pi * min(l, sep["h"])
-                                               * e_star(lim.E_mod, lim.nu)))
-                if kind != "ball" else 0.0)
     return {k: round(v, 4) if isinstance(v, float) else v for k, v in c.items()}
 
 
-def sep_limit(sep, k_sep, D, l, kind, rows, R, a, lim):
+def sep_limit(sep, k_sep, D, l, kind, rows, R, a, lim, mat=None):
     """M_sep, Н·м (вниз до 0.1), и причина: наименьший M, при котором σ перемычки = [σ]
-    или k_edge·σ_H = [σ_H] (CP-94, Д-116). a — для единой сигнатуры с sep_check."""
-    c = _sep(1.0, sep, k_sep, D, l, kind, rows, R, lim)
+    или k_edge·σ_H = [σ_H] (CP-94, Д-116; CP-103: предел — слой или ядро). a — для единой
+    сигнатуры с sep_check."""
+    c = _sep(1.0, sep, k_sep, D, l, kind, rows, R, lim, mat)
     u = max(c["u_b"], c["u_H"])
     if u <= 0:
         return 0.0, "сепаратор не нагружен (k_sep = 0) — проверка не выполнена"
     M = math.floor(10 / u) / 10
-    s = _sep(M, sep, k_sep, D, l, kind, rows, R, lim)
-    if c["u_b"] >= c["u_H"] and c["lim_elem"] == "полоса":       # CP-95b
-        why = (f"изгиб сплошной полосы через окна всех рядов (консоль от выходного торца), "
-               f"ширина {s['b_strip']:.1f} мм: σ {s['sig_strip']:.0f} МПа = [σ] "
-               f"{s['sig_allow']:.1f} МПа; пояса не догружены (CP-95b)")
-    elif c["u_b"] >= c["u_H"] and c["lim_elem"] == "перемычка":
+    s = _sep(M, sep, k_sep, D, l, kind, rows, R, lim, mat)
+    if c["u_b"] >= c["u_H"] and c["lim_elem"] == "перемычка":
         why = (f"изгиб перемычки ряда у выходного торца: σ рамы {s['sig_frame']:.0f} + σ ряда "
-               f"{s['sig_row']:.0f} МПа = [σ] = σ₋₁/(K·S) = {lim.sep_sigma_m1:g}/"
-               f"({lim.sep_K:g}·{lim.sep_S:g}) = {s['sig_allow']:.1f} МПа (CP-94)")
+               f"{s['sig_row']:.0f} МПа = [σ] {s['sig_allow']:.1f} МПа, предел — "
+               f"{s['allow_where']} (CP-103)")
     elif c["u_b"] >= c["u_H"]:                            # CP-98: лимитирует пояс
         bd, mid = sep["band"], c["lim_elem"] == "пояс"
         where = (f"пояс между рядами {c['n_row_lim']}–{c['n_row_lim'] + 1} от выходного торца"
                  if mid else "пояс у выходного торца")
         why = (f"изгиб: {where}, {bd['h_mid'] if mid else bd['h_end']:g} × {bd['t']:g} мм: "
-               f"σ {s['sig_band'] if mid else s['sig_end']:.0f} МПа = [σ] {s['sig_allow']:.1f} МПа; "
-               f"усилить пояс (sep_band_t) или поднять row_gap (CP-98, OQ-46)")
+               f"σ {s['sig_band'] if mid else s['sig_end']:.0f} МПа = [σ] {s['sig_allow']:.1f} МПа "
+               f"({s['allow_where']}); "
+               f"усилить пояс (sep_band_t) или поднять row_gap — по раме, полоса справка, "
+               f"МКЭ (OQ-46)")
     else:
         why = (f"контакт тело/окно: k_edge·σ_H = {s['sig_H']:.0f} МПа = [σ_H] "
-               f"{lim.sep_sigma_H:g} МПа при F {s['F']:.0f} Н (CP-94)")
+               f"{s['sigH_allow']:.0f} МПа ({s['H_layer']}, z_t {s['z_tau']:.3f} мм) при F {s['F']:.0f} Н (CP-94)")
     return M, why
 
 
-def sep_refs(sep, k_sep, D, l, kind, rows, R, a, lim):
+def sep_refs(sep, k_sep, D, l, kind, rows, R, a, lim, mat=None):
     """Референсы сепаратора, Н·м (CP-98, Д-118), вниз до 0.1:
     M_row_b — один ряд, только изгиб перемычки своим рядом (без переноса через дальние ряды);
     M_row_H — один ряд по контакту тело/окно; M_row = min(M_row_b, M_row_H);
     M_win — пакет по контакту тело/окно (= rows·M_row_H) — предел тела в окне, M_body_win."""
-    c = _sep(1.0, sep, k_sep, D, l, kind, rows, R, lim)
+    c = _sep(1.0, sep, k_sep, D, l, kind, rows, R, lim, mat)
     Mb = c["sig_allow"] / (rows * c["sig_row"]) if c["sig_row"] > 0 else 0.0
     Mw = 1 / c["u_H"] if c["u_H"] > 0 else 0.0
     f = lambda x: math.floor(10 * x) / 10
@@ -313,7 +352,9 @@ def self_test():
     t5 = torque(19, z, a, R, D, 8.0, "roller", None, lim, 4)         # Д-42: эксцентрик
     assert t5["M_B"] is None and t5["M_H"] >= t1["M_H"], (t5, t1)
     lim2 = SimpleNamespace(**vars(lim), sep_sigma_m1=509.0, sep_K=2.0, sep_S=2.5,  # CP-94
-                           sep_sigma_H=880.0, sep_k_edge=1.2)
+                           sep_sigma_Hlim=1056.0, sep_S_H=1.2, sep_Z_N=1.0,  # CP-103
+                           sep_K_depth=2.0, sep_case_k=3.0, sep_k_edge=1.2,
+                           sep_web_min=1.0, publish_dim=0.0, depth_dim=0.0)
     sep = {"n": 19, "r_in": R - 1.1 * a, "r_out": R + 1.1 * a, "h": 8.05,
            "web": 2 * (R - 1.1 * a) * math.sin(math.pi / 19) - 5.05}
     k = t1["k_sep"]
@@ -345,4 +386,27 @@ def self_test():
     assert 11.9 < _strip(st) < 12.3, _strip(st)                  # CP-95b: u = 10, окна 0/18°
     assert _strip({"n": 63, "w": 3.05, "r_in": 60.84,
                    "rows": [{"cage": c} for c in (0.0, 4.2857, 2.8571, 1.4286)]}) == 0.0
+    # CP-103: двухточечный [σ]; δ = 0 — ядро, δ ≥ b/2 — ядро, тонкий слой с прочным ядром — слой
+    L3 = SimpleNamespace(sep_K=2.0, sep_S=2.5, sep_K_depth=2.0)
+    m = {"m1_case": 608.0, "m1_core": 392.0, "depth": 0.0}
+    assert _allow(m, L3, 5.894)[1] == "ядро"                      # нет слоя
+    a, w_, _ = _allow({**m, "depth": 0.4}, L3, 5.894)
+    assert w_ == "ядро" and abs(a - 90.7) < 0.1, a                # R6X6
+    assert _allow({**m, "depth": 3.0}, L3, 5.894)[1] == "ядро"
+    assert _allow({**m, "m1_core": 2000.0, "depth": 0.4}, L3, 5.894)[1] == "слой"
+    bh, zt = _hertz(263.5, 6.0, 6.0, "roller", Es)
+    assert abs(bh - 0.0381) < 5e-4 and abs(zt - 0.030) < 1e-3, (bh, zt)
+    # CP-104: C-1 — R6X6 s_bd ~ 71.0 МПа (было 33.55), tau ~ 29.0
+    sp = {"n": 32, "r_in": 60.93, "r_out": 63.57, "h": 6.05, "web": 5.894, "w": 6.05,
+          "band": {"t": 2.64, "h_mid": 4.95, "h_end": 4.95}, "rows": []}
+    kk = 263.54 / 131225.0
+    c4 = sep_check(524.9, sp, kk, 6.0, 6.0, "roller", 4, 62.25, 1.2, lim2)
+    assert abs(c4["sig_band"] - 70.98) < 0.3 and abs(c4["tau_band"] - 29.04) < 0.2, c4
+    # C-2: полоса уже перемычки — не полоса, предел по раме
+    s2 = {**sp, "rows": [{"cage": 0.0, "z0": 0.0}, {"cage": 5.609, "z0": 7.0}]}
+    c5 = sep_check(100.0, s2, kk, 6.0, 6.0, "roller", 4, 62.25, 1.2, lim2)
+    assert c5["b_strip"] == 0.0 and c5["u_b"] == c5["u_fr"], c5
+    # C-4: шарик — b_H > 0 (радиус площадки), контакт по ядру/слою считается
+    c6 = sep_check(100.0, sp, kk, 3.0, 3.0, "ball", 4, 62.25, 1.2, lim2)
+    assert c6["b_H"] > 0 and c6["z_tau"] > 0, c6
     return True
