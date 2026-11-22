@@ -74,6 +74,21 @@ def publish(ok):
                 print(f"publish: {kind}/{f.name}")
 
 
+def _table_check(text, name="SPEC-10"):
+    """CP-106: таблицы Markdown — разделитель обязан совпасть с шапкой по числу колонок.
+
+    Лишняя колонка в `|---|` не ломает прогон, но таблица разъезжается в просмотрщике
+    (появляется пустая колонка, значения съезжают). Проверяется каждая таблица файла."""
+    bad, L = [], text.split("\n")
+    is_sep = lambda x: bool(x.startswith("|")) and not re.sub(r"[|:\-\s]", "", x)
+    for i, l in enumerate(L[1:], 1):
+        if is_sep(l) and L[i - 1].startswith("|"):
+            a, b = L[i - 1].count("|"), l.count("|")
+            if a != b:
+                bad.append(f"{name}: таблица у строки {i}: шапка {a - 1} кол., разделитель {b - 1}")
+    return bad
+
+
 def run_ptk(prices):
     """SPEC-10: калькулятор ПТК по входу шага 1 (application.yaml → products.PTK, Д-79)."""
     try:
@@ -123,6 +138,7 @@ def run_ptk(prices):
                  if excl else "нет",
         two_stage=ptk.two_stage_table(lim), phasing=phasing,
         mreq=ptk.mreq_table([r for r in rows if not r["excluded"]], lim))   # CP-95
+    bad += _table_check(text)          # CP-106: разъехавшиеся таблицы — в checks.md
     write("specs", "SPEC-10_PTK_CALC.md", text)
     bad = [f"SPEC-10: в шаблоне нет полей {missing}"] if missing else []
     keys = [(r["id"], round(float(r["M_req"] or 0), 6)) for r in rows]   # CP-99: по вариантам u
