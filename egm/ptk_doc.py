@@ -370,3 +370,59 @@ def self_test():
     scan(rec)
     assert not miss, miss
     return True
+
+
+def materials_md(rows, lim=None):
+    """CP-105: марки сепаратора .02 — пределы, коэффициенты пересчёта M_sep и что вышло в таблице.
+
+    При неизменной геометрии M_sep ∝ [σ] (изгиб перемычки) и ∝ [σ_H]^p (контакт тело/окно,
+    p = 2 ролик, 3 шарик), поэтому отношение по марке точно. Но перебор под M_req находит
+    каждой марке свою геометрию (dR, hb, тело), поэтому фактическое отношение в таблице
+    исполнений отличается от коэффициента — колонка «по таблице» показывает размах."""
+    per = {}
+    for r in rows:
+        ref = (r.get("sep_mat") or {}).get("ref")
+        if not ref:
+            continue
+        d = per.setdefault(ref, {"n": 0, "ok": 0, "v": set(), "chk": None, "Mm": {}})
+        d["n"] += 1
+        if r["ok"]:
+            d["ok"] += 1
+            d["v"].add((r["u"], r.get("M_req")))
+        c = r.get("sep_chk") or {}
+        if d["chk"] is None and c.get("sig_allow"):
+            d["chk"] = c
+        if r.get("M_sep"):
+            k = (r["u"], r.get("M_req"))
+            d["Mm"][k] = min(d["Mm"].get(k, 1e18), r["M_sep"])
+    if len(per) < 2:
+        return ""
+    base = next(iter(per))            # CP-105: базовая — первая в u_calc.materials
+    b = per[base]["chk"] or {}
+    bs, bh = b.get("sig_allow") or 1.0, b.get("sigH_allow") or 1.0
+    t = ["### Марки сепаратора .02 — пределы и пересчёт (CP-105)", "",
+         f"Базовая марка — `{base}`: её таблица выше полная, остальные строки посчитаны тем же "
+         "перебором (перебор марок — `u_calc.materials`). При неизменной геометрии "
+         "$M_\\text{sep} \\propto [\\sigma]$ по изгибу перемычки и "
+         "$\\propto [\\sigma_H]^p$ по контакту тело/окно ($p$ = 2 ролик, 3 шарик), "
+         "поэтому отношение по марке точно. Но под `M_req` каждой марке находится своя "
+         "геометрия (dR, hb, тело), поэтому отношение в таблице исполнений не равно "
+         "коэффициенту — колонка «по таблице» даёт фактический размах по вариантам.", "",
+         "| Марка | $[\\sigma]$ изгиба, МПа (первая строка) | $[\\sigma_H]$, МПа | $k$ изгиба | "
+         "$k$ контакта ($p$ = 2) | по таблице | OK строк | Вариантов OK |",
+         "|---|---|---|---|---|---|---|---|"]
+    for ref, d in per.items():
+        c = d["chk"] or {}
+        sa = c.get("sig_allow")
+        sh = c.get("sigH_allow")
+        kb = f"{sa / bs:.3f}" if sa and bs else "—"
+        kh = f"{(sh / bh) ** 2:.3f}" if sh and bh else "—"
+        bk = per[base]["v"] & d["v"]      # только варианты, где решаемы обе марки
+        rr = [d["Mm"][k] / per[base]["Mm"][k] for k in bk
+              if d["Mm"].get(k) and per[base]["Mm"].get(k)]
+        fact = f"{min(rr):.2f}…{max(rr):.2f}" if rr else "—"
+        whr = f" ({c.get('allow_where')})" if c.get("allow_where") else ""
+        hl = f" ({c.get('H_layer')})" if c.get("H_layer") else ""
+        t.append(f"| `{ref}` | {sa:.1f}{whr} | {sh:.1f}{hl} | {kb} | {kh} | {fact} | "
+                 f"{d['ok']} / {d['n']} | {len(d['v'])} |")
+    return "\n".join(t)
