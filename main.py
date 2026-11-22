@@ -96,10 +96,15 @@ def run_ptk(prices):
             config.load(config.cfg_file(APP, "products.PTK.configs.input")))
     except (KeyError, ValueError, TypeError) as e:
         return [f"products.PTK.configs.input: {e!r}"]
+    mats = config.load(config.cfg_file(APP, "configs.materials"))   # CP-108 (A-6.3): один источник
     rows = ptk.to_rows(ptk.sweep(prices["rollers"], prices.get("bearings", {}), lim, mounts,
-                                 fast, mode), mounts)
+                                 fast, mode, mats=mats), mounts)
     write("specs", ptk_doc.FILE + ".yaml", ptk_doc.dump(rows))
     table, errs, warns, excl = [], [], [], []
+    if len(lim.u_list) < 2:                     # CP-108 (A-5): границы одноступенчатого диапазона
+        warns.append(f"u_calc: задан один u ({', '.join(str(x) for x in lim.u_list)}) — границы "
+                     "одноступенчатого диапазона вырождены (u_min = u_max); для полного диапазона "
+                     "задайте `limits.u_range` (CP-103, A-5)")
     for r in rows:
         if r["excluded"]:                                # Д-45: не молча — в конец SPEC-10
             excl.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['gen']} | {r['excluded']} |")
