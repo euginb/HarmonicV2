@@ -148,7 +148,8 @@ def _sep(M, sep, k_sep, D, l, kind, rows, R, lim, mat=None):
     у торца перемычки V_j·L/2; свой ряд — тело давит на сторону окна силой F = k_sep·M_ряд,
     балка с заделкой F·L/12 — у того же торца. Перемычка: σ = (V_1·L/2 + F·L/12)/W, W = t·b²/6.
     Пояс между рядами j, j+1 (CP-98): узел уравновешивает две перемычки, на пояс
-    M_п = (V_j + V_j+1)·L/4 + F·L/12, W_п = t_п·h_п²/6, срез τ = 3·M_п/(s·t_п·h_п), s = 2πR_Σ/n;
+    M_п = (V_j + V_j+1)·(L + h)/4 + (F·L/12 + F·h/4)/2 (CP-104, CP-109), W_п = t_п·h_п²/6,
+    срез τ = 3·M_п/(s·t_п·h_п), s = 2πR_Σ/n;
     пояс у выходного торца — M_т = (V_1·L/2 + F·L/12)/2, h_т. Нет sep["band"] — пояса не
     проверяются (как CP-94). Контакт — Герц тело/плоскость на min(l, L), × sep_k_edge.
     CP-103 (Д-126): [σ] изгиба — двухточечно по сечению глубиной b (слой и граница слоя), у поясов
@@ -181,21 +182,31 @@ def _sep(M, sep, k_sep, D, l, kind, rows, R, lim, mat=None):
     # CP-95b: узлы рамы — жёсткие зоны шириной перемычки; пояс гнётся на пролёте окна w из шага 2πR/n
     w_win = sep.get("w") or 2 * sep["r_in"] * math.sin(math.pi / n) - sep["web"]
     k_off = min(1.0, w_win * n / (2 * math.pi * R))
+    a_bd = a_end = None                                   # CP-111: [σ] пояса — для среза и sig_core
     if bd:                                                # CP-98: пояса
         tb = bd["t"]
         if rows > 1 and bd.get("h_mid"):
             h = bd["h_mid"]      # CP-104 (C-1): момент в центре узла, плечо (L + h)/2;
-            #   поперечная сила тела F/2 переносится на h/2 -> F·h/4
-            mb = [(V[j] + V[j + 1]) * (L + h) / 4 + m_r + F * h / 4 for j in range(rows - 1)]
+            #   поперечная сила тела F/2 переносится на h/2 -> F·h/4. CP-109 (C-1 по ответу
+            #   модели): собственный (симметричный) член ряда на промежуточную опору не
+            #   передаётся — моменты F·L/12 и пары F/2 с плечами ±h/2 взаимно уничтожаются,
+            #   неуравновешенный момент есть только от одной нагруженной перемычки -> /2
+            mb = [(V[j] + V[j + 1]) * (L + h) / 4 + (m_r + F * h / 4) / 2
+                  for j in range(rows - 1)]
             j = max(range(rows - 1), key=mb.__getitem__)
             s_bd = 6 * k_off * mb[j] / (tb * bd["h_mid"] ** 2)
             tau = 3 * mb[j] / (2 * math.pi * R / n) / (tb * bd["h_mid"])
-            el.append((s_bd * allow / _allow(mat, lim, bd["h_mid"])[0], "пояс", j + 1))
+            a_bd = _allow(mat, lim, bd["h_mid"])[0]
+            el.append((s_bd * allow / a_bd, "пояс", j + 1))
         he = bd["h_end"]     # CP-104 (C-1): то же плечо у торцевого пояса
         s_end = 6 * k_off * (V[0] * (L + he) / 2 + m_r + F * he / 4) / 2 / (tb * he ** 2)
-        el.append((s_end * allow / _allow(mat, lim, bd["h_end"])[0], "торец", 0))
+        a_end = _allow(mat, lim, bd["h_end"])[0]
+        el.append((s_end * allow / a_end, "торец", 0))
     s_max, elem, j_lim = max(el)
-    u_fr = max(s_max / allow, tau / (0.58 * allow))
+    # CP-111: срез пояса — к [σ] пояса (было к [σ] перемычки; у 40Х совпадает, у nitr нет)
+    u_fr = max(s_max / allow, tau / (0.58 * a_bd) if a_bd else 0.0)
+    b_lim = {"перемычка": b, "пояс": (bd or {}).get("h_mid") or b,
+             "торец": (bd or {}).get("h_end") or b}[elem]
     # CP-95b: вторая схема — сплошная полоса b_c через окна всех рядов, консоль от выходного торца,
     # пояса не нагружены; рама и полоса — два статически допустимых поля, берётся меньшая загрузка
     b_raw, s_st = _strip(sep), 0.0
@@ -209,7 +220,7 @@ def _sep(M, sep, k_sep, D, l, kind, rows, R, lim, mat=None):
     return {"V": V[0], "F": F, "sig_frame": s_fr, "sig_row": s_row, "sig_b": s_fr + s_row,
             "sig_band": s_bd, "sig_end": s_end, "tau_band": tau, "sig_strip": s_st,
             "b_strip": b_c, "sig_allow": allow, "allow_where": a_where, "allow_core": a_core,
-            "sig_core": (s_max * (1 - 2 * d_c / b) if 0 < 2 * d_c < b else s_max),
+            "sig_core": (s_max * (1 - 2 * d_c / b_lim) if 0 < 2 * d_c < b_lim else s_max),
             "sig_H": sH, "sigH_allow": sH_allow, "z_tau": z_tau, "b_H": bH, "depth": d_c,
             "H_layer": "слой" if layer else "ядро",
             "u_b": u_fr, "u_fr": u_fr, "u_st": u_st if b_c > 0 else 0.0, "b_strip_raw": b_raw,
@@ -396,12 +407,13 @@ def self_test():
     assert _allow({**m, "m1_core": 2000.0, "depth": 0.4}, L3, 5.894)[1] == "слой"
     bh, zt = _hertz(263.5, 6.0, 6.0, "roller", Es)
     assert abs(bh - 0.0381) < 5e-4 and abs(zt - 0.030) < 1e-3, (bh, zt)
-    # CP-104: C-1 — R6X6 s_bd ~ 71.0 МПа (было 33.55), tau ~ 29.0
+    # CP-104: C-1 — R6X6 s_bd ~ 71.0 МПа (было 33.55), tau ~ 29.0;
+    # CP-109: собственный член ряда делится пополам -> 60.44 / 24.73
     sp = {"n": 32, "r_in": 60.93, "r_out": 63.57, "h": 6.05, "web": 5.894, "w": 6.05,
           "band": {"t": 2.64, "h_mid": 4.95, "h_end": 4.95}, "rows": []}
     kk = 263.54 / 131225.0
     c4 = sep_check(524.9, sp, kk, 6.0, 6.0, "roller", 4, 62.25, 1.2, lim2)
-    assert abs(c4["sig_band"] - 70.98) < 0.3 and abs(c4["tau_band"] - 29.04) < 0.2, c4
+    assert abs(c4["sig_band"] - 60.44) < 0.3 and abs(c4["tau_band"] - 24.73) < 0.2, c4
     # C-2: полоса уже перемычки — не полоса, предел по раме
     s2 = {**sp, "rows": [{"cage": 0.0, "z0": 0.0}, {"cage": 5.609, "z0": 7.0}]}
     c5 = sep_check(100.0, s2, kk, 6.0, 6.0, "roller", 4, 62.25, 1.2, lim2)

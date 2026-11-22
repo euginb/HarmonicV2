@@ -354,6 +354,73 @@ def _variant_limits(lim, params):
     return replace(lim, **kw) if kw else lim
 
 
+# CP-110 (A-6.1): замечания к входу, которые не привязаны к строке таблицы
+CFG_WARN = []
+
+
+def _dup_warnings(raw):
+    """CP-110 (A-6.1): дубли в перечнях u_calc — предупреждение, не ошибка.
+
+    Перечень схлопывается в dict молча, поэтому дубль на расчёт не влияет, но почти всегда
+    означает опечатку: одно тело выпало из списка, другое попало дважды. Так 32/400 остался
+    без R_D7x20 и не решился при 400 Н·м, хотя 32/700 решился при 718.3 на меньшем габарите."""
+    out = []
+
+    def chk(where, prm):
+        if not isinstance(prm, dict):
+            return
+        for k in ("rollers", "mounts", "materials"):
+            v = prm.get(k)
+            if not isinstance(v, (list, tuple)):
+                continue
+            seen, d = set(), []
+            for x in v:
+                if str(x) in seen and str(x) not in d:
+                    d.append(str(x))
+                seen.add(str(x))
+            if d:
+                out.append(f"{where}.{k}: дубли {d} — перечень схлопывается; проверьте, "
+                           f"не потеряно ли тело/крепление (CP-110, A-6.1)")
+
+    top = raw.get("ALL", {}) if isinstance(raw.get("ALL"), dict) else {}
+    chk("limits.u_calc.ALL.ALL", top.get("ALL", top))
+    for k_u, var in raw.items():
+        if k_u == "ALL" or not isinstance(var, dict):
+            continue
+        chk(f"limits.u_calc[{k_u}].ALL", var.get("ALL"))
+        for k_m, prm in var.items():
+            if k_m != "ALL":
+                chk(f"limits.u_calc[{k_u}][{k_m}]", prm)
+    return out
+
+
+def mreq_warn(rows):
+    """CP-110 (A-6.1): на одном u вариант с меньшим M_req не решён, а с большим решён —
+    почти всегда потерянное тело в перечне rollers (или опечатка в самом M_req)."""
+    by = {}
+    for r in rows:
+        if r.get("excluded") or not r.get("M_req"):
+            continue
+        try:
+            mm = float(r["M_req"])
+        except (TypeError, ValueError):
+            continue
+        key = (int(r["u"]), mm)
+        ok = bool(r.get("ok")) and float(r.get("M") or 0) + 1e-6 >= mm
+        by[key] = by.get(key, False) or ok
+    out = []
+    for u in sorted({k[0] for k in by}):
+        vs = sorted((mm, ok) for (uu, mm), ok in by.items() if uu == u)
+        for mm, ok in vs:
+            if ok:
+                continue
+            bigger = [x for x, o in vs if o and x > mm]
+            if bigger:
+                out.append(f"u_calc[{u}]: M_req {mm:g} не решён, а {bigger[0]:g} решён тем же u — "
+                           f"проверьте перечень rollers варианта (CP-110, A-6.1)")
+    return out
+
+
 def load_config(cfg):
     """specs/ptk_input.yaml -> (PtkLimits, {ключ: RingHoles}, fasteners, mount_mode) (Д-33)."""
     fast = {k: v for k, v in cfg["fasteners"].items() if not k.startswith("_")}
@@ -373,6 +440,8 @@ def load_config(cfg):
             raise ValueError("limits.u_range: нужно [u_min, u_max] по возрастанию (CP-103, A-5)")
     lim = _load(PtkLimits, raw_lim)
     lim.u_calc, lim.u_def, lim.u_list = _parse_u_calc(raw_lim.get("u_calc"))   # Д-119: края
+    CFG_WARN.clear()                                          # CP-110: дубли в перечнях
+    CFG_WARN.extend(_dup_warnings(raw_lim.get("u_calc")))
     bad = [g for g in lim.gen_types if g not in GEN_TYPES]
     if bad or not lim.gen_types:
         raise ValueError(f"limits.gen_types: {list(lim.gen_types)} — допустимы {GEN_TYPES} (Д-42)")
@@ -1166,6 +1235,9 @@ def self_test():
     # CP-98: пояс K20 5.95 мм не лимитирует — M_sep как в CP-94 (188.1), предел — перемычка ряда 1
     assert abs(k20.M_sep - 188.1) < 0.2 and s20["lim_elem"] == "перемычка", (k20.M_sep, s20)
     assert s20["n_row_lim"] == 1 and k20.sep["band"]["h_mid"] == 5.95, (s20, k20.sep["band"])
+    # CP-111: M_by = сепаратор — max(u_b, u_H) = 1 по определению (обе загрузки линейны по M);
+    # расхождение — только округление M сепаратора до 0.1 в sep_check
+    assert abs(max(s20["u_b"], s20["u_H"]) - 1.0) < 1e-3, (s20["u_b"], s20["u_H"])
     assert 0 < k20.M_row < k20.M_sep < 4 * s20["M_row_b"], (k20.M_row, k20.M_sep, s20)
     b20 = (k20.M_body_gen, k20.M_body_ring, k20.M_body_win)
     assert min(b20) > 0 and k20.M_H == min(b20[:2]) and k20.M <= min(b20), (b20, k20.M)

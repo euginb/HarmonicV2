@@ -105,6 +105,8 @@ def run_ptk(prices):
         warns.append(f"u_calc: задан один u ({', '.join(str(x) for x in lim.u_list)}) — границы "
                      "одноступенчатого диапазона вырождены (u_min = u_max); для полного диапазона "
                      "задайте `limits.u_range` (CP-103, A-5)")
+    warns += ptk.mreq_warn(rows)                # CP-110 (A-6.1): меньший M_req не решён, больший решён
+    warns += list(ptk.CFG_WARN)                 # CP-110: дубли в перечнях u_calc
     for r in rows:
         if r["excluded"]:                                # Д-45: не молча — в конец SPEC-10
             excl.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['gen']} | {r['excluded']} |")
