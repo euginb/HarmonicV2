@@ -117,6 +117,7 @@ def run_ptk(prices):
         n_ok=sum(r["ok"] for r in rows), n_all=len(table), n_excl=len(excl),
         tech=ptk.tech_md(),
         materials=ptk_doc.materials_md(rows, lim),
+        materials_note=ptk_doc.materials_note(rows, lim),
         parts=ptk_parts.table(rows),
         excluded=("| ID | u | Тело | Генератор | Код |\n|---|---|---|---|---|\n" + "\n".join(excl))
                  if excl else "нет",

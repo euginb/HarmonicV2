@@ -426,3 +426,60 @@ def materials_md(rows, lim=None):
         t.append(f"| `{ref}` | {sa:.1f}{whr} | {sh:.1f}{hl} | {kb} | {kh} | {fact} | "
                  f"{d['ok']} / {d['n']} | {len(d['v'])} |")
     return "\n".join(t)
+
+
+def materials_note(rows, lim, refs=("40Х", "40ХН2МА", "38Х2Н2МА", "38Х2МЮА:nitr"), b=5.894):
+    """CP-105: ремарка под таблицей результатов — разница марок при ФИКСИРОВАННОЙ геометрии.
+
+    M_sep ∝ [σ] по изгибу и ∝ [σ_H]^p по контакту (p = 2 ролик, 3 шарик), поэтому отношение
+    марок — точный множитель, а не оценка. Печатается всегда: при одной марке в u_calc это
+    справочная база для решения о добавлении остальных."""
+    import yaml
+    from egm import materials as _m, ptk_force as _f
+    root = Path(__file__).resolve().parents[1]
+    cat = yaml.safe_load((root / "specs" / "materials.yaml").read_text(encoding="utf-8"))
+    per = [str((r.get("sep_mat") or {}).get("ref") or "").strip()
+           for r in rows if (r.get("sep_mat") or {}).get("ref")]
+    used = sorted(set(per))
+    order = used + [x for x in refs if x not in used]
+    vals = {}
+    for ref in order:
+        pr = _m.sep_props(cat, ref)
+        if pr is None:
+            continue
+        c, cs = pr["core"], pr["case"] or {}
+        m = {"m1_case": cs.get("sigma_m1"), "m1_core": c["sigma_m1"], "depth": pr["depth"] or 0.0}
+        a3 = _f._allow(m, lim, b)      # (sigma, где, sigma ядра)
+        sa, where = a3[0], a3[1]
+        vals[ref] = (sa, where, (cs.get("sigma_Hlim") or c["sigma_Hlim"]))
+    if not vals:
+        return ""
+    z, sh_s = float(getattr(lim, "sep_Z_N", 1.0)), float(getattr(lim, "sep_S_H", 1.2))
+    base = used[0] if used and used[0] in vals else next(iter(vals))
+    sb = vals[base][0] or 1.0
+    shb = (vals[base][2] or 1.0) * z / sh_s
+    t = ["### Материалы сепаратора .02 — разница при фиксированной геометрии (CP-105)", "",
+         "При неизменной геометрии $M_\\text{sep} \\propto [\\sigma]$ (изгиб перемычки) и "
+         "$\\propto [\\sigma_H]^p$ (контакт тело/окно, $p$ = 2 ролик, 3 шарик), поэтому "
+         "разница между марками — точный множитель, а не оценка. Пределы — при перемычке "
+         f"{b:.2f} мм (R6X6) и запасах `limits` (K {getattr(lim, 'sep_K', '')}, "
+         f"S {getattr(lim, 'sep_S', '')}, S_H {getattr(lim, 'sep_S_H', '')}):", "",
+         "| Марка | $[\\sigma]$ изгиба, МПа | $[\\sigma_H]$, МПа | Изгиб, × | Контакт, × | "
+         "Что задаёт предел |", "|---|---|---|---|---|---|"]
+    for ref, (sa, where, Hl) in vals.items():
+        sh = (Hl or 0.0) * z / sh_s
+        tb = f"{sa / sb:.2f}" if sa else "—"
+        th = f"{(sh / shb) ** 2:.2f}" if sh and shb else "—"
+        lay = "слой" if (sh > 600.0) else "ядро"
+        mark = " (база)" if ref == base else ""
+        t.append(f"| `{ref}`{mark} | {sa:.1f} ({where or '—'}) | {sh:.0f} ({lay}) | {tb} | {th} | "
+                 f"{where or '—'} |")
+    t += ["", "Изгиб материалом почти не двигается (разброс ±16 %): ядро перемычки азотирование "
+          "не упрочняет, а слой на стенке 6 мм работает частично. Контакт двигает только "
+          "азотирование (×2.69) — единственный способ снять предел «контакт тело/окно». "
+          "Отношение `M_sep` в таблице выше **не равно** этим коэффициентам: перебор под `M_req` "
+          "находит каждой марке свою геометрию (dR, hb, тело), и прочная марка выигрывает "
+          "меньшим `D`, а не моментом.", "",
+          f"Марок в прогоне: {len(used)} (`u_calc.materials`). Рекомендации по выбору — "
+          "TECH-01 «Сравнение марок по расчёту»; как задавать — INS-10 §7.0–7.2."]
+    return "\n".join(t)
