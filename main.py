@@ -74,6 +74,21 @@ def publish(ok):
                 print(f"publish: {kind}/{f.name}")
 
 
+def _table_check(text, name="SPEC-10"):
+    """CP-106: таблицы Markdown — разделитель обязан совпасть с шапкой по числу колонок.
+
+    Лишняя колонка в `|---|` не ломает прогон, но таблица разъезжается в просмотрщике
+    (появляется пустая колонка, значения съезжают). Проверяется каждая таблица файла."""
+    bad, L = [], text.split("\n")
+    is_sep = lambda x: bool(x.startswith("|")) and not re.sub(r"[|:\-\s]", "", x)
+    for i, l in enumerate(L[1:], 1):
+        if is_sep(l) and L[i - 1].startswith("|"):
+            a, b = L[i - 1].count("|"), l.count("|")
+            if a != b:
+                bad.append(f"{name}: таблица у строки {i}: шапка {a - 1} кол., разделитель {b - 1}")
+    return bad
+
+
 def run_ptk(prices):
     """SPEC-10: калькулятор ПТК по входу шага 1 (application.yaml → products.PTK, Д-79)."""
     try:
@@ -100,7 +115,8 @@ def run_ptk(prices):
                      f"{r['alpha_max'] or '—'} | "
                      f"{(r['holes'] + ' (' + r['mount'] + ')') if r['holes'] else '—'} | "
                      f"{r['ring_variants'] or '—'} | {r['d_bc']} | {r['d_out']} | "
-                     f"{r['width']} | {m} | {r['M_req'] or '—'} | {r['t_hold']} | {st} |")
+                     f"{r['width']} | {m} | {r['M_req'] or '—'} | {r['t_hold']} | "
+                     f"{(r['sep_mat'] or {}).get('ref') or '—'} | {st} |")
         tag = f"- u={r['u']}, {r['roller']}, {r['gen']}: "
         errs += [tag + e for e in r["errors"]]
         warns += [tag + w for w in r["warnings"]]
@@ -115,13 +131,16 @@ def run_ptk(prices):
         errors="\n".join(errs) or "нет", warnings="\n".join(warns) or "нет",
         n_ok=sum(r["ok"] for r in rows), n_all=len(table), n_excl=len(excl),
         tech=ptk.tech_md(),
+        materials=ptk_doc.materials_md(rows, lim),
+        materials_note=ptk_doc.materials_note(rows, lim),
         parts=ptk_parts.table(rows),
         excluded=("| ID | u | Тело | Генератор | Код |\n|---|---|---|---|---|\n" + "\n".join(excl))
                  if excl else "нет",
-        two_stage=ptk.two_stage_table(lim), phasing=phasing,
+        phasing=phasing,
         mreq=ptk.mreq_table([r for r in rows if not r["excluded"]], lim))   # CP-95
     write("specs", "SPEC-10_PTK_CALC.md", text)
     bad = [f"SPEC-10: в шаблоне нет полей {missing}"] if missing else []
+    bad += _table_check(text)          # CP-106: таблицы, где разделитель не совпал с шапкой
     keys = [(r["id"], round(float(r["M_req"] or 0), 6)) for r in rows]   # CP-99: по вариантам u
     dup = sorted({k[0] for k in keys if keys.count(k) > 1})
     if dup:
