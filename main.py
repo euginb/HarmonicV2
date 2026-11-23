@@ -112,8 +112,8 @@ def run_ptk(prices):
             excl.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['gen']} | {r['excluded']} |")
             continue
         m = f"{r['M']:g} ({r['M_by']})" if r["M"] else "—"
-        sep = (f"{r['M_sep']:g} | {r['sep_l_opt']:g} | {r['sep_M_opt']:g}"
-               if r["sep_M_opt"] else "— | — | —")          # CP-116: предел, l опт, M_sep max
+        sep = (f"{r['M_sep']:g} | {r['sep_l_req']:g} | {r['sep_M_cap']:g}"
+               if r["sep_M_cap"] else "— | — | —")     # CP-116: предел, l под M_req, M_sep ≤ M_req
         gen = ((r["bearing"] or "—") + (" + обод" if r["gen"] == "rim" else "")
                if r["gen"] in ("bearing", "rim") else "эксцентрик")     # CP-96
         st = ("OK" if r["ok"] else "нет") + (f" ({', '.join(r['tech'])})" if r["tech"] else "")

@@ -160,8 +160,9 @@ class PtkResult:
     band_fill: bool = False       # CP-95b: пояс сепаратора утолщён до t_max
     sep_mat: dict = field(default_factory=dict)   # CP-102: материал сепаратора (в хэше ID)
     sep_why: str = ""             # причина M_sep: механизм, напряжения, [σ] (CP-94)
-    sep_l_opt: float = 0.0        # CP-116: оптимальная длина тела того же диаметра, мм (Д-127)
-    sep_M_opt: float = 0.0        # CP-116: наибольший M_sep при этой длине, Н·м
+    sep_l_req: float = 0.0        # CP-116: наименьшая длина тела того же Ø, при которой сепаратор
+                                  #   держит M_req категории, мм (Д-127)
+    sep_M_cap: float = 0.0        # CP-116: M_sep в пределах M_req (не выше цели категории), Н·м
     M_body_gen: float = 0.0       # предел тела по контакту с генератором, Н·м (CP-98)
     M_body_ring: float = 0.0      # то же с венцом, Н·м
     M_body_win: float = 0.0       # то же со стороной окна сепаратора, Н·м
@@ -995,19 +996,22 @@ def _sep_at(sep, l, pitch, lim):
 
 
 def sep_scan(r, lim, bears, rol):
-    """CP-116 (Д-127): для заданного диаметра тела — оптимальная длина и наибольший M_sep, Н·м.
+    """CP-116 (Д-127): длина тела под M_req своей категории и M_sep в пределах M_req, Н·м.
 
     Перебирается только l: n, R_Σ, a_ω, D_ш, материал, ряды зафиксированы строкой; l меняет
     окно h, шаг рядов max(l, B подш.) + hb и пояса. Ёмкость контакта ∝ l, изгиб перемычки на
-    пролёте L = h ∝ l² — у M_sep(l) есть максимум. Длина из каталога — дискретное значение,
-    поэтому в строке печатается и l_опт, и M_sep при ней: видно, сколько теряется на каталоге.
+    пролёте L = h ∝ l² — у M_sep(l) есть максимум. Длина наращивается только до M_req категории:
+    если сепаратор держит M_req уже при коротком теле, длиннее брать незачем — категория остаётся
+    компактной, а больший момент — отдельная категория с большим M_req. Поэтому в строке печатается
+    наименьшая l, при которой M_sep ≥ M_req (l_req), и M_sep, ограниченный M_req (M_cap).
     Контроль: при l из каталога скан обязан дать M_sep строки, иначе — предупреждение."""
     if not r.sep or not r.M_sep or not r.k_sep or not r.sep.get("rows"):
         return 0.0, 0.0
     kind, mat = rol.get("type", "roller"), (r.sep_mat or None)
     bB = ((bears.get(r.bearing) or {}).get("B", 0.0) or 0.0) if r.bearing else 0.0
     l0, M0 = float(rol["l"]), 0.0
-    best, best_l = 0.0, 0.0
+    cap = float(r.M_req or 0.0)                     # CP-116: цель категории — предел наращивания
+    best, best_l, hit = 0.0, 0.0, 0.0
     n_st = int(round((lim.sep_l_scan_max - lim.sep_l_scan_min) / lim.sep_l_scan_step))
     for i in range(n_st + 1):
         l = round(lim.sep_l_scan_min + i * lim.sep_l_scan_step, 3)
@@ -1020,10 +1024,26 @@ def sep_scan(r, lim, bears, rol):
             M0 = M
         if M > best + 1e-9:
             best, best_l = M, l
+        if not hit and cap > 0 and M >= cap - 1e-9:  # сепаратор дорос до M_req — дальше не растим
+            hit = l
     if M0 and abs(M0 - r.M_sep) > 0.2:              # скан должен воспроизводить строку
         r.warnings.append(f"скан длины: M_sep при l {l0:g} мм = {M0:g} против {r.M_sep:g} в строке — "
                           f"расхождение (CP-116)")
-    return best_l, best
+    l_req = hit or best_l
+    M_cap = min(best, cap) if cap > 0 else best
+    # CP-116: что делать с длиной — только то, что меняет решение (B или недостижение M_req)
+    dB = lim.rows * (max(l0, bB) - max(l_req, bB))
+    if cap > 0 and not hit:
+        r.warnings.append(f"длина под M_req {cap:g}: сепаратор не держит ни при какой l ≤ "
+                          f"{lim.sep_l_scan_max:g} мм — наибольший M_sep {best:g} при l {best_l:g} "
+                          f"(CP-116)")
+    elif cap > 0 and l_req < l0 - lim.sep_l_scan_step / 2 and dB > 1e-9:
+        r.warnings.append(f"длина под M_req {cap:g}: сепаратор держит уже при l {l_req:g} мм (каталог "
+                          f"{l0:g}) — пакет можно укоротить по B на {dB:g} мм (CP-116)")
+    elif cap > 0 and l_req > l0 + lim.sep_l_scan_step / 2:
+        r.warnings.append(f"длина под M_req {cap:g}: при каталоге l {l0:g} мм M_sep {M0:g} < M_req, "
+                          f"нужно l {l_req:g} мм (B +{abs(dB):g} мм) (CP-116)")
+    return l_req, M_cap
 
 
 def _roller_groups(rl):
@@ -1097,7 +1117,7 @@ def sweep(rollers, bears, lim, mounts, fast, mode="first_ok", mats=None):
                     out += [_pick(v) for v in by.values()] if mode == "all" else [_pick(one)]
     for r in out:                                       # CP-116: скан длины — по принятой строке
         if not r.excluded and r.sep:
-            r.sep_l_opt, r.sep_M_opt = sep_scan(r, lim, bears, rollers.get(r.roller) or {})
+            r.sep_l_req, r.sep_M_cap = sep_scan(r, lim, bears, rollers.get(r.roller) or {})
     return out
 
 def two_stage(u, lim):
@@ -1228,10 +1248,15 @@ def self_test():
     assert r.M_sep > 0 and r.sep_chk["sig_b"] <= r.sep_chk["sig_allow"], r.sep_chk   # CP-94
     # CP-116 (Д-127): скан длины тела того же диаметра — максимум M_sep не ниже строки, длина
     # внутри сетки limits.sep_l_scan_*, при длине из каталога скан воспроизводит M_sep строки
-    l_opt, M_opt = sep_scan(r, lim, bears, b)
-    assert lim.sep_l_scan_min <= l_opt <= lim.sep_l_scan_max and M_opt >= r.M_sep, (l_opt, M_opt, r.M_sep)
+    l_req, M_cap = sep_scan(r, lim, bears, b)
+    assert lim.sep_l_scan_min <= l_req <= lim.sep_l_scan_max and M_cap >= r.M_sep, (l_req, M_cap, r.M_sep)
     assert not [w for w in r.warnings if "скан длины" in w], r.warnings
-    assert M_opt == sep_scan(r, lim, bears, b)[1] and len(r.sep["rows"]) == lim.rows
+    assert (l_req, M_cap) == sep_scan(r, lim, bears, b) and len(r.sep["rows"]) == lim.rows
+    # CP-116 (Д-127): скан ограничен M_req категории — длина наращивается только до цели
+    rc = calc(19, "t", b, lim, holes, fast, bears, "bearing", 0.0, 0.0, False, 300.0)
+    l_c, M_c = sep_scan(rc, lim, bears, b)
+    assert M_c <= 300.0 + 1e-9, (M_c, rc.M_sep)
+    assert l_c <= l_req + 1e-9 or rc.M_sep >= 300.0, (l_c, l_req, rc.M_sep)
     # CP-98: шаг ряда = l (B 7 < l 8) — пояс 0.95 мм лимитирует; усиление пояса поднимает M_sep,
     # ID не меняется (sep_band_t не в GEOM_LIMITS до CAD пояса, OQ-46)
     rr = calc(19, "t", b, PtkLimits(sep_band_t=3.0), holes, fast, bears)
