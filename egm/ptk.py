@@ -1034,15 +1034,17 @@ def sep_scan(r, lim, bears, rol):
     # CP-116: что делать с длиной — только то, что меняет решение (B или недостижение M_req)
     dB = lim.rows * (max(l0, bB) - max(l_req, bB))
     if cap > 0 and not hit:
-        r.warnings.append(f"длина под M_req {cap:g}: сепаратор не держит ни при какой l ≤ "
-                          f"{lim.sep_l_scan_max:g} мм — наибольший M_sep {best:g} при l {best_l:g} "
-                          f"(CP-116)")
+        if r.ok:                                  # недостижение уже в ошибке строки — не дублируем
+            r.warnings.append(f"длина под M_req {cap:g}: сепаратор не держит ни при какой l ≤ "
+                              f"{lim.sep_l_scan_max:g} мм — наибольший M_sep {best:g} при l {best_l:g} "
+                              f"(CP-116)")
     elif cap > 0 and l_req < l0 - lim.sep_l_scan_step / 2 and dB > 1e-9:
         r.warnings.append(f"длина под M_req {cap:g}: сепаратор держит уже при l {l_req:g} мм (каталог "
                           f"{l0:g}) — пакет можно укоротить по B на {dB:g} мм (CP-116)")
     elif cap > 0 and l_req > l0 + lim.sep_l_scan_step / 2:
         r.warnings.append(f"длина под M_req {cap:g}: при каталоге l {l0:g} мм M_sep {M0:g} < M_req, "
-                          f"нужно l {l_req:g} мм (B +{abs(dB):g} мм) (CP-116)")
+                          f"нужно l {l_req:g} мм"
+                          + (f" (B +{abs(dB):g} мм)" if dB > 1e-9 else "") + " (CP-116)")
     return l_req, M_cap
 
 
