@@ -64,6 +64,7 @@ bearings:
 rollers:
   R_D8x16: {type: roller, d: 8.0, l: 16.0}
   R_D8x8: {type: roller, d: 8.0, l: 8.0}
+  R_D7x8: {type: roller, d: 7.0, l: 8.0}
   R_D7x20: {type: roller, d: 7.0, l: 20.0}
   R_D6x6: {type: roller, d: 6.0, l: 6.0}
   R_D6x8: {type: roller, d: 6.0, l: 8.0}

@@ -112,6 +112,8 @@ def run_ptk(prices):
             excl.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['gen']} | {r['excluded']} |")
             continue
         m = f"{r['M']:g} ({r['M_by']})" if r["M"] else "—"
+        sep = (f"{r['M_sep']:g} | {r['sep_l_req']:g} | {r['sep_M_cap']:g}"
+               if r["sep_M_cap"] else "— | — | —")     # CP-116: предел, l под M_req, M_sep ≤ M_req
         gen = ((r["bearing"] or "—") + (" + обод" if r["gen"] == "rim" else "")
                if r["gen"] in ("bearing", "rim") else "эксцентрик")     # CP-96
         st = ("OK" if r["ok"] else "нет") + (f" ({', '.join(r['tech'])})" if r["tech"] else "")
@@ -122,7 +124,7 @@ def run_ptk(prices):
                      f"{r['alpha_max'] or '—'} | "
                      f"{(r['holes'] + ' (' + r['mount'] + ')') if r['holes'] else '—'} | "
                      f"{r['ring_variants'] or '—'} | {r['d_bc']} | {r['d_out']} | "
-                     f"{r['width']} | {m} | {r['M_req'] or '—'} | {r['t_hold']} | "
+                     f"{r['width']} | {m} | {sep} | {r['M_req'] or '—'} | {r['t_hold']} | "
                      f"{(r['sep_mat'] or {}).get('ref') or '—'} | {st} |")
         tag = f"- u={r['u']}, {r['roller']}, {r['gen']}: "
         errs += [tag + e for e in r["errors"]]
