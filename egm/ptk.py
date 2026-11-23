@@ -948,9 +948,11 @@ def solve(u, rid, rol, gen, bears, lim, mounts, fast, m_req, mat=None):
     Нет кандидата — реализуемая строка с наибольшим M (при равном — меньшие D, B) и ошибкой
     с потолками M_H, M_win, крепления, подшипника: что именно не пускает к M_req."""
     M_req, best, top, first = float(m_req), None, None, None
+    by_mount = {}                                   # CP-115: наибольший M по креплению
     n_up = int(round(lim.r_up_max / lim.r_step)) if lim.r_step > 0 else 0
     tiers = [(hb, f) for hb in (lim.band_h_list or (0.0,)) for f in (False, True)]
     for key, h in mounts.items():
+        topk = 0.0
         hit = False
         for i in range(n_up + 1):
             for hb, f in tiers:
@@ -962,6 +964,8 @@ def solve(u, rid, rol, gen, bears, lim, mounts, fast, m_req, mat=None):
                 first = first or r
                 if r.ok and (top is None or (r.M, -r.d_out, -r.width) > (top.M, -top.d_out, -top.width)):
                     top = r
+                if r.ok:
+                    topk = max(topk, r.M)               # CP-115: потолок этого крепления
                 if r.ok and r.M >= M_req - 1e-9:
                     if best is None or (r.d_out, r.width, -r.M) < (best.d_out, best.width, -best.M):
                         best = r
@@ -971,15 +975,17 @@ def solve(u, rid, rol, gen, bears, lim, mounts, fast, m_req, mat=None):
                     break
             if hit or (lim.d_out_max and r.d_out > lim.d_out_max):
                 break                                   # больший dR — больший D: дальше смысла нет
+        by_mount[key] = topk
     if best is not None:
         return best
     top = top or first
     sf = mounts[top.mount].safety if top.mount in mounts else 1.0
+    tops = ", ".join(f"{k} {v:g}" for k, v in by_mount.items() if v) or "нет реализуемых"
     top.errors.append(f"M_req {M_req:g} Н·м не достигнут: наибольший M {top.M:g} ({top.M_by or '—'}); "
                       f"потолки — контакт M_H {top.M_H:g}, тело/окно M_win {top.M_body_win:g}, "
                       f"крепление {top.t_hold / sf:.1f}, подшипник {top.M_B:g} Н·м "
                       f"(dR ≤ {lim.r_up_max:g}, hb ≤ {max(lim.band_h_list or (0.0,)):g} мм, "
-                      f"крепления {list(mounts)}; CP-95b)")
+                      f"по креплениям наибольший M: {tops} Н·м; CP-95b, CP-115)")
     top.ok = False
     return top
 
@@ -1097,8 +1103,11 @@ def sweep(rollers, bears, lim, mounts, fast, mode="first_ok", mats=None):
                     mt = _mat(vl, ref, mats)
                     for grp in _roller_groups(rl):     # CP-116: одна строка на диаметр
                         for gen in gs:
-                            out.append(_pick([solve(u, rid, rol, gen, bears, vl, ms, fast, m, mt)
-                                              for rid, rol in grp]))
+                            # CP-115: all — строка на крепление, иначе вторая плита теряется молча
+                            for key, h in (ms.items() if mode == "all" else [(None, None)]):
+                                one = ms if key is None else {key: h}
+                                out.append(_pick([solve(u, rid, rol, gen, bears, vl, one, fast,
+                                                        m, mt) for rid, rol in grp]))
             continue
         prm = lim.u_def.get(u, {})
         rl, ms, gs = _scope(prm, rollers, mounts, lim, f"u_calc[{u}].ALL")
@@ -1254,6 +1263,11 @@ def self_test():
     assert lim.sep_l_scan_min <= l_req <= lim.sep_l_scan_max and M_cap >= r.M_sep, (l_req, M_cap, r.M_sep)
     assert not [w for w in r.warnings if "скан длины" in w], r.warnings
     assert (l_req, M_cap) == sep_scan(r, lim, bears, b) and len(r.sep["rows"]) == lim.rows
+    # CP-115 (Д-130): недостижение M_req перечисляет потолки по всем креплениям, а не только по
+    # выбранному; в mount_mode: all каждая плита даёт свою строку
+    t115 = solve(19, "t", b, "bearing", bears, lim, {"A": holes, "B": holes}, fast, 1e6)
+    assert not t115.ok and "по креплениям наибольший M: A " in " ".join(t115.errors), t115.errors
+    assert 12 < t115.M < 400, t115.M
     # CP-116 (Д-127): скан ограничен M_req категории — длина наращивается только до цели
     rc = calc(19, "t", b, lim, holes, fast, bears, "bearing", 0.0, 0.0, False, 300.0)
     l_c, M_c = sep_scan(rc, lim, bears, b)
