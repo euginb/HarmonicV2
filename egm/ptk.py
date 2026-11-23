@@ -152,6 +152,7 @@ class PtkResult:
     M_sep: float = 0.0            # предел по сепаратору, Н·м (CP-94, Д-116)
     M_row: float = 0.0            # референс: предел одного ряда окон, Н·м (CP-98, Д-118)
     k_sep: float = 0.0            # CP-116: сила тела на окно / момент ряда, 1/мм
+    sep_t: float = 0.0            # CP-118: стенка сепаратора t = 2·SEP_K·a_ω, мм
     M: float = 0.0                # допускаемый выходной момент, Н·м
     M_by: str = ""                # что ограничивает M: контакт | подшипник | крепление | сепаратор
     M_req: float = 0.0            # CP-95: требуемый момент для u, Н·м; 0 — прямая постановка
@@ -884,6 +885,7 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
     if not r.errors and (brg is not None or gen == "eccentric"):    # Д-46: детали .02, .03
         r.sep = ptk_parts.separator(n, R, a, D, rol["l"], pitch, r.phasing, lim, SEP_K)
         r.sep["band"] = ptk_parts.sep_band(r.sep, d_root, lim, fill)   # CP-98; CP-95b: fill
+        r.sep_t = round(r.sep["r_out"] - r.sep["r_in"], 3)   # CP-118
         r.warnings += r.sep["band"].pop("warnings")
         if fill:                                        # CP-95b: CAD утолщения пояса нет
             r.warnings.append(f"сепаратор: пояс до t_max {r.sep['band']['t']:g} мм — CAD пояса нет (OQ-46)")
