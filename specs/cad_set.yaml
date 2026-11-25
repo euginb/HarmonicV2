@@ -23,7 +23,7 @@ step: spline        # контур впадин в STEP: spline — B-сплай
                     # приоритет: --step → здесь → configs/application.yaml cad.export.step.mode (Д-79)
 
 items:
-  - id: PTK-063-R3X8-22M6P2   # исполнение из SPEC-10 (префикс без хэша — Д-51)
+  - id: PTK-032-R7X20-22M5P2   # исполнение из SPEC-10 (префикс без хэша — Д-51)
     design: K20                # проработка шага 2 (SPEC-11)
     assy: true                 # + сборка одним STEP: <ID>-K10.step
   # Пример записи с фильтрами (раскомментировать и подставить свой ID):

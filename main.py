@@ -112,8 +112,11 @@ def run_ptk(prices):
             excl.append(f"| {r['id']} | {r['u']} | {r['roller']} | {r['gen']} | {r['excluded']} |")
             continue
         m = f"{r['M']:g} ({r['M_by']})" if r["M"] else "—"
-        sep = (f"{r['M_sep']:g} | {r['sep_l_req']:g} | {r['sep_M_cap']:g}"
-               if r["sep_M_cap"] else "— | — | —")     # CP-116: предел, l под M_req, M_sep ≤ M_req
+        mech = (r.get("sep_chk") or {}).get("by") or ""    # CP-121: механизм предела
+        sep = (f"{r['M_sep']:g}" + (f" ({mech})" if mech else "")
+               + f" | {r['sep_l_req']:g} | {r['sep_M_cap']:g}"
+               if r["sep_M_cap"] else "— | — | —")     # CP-116/CP-121: предел (чем), l, M_sep ≤ M_req
+        web = r["sep"].get("web") if r.get("sep") else None   # CP-121: перемычка b, мм
         gen = ((r["bearing"] or "—") + (" + обод" if r["gen"] == "rim" else "")
                if r["gen"] in ("bearing", "rim") else "эксцентрик")     # CP-96
         st = ("OK" if r["ok"] else "нет") + (f" ({', '.join(r['tech'])})" if r["tech"] else "")
@@ -124,7 +127,8 @@ def run_ptk(prices):
                      f"{r['alpha_max'] or '—'} | "
                      f"{(r['holes'] + ' (' + r['mount'] + ')') if r['holes'] else '—'} | "
                      f"{r['ring_variants'] or '—'} | {r['d_bc']} | {r['d_out']} | "
-                     f"{r['width']} | {r['sep_t'] or '—'} | {m} | {sep} | {r['M_req'] or '—'} | {r['t_hold']} | "
+                     f"{r['width']} | {r['sep_t'] or '—'} | {web or '—'} | {m} | {sep} | "
+                     f"{r['M_req'] or '—'} | {r['t_hold']} | "
                      f"{(r['sep_mat'] or {}).get('ref') or '—'} | {st} |")
         tag = f"- u={r['u']}, {r['roller']}, {r['gen']}: "
         errs += [tag + e for e in r["errors"]]

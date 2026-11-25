@@ -233,7 +233,9 @@ def find(designs, cid, name):
     """Запись ptk_designs.json по ID исполнения (детали) и имени проработки."""
     base = cid.split(".")[0]
     for r in designs:
-        if r["id"] == base and r["name"] == name and r.get("ecc"):
+        # Д-51: исполнение задаётся полным ID или префиксом без хэша (<ID>-XXXXXX)
+        if (r["id"] == base or r["id"].startswith(base + "-")) \
+                and r["name"] == name and r.get("ecc"):
             return r
     raise KeyError(f"проработка {name} для {base} не найдена в specs/ptk_designs.yaml — "
                    f"проверить ptk_design_input.yaml, python main.py --publish (Д-48)")

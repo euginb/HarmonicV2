@@ -15,6 +15,7 @@ egm/cad/techdraw_sheet.py; Spreadsheet/LegendView и аннотации не с�
 """
 import datetime
 import importlib
+import time
 import json
 import math
 import os
@@ -33,6 +34,49 @@ VTOL = 0.05                                     # допуск поиска кр
 STYLE = {"d_root": 2, "d_tip": 2, "d_bc": 4}    # LineStyle: 2 — штрих, 4 — штрихпунктир
 ANGLES = (45, 135, 225, 315, 20, 160, 200, 340)  # углы выносок диаметров на виде по оси
 MAX_EDGES = 20000
+SKIP = tuple(k.strip() for k in (os.environ.get("EGM_TD_SKIP") or "").split(",") if k.strip())
+MAX_SEC_EDGES = 4000   # рёбер в сечении больше — контуры не обходим (повисание OCC)
+RHO_MAX = 6000         # точек дискретизации на одно ребро контура (CP-122)
+CYL_BAND = 1.0         # CP-123: Ø цилиндра считается той же величиной, если Δ от эталона ≤ 1 мм
+EXT_COARSE, EXT_FINE, EXT_TOP = 48, 1200, 3   # CP-123: экстремум ρ — грубо по рёбрам, точно по 3
+
+_ECACHE = {}                 # CP-122: кромки вида — один раз (getEdgeByIndex дорогой)
+_LOG = {"path": None, "t0": None, "last": ""}
+_REP = {"path": None, "data": None, "rep": []}
+
+
+def _log(msg, path=None):
+    """CP-122: строка хода — в <ID>.techdraw.log, в Report view и в отчёт.
+
+    Отчёт <ID>.techdraw.md пишется с первой секунды, поэтому при зависании видно,
+    на каком именно шаге остановились (раньше отчёт появлялся только в самом конце)."""
+    import time
+    if _LOG["path"] is None:
+        _LOG["t0"] = time.time()
+        p = re.sub(r"\.assy\.json$", "", path) + ".techdraw.log" if path else "—"
+        _LOG["path"] = p
+        if p != "—":
+            try:
+                fresh = not os.path.exists(p) or os.path.getsize(p) == 0
+                with open(p, "a", encoding="utf-8", newline="\n") as f:
+                    if fresh:
+                        f.write("EGM TechDraw: ход построения (CP-122); "
+                                "последняя строка — где остановились\n")
+                    f.write(f"--- запуск {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+            except Exception:
+                _LOG["path"] = "—"
+    _LOG["last"] = msg
+    line = f"[{time.time() - (_LOG['t0'] or time.time()):7.1f} с] {msg}"
+    App.Console.PrintMessage("EGM TechDraw: " + line + "\n")
+    if _LOG["path"] != "—":
+        try:
+            with open(_LOG["path"], "a", encoding="utf-8", newline="\n") as f:
+                f.write(line + "\n")
+        except Exception:
+            pass
+    if _REP["data"] is not None:                 # частичный отчёт: шапка + текущий этап
+        _report(_REP["path"], _REP["data"], _REP["rep"], msg)
+
 
 
 def _repo(path):
@@ -130,12 +174,46 @@ def _circ(w):
     return c0.Center.x, c0.Center.y, c0.Radius
 
 
-def _rho(w, step=0.05):
-    out = []
+def _extreme(w, want="max"):
+    """Экстремум ρ контура: max — DВ (впадины), min — Dверш.
+
+    CP-123: раньше контур дискретизировался целиком с шагом 0.05 мм по каждому ребру
+    (до RHO_MAX точек на ребро). У цевочного контура рёбер десятки, и 24 отверстия двух
+    диаметров давали сотни тысяч точек — OCC считал их минутами, снаружи это зависание.
+    Теперь: грубая выборка по каждому ребру (EXT_COARSE точек) -> три лучших ребра ->
+    тонкая выборка только по ним. Работы ограничено (рёбра × 48 + 3 × 1200)."""
+    er = []
     for e in w.Edges:
-        n = max(16, int(e.Length / step) + 1)
-        out += [math.hypot(p.x, p.y) for p in e.discretize(Number=n)]
-    return out
+        rr = [math.hypot(p.x, p.y) for p in e.discretize(Number=EXT_COARSE)]
+        er.append((min(rr), max(rr), e))
+    j = 1 if want == "max" else 0
+    best = sorted(er, key=lambda t: t[j], reverse=(want == "max"))[:EXT_TOP]
+    vals = []
+    for _, _, e in best:
+        n = min(RHO_MAX, max(64, int(e.Length / 0.05) + 1))
+        vals += [math.hypot(p.x, p.y) for p in e.discretize(Number=n)]
+    return max(vals) if want == "max" else min(vals)
+
+
+def _by_cyl(cyl, v, k):
+    """Ø по цилиндрической грани с осью z, ближайший к эталону (CP-123).
+
+    Впадины/вершины цевочного контура в STEP — цилиндрические грани: значение берётся
+    с грани (точное, без дискретизации), а сечение остаётся запасным путём. Грань
+    принимается, если её Ø отличается от эталона не более CYL_BAND (иначе это другая
+    поверхность — меряем по сечению и получаем честное расхождение)."""
+    if not cyl:
+        _log(f"  {k}: цилиндрических граней нет — меряю по сечению")
+        return None
+    r = min(cyl, key=lambda q: abs(2 * q - v))
+    d = 2 * r
+    if abs(d - v) <= CYL_BAND:
+        _log(f"  {k}: по цилиндрической грани Ø{d:.4f} (эталон {v:g}, "
+             f"Δ {abs(d - v):.4f})")
+        return d
+    _log(f"  {k}: грань Ø{d:.3f} — не та (эталон {v:g}, Δ {abs(d - v):.3f} > "
+         f"{CYL_BAND:g}); меряю по сечению")
+    return None
 
 
 def _split(ws):
@@ -162,6 +240,9 @@ def _section(shape, z):
         L = 4 * shape.BoundBox.DiagonalLength
         pl = Part.makePlane(L, L, App.Vector(-L / 2, -L / 2, z))
         cross = shape.section(pl)
+        if len(cross.Edges) > MAX_SEC_EDGES:      # CP-122: sortEdges на тысячах рёбер не считаем
+            raise ValueError(f"сечение z = {z:g}: {len(cross.Edges)} рёбер (предел "
+                             f"{MAX_SEC_EDGES}) — обход контуров пропущен")
         ws2 = []
         for grp in Part.sortEdges(cross.Edges):
             try:
@@ -197,14 +278,16 @@ def _value(c, sec, cyl, bb, rad=()):
         return sec["n"]
     oc = sec["oc"]
     if k == "d_out":
-        return 2 * oc[2] if oc else 2 * max(_rho(sec["outer"]))
+        return 2 * oc[2] if oc else 2 * _extreme(sec["outer"], "max")
     if k == "center":
         return [oc[0], oc[1]] if oc else "наружный контур не окружность"
     if k in ("d_root", "d_tip"):
+        d = _by_cyl(cyl, v, "DВ" if k == "d_root" else "Dверш")   # CP-123
+        if d is not None:
+            return d
         if sec["inner"] is None:
             return "нет внутреннего контура"
-        r = _rho(sec["inner"])
-        return 2 * max(r) if k == "d_root" else 2 * min(r)
+        return 2 * _extreme(sec["inner"], "max" if k == "d_root" else "min")
     hs = sec["holes"]
     if k == "n_holes":
         return len(hs)
@@ -241,23 +324,39 @@ def _radial(shape, tol=3.0):
 
 
 def measure(shape, chk):
-    """{sym: значение по 3D | строка-причина} для эталонов chk."""
+    """{sym: значение по 3D | строка-причина} для эталонов chk.
+
+    CP-122: каждая ступень пишется в лог — по нему видно, на какой проверке
+    остановился макрос (OCC-вызовы не прерываются извне)."""
     bb = shape.BoundBox
+    _log(f"  форма: граней {len(shape.Faces)}, рёбер {len(shape.Edges)}, "
+         f"габарит {bb.XLength:.1f}×{bb.YLength:.1f}×{bb.ZLength:.1f}")
+    t = time.time()
     cyl = sorted({round(f.Surface.Radius, 6) for f in shape.Faces if _tn(f.Surface) == "Cylinder"
                   and abs(f.Surface.Axis.z) > 0.999})
     rad = _radial(shape)
+    _log(f"  цилиндры {len(cyl)}, радиальных отверстий {len(rad)}: {time.time() - t:.1f} с")
     secs, out = {}, {}
     for c in chk:
         z = c.get("z")
         if z is not None and z not in secs:
+            t = time.time()
             try:
                 secs[z] = _section(shape, z)
             except Exception as e:
                 secs[z] = f"сечение z = {z:g}: {type(e).__name__}: {e}"
+            _log(f"  сечение z = {z:g}: {time.time() - t:.1f} с")
+        if c["kind"] in SKIP:                     # CP-122: обойти зависшую проверку без правки кода
+            out[c["sym"]] = f"пропущено (EGM_TD_SKIP={c['kind']})"
+            _log(f"  {c['sym']} ({c['kind']}): пропущено по EGM_TD_SKIP")
+            continue
+        _log(f"  {c['sym']} ({c['kind']}) …")
+        t = time.time()
         try:
             out[c["sym"]] = _value(c, secs.get(z), cyl, bb, rad)
         except Exception as e:
             out[c["sym"]] = f"{type(e).__name__}: {e}"
+        _log(f"  {c['sym']} = {out[c['sym']]}: {time.time() - t:.1f} с")
     return out
 
 
@@ -309,7 +408,11 @@ def _symbol(doc, page, pid, b, scale):
 
 
 def _edges(v):
-    """[(«EdgeN», кромка)] в нумерации ссылок размеров (getEdgeByIndex), с косметикой."""
+    """[(«EdgeN», кромка)] в нумерации ссылок размеров (getEdgeByIndex), с косметикой.
+    CP-122: кэш на вид — иначе каждый размер заново перебирает кромки (до MAX_EDGES)."""
+    key = getattr(v, "Name", None) or str(id(v))
+    if key in _ECACHE:
+        return _ECACHE[key]
     out = []
     for i in range(MAX_EDGES):
         try:
@@ -319,6 +422,7 @@ def _edges(v):
         if e is None:
             break
         out.append((f"Edge{i}", e))
+    _ECACHE[key] = out
     return out
 
 
@@ -398,7 +502,7 @@ def _pdf(page, path, rec):
         return None
 
 
-WAIT_S = 180.0                                  # предел ожидания HLR видов листа, с (Д-70)
+WAIT_S = float(os.environ.get("EGM_TD_WAIT") or 180.0)   # предел ожидания HLR, с (Д-70)
 
 
 def _ready(v):
@@ -432,6 +536,7 @@ def _wait(views, timeout=WAIT_S, times=None, t0=None):
     start = time.time()
     t0 = start if t0 is None else t0
     left = [k for k, v in views.items() if v is not None]
+    n0, last = len(left), -15.0
     while True:
         pump()
         still = []
@@ -442,7 +547,11 @@ def _wait(views, timeout=WAIT_S, times=None, t0=None):
             else:
                 still.append(k)
         left = still
-        if not left or time.time() - start > timeout:
+        el = time.time() - start
+        if el - last >= 15.0 and 0 < el < timeout:      # CP-122: видно, что идёт HLR, а не зависание
+            last = el
+            _log(f"жду HLR: готово {n0 - len(left)} из {n0}, {el:.0f} с")
+        if not left or el > timeout:
             return left, time.time() - start
         time.sleep(0.1)
 
@@ -531,7 +640,9 @@ def _dim_span(doc, page, pid, v, refs, fmt, s, r):
 def _start(TD, TS, doc, grp, tpl, pid, rec, shape):
     """Проход 1 (Д-71): замеры по 3D, лист и виды без размеров. HLR не ждём —
     он запускается общим recompute для всех листов сразу (_run)."""
+    _log(f"лист {pid}: замеры 3D (сечений {len({c.get('z') for c in rec['checks'] if c.get('z') is not None})})")
     meas = measure(shape, rec["checks"])
+    _log(f"лист {pid}: замеры готовы → виды")
     res = TD.compare(rec["checks"], meas, rec.get("tol", TD.TOL))
     warn = TD.warnings(res)
     bb = shape.BoundBox
@@ -630,35 +741,45 @@ def _run(TD, TS, doc, jobs, path, pdf):
     идёт — легенды и примечания; затем общее ожидание, косметика, размеры, PDF."""
     import time
     t0 = time.time()
+    _log(f"HLR: recompute {len(jobs)} листов, видов {sum(len(j['views']) for j in jobs)}")
     doc.recompute()
+    _log("HLR: recompute вернулся — ждём кромки")
     for j in jobs:
         _guard(j, lambda: _legend(TS, doc, j))
     allv = {(j["pid"], k): v for j in jobs for k, v in j["views"].items()}
     times = {}
     late, _ = _wait(allv, WAIT_S, times, t0)
+    _log(f"HLR: готово {len(allv) - len(late)} из {len(allv)} за {time.time() - t0:.0f} с")
     coarse = [key for key in late if _coarse(allv[key])]
     if coarse:
         doc.recompute()
         late, _ = _wait({key: allv[key] for key in late}, 60.0, times, t0)
+    _log(f"косметика: {len(jobs)} листов")
     for j in jobs:
         _guard(j, lambda: _cosmetics(TD, j, late))
     doc.recompute()
     _wait({key: v for key, v in allv.items() if key not in late}, 60.0)
+    _log("размеры: начало")
+    _ECACHE.clear()
     for j in jobs:
         _guard(j, lambda: _dims(TD, doc, j))
+    _log("размеры: готово")
     doc.recompute()
-    for j in jobs:
+    for k, j in enumerate(jobs, 1):
+        _log(f"PDF {k}/{len(jobs)}: {j['page'].Label}") if pdf else None
         out = _pdf(j["page"], path, j["rec"]) if pdf else None
         j["head"] = _head(j, out, times, coarse, late)
         j["table"] = TD.md_table(j["res"])
 
 
-def _report(path, data, rep):
+def _report(path, data, rep, stage=None):
     out = _stem(path) + ".techdraw.md"
     lines = [f"# Чертежи TechDraw {data.get('id', '')} (Д-65, Д-66; пишет макрос, НЕ ПРАВИТЬ РУКАМИ)",
-             "", f"Источник геометрии: STEP; эталоны: {os.path.basename(path)} → drawings", ""]
+             "", f"Источник геометрии: STEP; эталоны: {os.path.basename(path)} → drawings", "",
+             f"Этап: {stage or 'готово'}", ""]
     for pid, lab, head, table in rep:
-        lines += [f"## {pid} — {lab}", "", head, ""] + table + [""]
+        lines += [f"## {pid} — {lab}", "",
+                  head or "в работе: лист построен, ждут HLR, косметика и размеры", ""] + table + [""]
         App.Console.PrintMessage(f"EGM TechDraw: {lab}: {head}\n")
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines))
@@ -671,6 +792,7 @@ def apply(path, doc=None, pdf=True):
         raise RuntimeError("нет открытого документа: открыть <ID>.step или запустить "
                            "tools/freecad_egm.py (откроет STEP сам)")
     TD, TS = _td(path)
+    _ECACHE.clear()
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     drw = data.get("drawings") or {}
@@ -678,6 +800,9 @@ def apply(path, doc=None, pdf=True):
         App.Console.PrintError("EGM TechDraw: в .assy.json нет drawings — пересоздать: "
                                "python -m egm.cad <ID> --assy (CP-55)\n")
         return []
+    _REP.update(path=path, data=data, rep=[])      # CP-122: отчёт существует с первой секунды
+    _log(f"старт: листов {len(drw)}, документ «{doc.Name}»", path)
+    _report(path, data, [], "старт")
     _clear(doc)
     tpl = _stem(path) + ".A3.svg"
     with open(tpl, "w", encoding="utf-8", newline="\n") as f:
@@ -690,7 +815,8 @@ def apply(path, doc=None, pdf=True):
         App.Console.PrintWarning("EGM TechDraw: нет формы для меток: " + ", ".join(miss)
                                  + "\n  метки в документе (первые 30): " + ", ".join(have[:30]) + "\n")
     rep, jobs = [], []
-    for pid, rec in drw.items():
+    _REP["rep"] = rep
+    for k, (pid, rec) in enumerate(drw.items(), 1):
         lab = rec.get("label", pid)
         if "error" in rec:
             rep.append((pid, lab, "пропущен: " + rec["error"], []))
@@ -698,6 +824,7 @@ def apply(path, doc=None, pdf=True):
             rep.append((pid, lab, "пропущен: нет объекта с такой меткой в документе", []))
         else:
             try:
+                _log(f"лист {k}/{len(drw)}: {pid} — {lab}")
                 jobs.append(_start(TD, TS, doc, grp, tpl, pid, rec, src[lab]))
                 rep.append((pid, lab, None, []))
             except Exception as e:
@@ -706,7 +833,8 @@ def apply(path, doc=None, pdf=True):
     done = {j["pid"]: j for j in jobs}
     rep = [(p, lab, done[p]["head"], done[p]["table"]) if h is None else (p, lab, h, t)
            for p, lab, h, t in rep]
-    _report(path, data, rep)
+    _report(path, data, rep, "готово")
+    _log("готово")
     _show(doc)
     return rep
 
