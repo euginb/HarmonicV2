@@ -15,6 +15,7 @@ egm/cad/techdraw_sheet.py; Spreadsheet/LegendView и аннотации не с�
 """
 import datetime
 import importlib
+import time
 import json
 import math
 import os
@@ -33,6 +34,9 @@ VTOL = 0.05                                     # допуск поиска кр
 STYLE = {"d_root": 2, "d_tip": 2, "d_bc": 4}    # LineStyle: 2 — штрих, 4 — штрихпунктир
 ANGLES = (45, 135, 225, 315, 20, 160, 200, 340)  # углы выносок диаметров на виде по оси
 MAX_EDGES = 20000
+SKIP = tuple(k.strip() for k in (os.environ.get("EGM_TD_SKIP") or "").split(",") if k.strip())
+MAX_SEC_EDGES = 4000   # рёбер в сечении больше — контуры не обходим (повисание OCC)
+RHO_MAX = 6000         # точек дискретизации на одно ребро контура (CP-122)
 
 _ECACHE = {}                 # CP-122: кромки вида — один раз (getEdgeByIndex дорогой)
 _LOG = {"path": None, "t0": None, "last": ""}
@@ -56,6 +60,7 @@ def _log(msg, path=None):
                     if fresh:
                         f.write("EGM TechDraw: ход построения (CP-122); "
                                 "последняя строка — где остановились\n")
+                    f.write(f"--- запуск {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
             except Exception:
                 _LOG["path"] = "—"
     _LOG["last"] = msg
@@ -167,10 +172,12 @@ def _circ(w):
     return c0.Center.x, c0.Center.y, c0.Radius
 
 
-def _rho(w, step=0.05):
+def _rho(w, step=0.05, cap=RHO_MAX):
+    """Радиусы точек контура; точек на ребро не больше cap (CP-122: длинная кромка
+    при шаге 0.05 мм давала сотни тысяч точек и выглядела как зависание)."""
     out = []
     for e in w.Edges:
-        n = max(16, int(e.Length / step) + 1)
+        n = min(cap, max(16, int(e.Length / step) + 1))
         out += [math.hypot(p.x, p.y) for p in e.discretize(Number=n)]
     return out
 
@@ -199,6 +206,9 @@ def _section(shape, z):
         L = 4 * shape.BoundBox.DiagonalLength
         pl = Part.makePlane(L, L, App.Vector(-L / 2, -L / 2, z))
         cross = shape.section(pl)
+        if len(cross.Edges) > MAX_SEC_EDGES:      # CP-122: sortEdges на тысячах рёбер не считаем
+            raise ValueError(f"сечение z = {z:g}: {len(cross.Edges)} рёбер (предел "
+                             f"{MAX_SEC_EDGES}) — обход контуров пропущен")
         ws2 = []
         for grp in Part.sortEdges(cross.Edges):
             try:
@@ -278,23 +288,39 @@ def _radial(shape, tol=3.0):
 
 
 def measure(shape, chk):
-    """{sym: значение по 3D | строка-причина} для эталонов chk."""
+    """{sym: значение по 3D | строка-причина} для эталонов chk.
+
+    CP-122: каждая ступень пишется в лог — по нему видно, на какой проверке
+    остановился макрос (OCC-вызовы не прерываются извне)."""
     bb = shape.BoundBox
+    _log(f"  форма: граней {len(shape.Faces)}, рёбер {len(shape.Edges)}, "
+         f"габарит {bb.XLength:.1f}×{bb.YLength:.1f}×{bb.ZLength:.1f}")
+    t = time.time()
     cyl = sorted({round(f.Surface.Radius, 6) for f in shape.Faces if _tn(f.Surface) == "Cylinder"
                   and abs(f.Surface.Axis.z) > 0.999})
     rad = _radial(shape)
+    _log(f"  цилиндры {len(cyl)}, радиальных отверстий {len(rad)}: {time.time() - t:.1f} с")
     secs, out = {}, {}
     for c in chk:
         z = c.get("z")
         if z is not None and z not in secs:
+            t = time.time()
             try:
                 secs[z] = _section(shape, z)
             except Exception as e:
                 secs[z] = f"сечение z = {z:g}: {type(e).__name__}: {e}"
+            _log(f"  сечение z = {z:g}: {time.time() - t:.1f} с")
+        if c["kind"] in SKIP:                     # CP-122: обойти зависшую проверку без правки кода
+            out[c["sym"]] = f"пропущено (EGM_TD_SKIP={c['kind']})"
+            _log(f"  {c['sym']} ({c['kind']}): пропущено по EGM_TD_SKIP")
+            continue
+        _log(f"  {c['sym']} ({c['kind']}) …")
+        t = time.time()
         try:
             out[c["sym"]] = _value(c, secs.get(z), cyl, bb, rad)
         except Exception as e:
             out[c["sym"]] = f"{type(e).__name__}: {e}"
+        _log(f"  {c['sym']} = {out[c['sym']]}: {time.time() - t:.1f} с")
     return out
 
 
@@ -716,7 +742,8 @@ def _report(path, data, rep, stage=None):
              "", f"Источник геометрии: STEP; эталоны: {os.path.basename(path)} → drawings", "",
              f"Этап: {stage or 'готово'}", ""]
     for pid, lab, head, table in rep:
-        lines += [f"## {pid} — {lab}", "", head or f"в работе: {stage or ''}", ""] + table + [""]
+        lines += [f"## {pid} — {lab}", "",
+                  head or "в работе: лист построен, ждут HLR, косметика и размеры", ""] + table + [""]
         App.Console.PrintMessage(f"EGM TechDraw: {lab}: {head}\n")
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines))
