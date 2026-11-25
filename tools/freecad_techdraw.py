@@ -36,10 +36,14 @@ ANGLES = (45, 135, 225, 315, 20, 160, 200, 340)  # углы выносок ди�
 MAX_EDGES = 20000
 SKIP = tuple(k.strip() for k in (os.environ.get("EGM_TD_SKIP") or "").split(",") if k.strip())
 MAX_SEC_EDGES = 4000   # рёбер в сечении больше — контуры не обходим (повисание OCC)
-RHO_MAX = 6000         # точек дискретизации на одно ребро контура (CP-122)
 CYL_BAND = 1.0         # CP-123: Ø цилиндра считается той же величиной, если Δ от эталона ≤ 1 мм
-EXT_COARSE, EXT_FINE, EXT_TOP = 48, 1200, 3   # CP-123: экстремум ρ — грубо по рёбрам, точно по 3
-EXT_EDGES = 200        # CP-124: контур с большим числом рёбер не обходим (венец, Д-136)
+EXT_COARSE = 48        # CP-123: грубая выборка точек на ребро контура
+EXT_EDGES = 5000      # CP-126: предел рёбер контура (poly-венец u = 63: 64·24 = 1536)
+EXT_EVAL = 200000     # CP-126: предел вычислений valueAt на один контур (вместо длины дуги)
+SPL_SPAN = 8          # CP-126: точек выборки на пролёт узлов B-сплайна
+SPL_POLES = 50000     # CP-126: сплайн с большим числом полюсов не обходим
+PRISM_TOL = 1e-6      # CP-126: допуск |n_z| при проверке призмы
+ANALYTIC = ("Plane", "Cylinder", "Cone", "Sphere", "Toroid")   # CP-126: сечение ограничено
 
 _ECACHE = {}                 # CP-122: кромки вида — один раз (getEdgeByIndex дорогой)
 _LOG = {"path": None, "t0": None, "last": ""}
@@ -175,34 +179,111 @@ def _circ(w):
     return c0.Center.x, c0.Center.y, c0.Radius
 
 
-def _extreme(w, want="max"):
-    """-> (значение | None, причина отказа | None). CP-124: сплайновый контур венца
-    (step: spline) не обходится вовсе — OCC на нём не отвечает часами."""
-    """Экстремум ρ контура: max — DВ (впадины), min — Dверш.
+def _diag(e):
+    """CP-126: атрибуты кривой ребра для лога — O(1), без обхода (диагноз Д-136)."""
+    c = getattr(e, "Curve", None)
+    if _tn(c) != "BSplineCurve":
+        return _tn(c)
+    return (f"BSpline полюсов {c.NbPoles}, узлов {c.NbKnots}, степень {c.Degree}, "
+            f"{c.Continuity}, периодич. {c.isPeriodic()}, допуск {e.Tolerance:g}")
 
-    CP-123: раньше контур дискретизировался целиком с шагом 0.05 мм по каждому ребру
-    (до RHO_MAX точек на ребро). У цевочного контура рёбер десятки, и 24 отверстия двух
-    диаметров давали сотни тысяч точек — OCC считал их минутами, снаружи это зависание.
-    Теперь: грубая выборка по каждому ребру (EXT_COARSE точек) -> три лучших ребра ->
-    тонкая выборка только по ним. Работы ограничено (рёбра × 48 + 3 × 1200)."""
+
+def _params(e):
+    """CP-126: параметры выборки ребра -> (список u | None, причина | None).
+    B-сплайн — SPL_SPAN точек на пролёт узлов (периодический — узлы ±период),
+    прочие кривые — EXT_COARSE равных шагов по параметру. Длина дуги не считается."""
+    u0, u1 = e.FirstParameter, e.LastParameter
+    c = getattr(e, "Curve", None)
+    if _tn(c) != "BSplineCurve":
+        return [u0 + (u1 - u0) * i / EXT_COARSE for i in range(EXT_COARSE + 1)], None
+    if c.NbPoles > SPL_POLES:
+        return None, f"B-сплайн {c.NbPoles} полюсов (предел {SPL_POLES})"
+    ks = list(c.getKnots())
+    if c.isPeriodic():
+        T = ks[-1] - ks[0]
+        ks = [k + m * T for m in (-1, 0, 1) for k in ks]
+    ks = [u0] + sorted({k for k in ks if u0 < k < u1}) + [u1]
+    us = [a + (b - a) * i / SPL_SPAN for a, b in zip(ks, ks[1:]) for i in range(SPL_SPAN)]
+    return us + [u1], None
+
+
+def _refine(e, a, b, sgn, it=60):
+    """CP-126: золотое сечение sgn·ρ(u) на [a, b] — фиксированные it шагов."""
+    def f(u):
+        p = e.valueAt(u)
+        return sgn * math.hypot(p.x, p.y)
+    g = (math.sqrt(5.0) - 1.0) / 2.0
+    c, d = b - g * (b - a), a + g * (b - a)
+    fc, fd = f(c), f(d)
+    for _ in range(it):
+        if fc > fd:
+            b, d, fd = d, c, fc
+            c = b - g * (b - a)
+            fc = f(c)
+        else:
+            a, c, fc = c, d, fd
+            d = a + g * (b - a)
+            fd = f(d)
+    return sgn * max(fc, fd)
+
+
+def _extreme(w, want="max"):
+    """Экстремум ρ контура: max — DВ (впадины), min — Dверш -> (значение | None, причина | None).
+
+    CP-126 (Д-136): без discretize(Number=) — деление по длине дуги на сплайне из
+    сечения не возвращалось. Каждое ребро — выборка по параметру (_params), лучшее
+    ребро уточняется золотым сечением. Работа ограничена EXT_EVAL вычислениями."""
     ed = w.Edges
     if len(ed) > EXT_EDGES:
         return None, f"контур {len(ed)} рёбер (предел {EXT_EDGES}) — не обхожу (Д-136)"
-    spl = sum(1 for e in ed if _tn(getattr(e, "Curve", None)) == "BSplineCurve")
-    if spl:
-        return None, (f"контур впадин B-сплайн ({spl} из {len(ed)} рёбер) — обход ρ "
-                      "отключён (Д-136)")
-    er = []
     for e in ed:
-        rr = [math.hypot(p.x, p.y) for p in e.discretize(Number=EXT_COARSE)]
-        er.append((min(rr), max(rr), e))
-    j = 1 if want == "max" else 0
-    best = sorted(er, key=lambda t: t[j], reverse=(want == "max"))[:EXT_TOP]
-    vals = []
-    for _, _, e in best:
-        n = min(RHO_MAX, max(64, int(e.Length / 0.05) + 1))
-        vals += [math.hypot(p.x, p.y) for p in e.discretize(Number=n)]
-    return (max(vals) if want == "max" else min(vals)), None
+        if _tn(getattr(e, "Curve", None)) == "BSplineCurve":
+            _log(f"    ребро: {_diag(e)}")
+    sgn, best, left = (1.0 if want == "max" else -1.0), None, EXT_EVAL
+    for e in ed:
+        us, why = _params(e)
+        if why:
+            return None, why
+        left -= len(us)
+        if left < 0:
+            return None, f"контур: больше {EXT_EVAL} точек выборки — не обхожу (Д-136)"
+        rr = [math.hypot(p.x, p.y) for p in (e.valueAt(u) for u in us)]
+        i = max(range(len(rr)), key=lambda j: sgn * rr[j])
+        if best is None or sgn * rr[i] > sgn * best[0]:
+            best = (rr[i], e, us[max(i - 1, 0)], us[min(i + 1, len(us) - 1)])
+    if best is None:
+        return None, "контур без рёбер"
+    r = _refine(best[1], best[2], best[3], sgn)
+    return (max(best[0], r) if want == "max" else min(best[0], r)), None
+
+
+def _prism_top(shape):
+    """CP-126: призма вдоль z -> плоская торцевая грань на ZMax (её контуры = сечение
+    при любом z), иначе None. Проверка по самой форме: плоские грани — торцы (нормаль ‖ z
+    на ZMin/ZMax) или боковые (нормаль ⟂ z); остальные — нормаль ⟂ z в сетке 3×3."""
+    bb, top = shape.BoundBox, []
+    try:
+        for f in shape.Faces:
+            u0, u1, v0, v1 = f.ParameterRange
+            if _tn(f.Surface) == "Plane":
+                nz = abs(f.normalAt((u0 + u1) / 2, (v0 + v1) / 2).z)
+                if nz <= PRISM_TOL:
+                    continue                                  # боковая плоская грань
+                fb = f.BoundBox
+                if abs(nz - 1) > PRISM_TOL or fb.ZLength > PRISM_TOL:
+                    return None
+                if abs(fb.ZMax - bb.ZMax) <= PRISM_TOL:
+                    top.append(f)
+                elif abs(fb.ZMin - bb.ZMin) > PRISM_TOL:
+                    return None                               # горизонтальная ступень — не призма
+                continue
+            for su in (0.0, 0.5, 1.0):
+                for sv in (0.0, 0.5, 1.0):
+                    if abs(f.normalAt(u0 + su * (u1 - u0), v0 + sv * (v1 - v0)).z) > PRISM_TOL:
+                        return None
+    except Exception:
+        return None
+    return top[0] if len(top) == 1 else None
 
 
 def _by_cyl(cyl, v, k):
@@ -242,8 +323,20 @@ def _split(ws):
             "inner": inner[0] if inner else None}
 
 
-def _section(shape, z):
-    """Сечение z: slice; нет внутреннего контура (сплайн впадин) — section + sortEdges."""
+def _section(shape, z, top=None):
+    """Сечение z. CP-126: призма — контуры торцевой грани (точные кривые STEP, без
+    пересечения); не призма с неаналитической гранью — отказ с причиной (пересечение
+    плоскости со сплайновой поверхностью в OCC не ограничено по времени, Д-136);
+    иначе slice, нет внутреннего контура — section + sortEdges."""
+    if top is not None:
+        sec = _split(list(top.Wires))
+        sec["how"] = "торец призмы"
+        return sec
+    bad = sorted({_tn(f.Surface) for f in shape.Faces} - set(ANALYTIC))
+    if bad:
+        raise ValueError(f"сечение z = {z:g} не строю: деталь не призма, грани {bad} — "
+                         f"пересечение со сплайновой поверхностью в OCC не ограничено по "
+                         f"времени (Д-136)")
     ws = shape.slice(App.Vector(0, 0, 1), z)
     sec = _split(ws) if ws else None
     if sec is None or sec["inner"] is None:
@@ -265,6 +358,7 @@ def _section(shape, z):
                 sec = s2
     if sec is None:
         raise ValueError(f"сечение z = {z:g} пустое")
+    sec.setdefault("how", "сечение")
     return sec
 
 
@@ -343,23 +437,29 @@ def measure(shape, chk):
     CP-122: каждая ступень пишется в лог — по нему видно, на какой проверке
     остановился макрос (OCC-вызовы не прерываются извне)."""
     bb = shape.BoundBox
+    if not _LOG.get("ver"):                       # CP-126: версия FreeCAD — в лог (Д-138)
+        _LOG["ver"] = ".".join(str(x) for x in App.Version()[:3])
+        _log(f"  FreeCAD {_LOG['ver']}")
     _log(f"  форма: граней {len(shape.Faces)}, рёбер {len(shape.Edges)}, "
          f"габарит {bb.XLength:.1f}×{bb.YLength:.1f}×{bb.ZLength:.1f}")
     t = time.time()
     cyl = sorted({round(f.Surface.Radius, 6) for f in shape.Faces if _tn(f.Surface) == "Cylinder"
                   and abs(f.Surface.Axis.z) > 0.999})
     rad = _radial(shape)
-    _log(f"  цилиндры {len(cyl)}, радиальных отверстий {len(rad)}: {time.time() - t:.1f} с")
+    top = _prism_top(shape)                       # CP-126: призма — сечения по торцу
+    _log(f"  цилиндры {len(cyl)}, радиальных отверстий {len(rad)}, призма "
+         f"{'да — сечения по торцу' if top is not None else 'нет'}: {time.time() - t:.1f} с")
     secs, out = {}, {}
     for c in chk:
         z = c.get("z")
         if z is not None and z not in secs:
             t = time.time()
             try:
-                secs[z] = _section(shape, z)
+                secs[z] = _section(shape, z, top)
             except Exception as e:
                 secs[z] = f"сечение z = {z:g}: {type(e).__name__}: {e}"
-            _log(f"  сечение z = {z:g}: {time.time() - t:.1f} с")
+            how = secs[z].get("how") if isinstance(secs[z], dict) else None
+            _log(f"  сечение z = {z:g}: {time.time() - t:.1f} с" + (f" ({how})" if how else ""))
         if c["kind"] in SKIP:                     # CP-122: обойти зависшую проверку без правки кода
             out[c["sym"]] = f"пропущено (EGM_TD_SKIP={c['kind']})"
             _log(f"  {c['sym']} ({c['kind']}): пропущено по EGM_TD_SKIP")
