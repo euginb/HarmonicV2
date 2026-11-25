@@ -504,3 +504,11 @@ techdraw: 15 чертежей деталей в out\cad\PTK-032-R7X20-22M5P2-CFF
 step: сборка строится (19 деталей, 157 экземпляров, spline)…
 step: out\cad\PTK-032-R7X20-22M5P2-CFF527\PTK-032-R7X20-22M5P2-CFF527-L4.step (14.7 с); метаданные в STEP: 27 узлов (PROPERTY_DEFINITION, Д-50); FreeCAD: макрос tools/freecad_meta.py
 отчёт: reports\cad_report.md
+
+---
+
+- Запуск: 2026-11-25 11:03:03
+- Команда: python -m egm.cad PTK-032-R7X20-22M5P2 --design K20 --assy
+
+ошибка: 'проработка K20 для PTK-032-R7X20-22M5P2 не найдена в specs/ptk_designs.yaml — проверить ptk_design_input.yaml, python main.py --publish (Д-48)'
+отчёт: reports/cad_report.md

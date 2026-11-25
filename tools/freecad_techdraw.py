@@ -34,6 +34,43 @@ STYLE = {"d_root": 2, "d_tip": 2, "d_bc": 4}    # LineStyle: 2 — штрих, 4
 ANGLES = (45, 135, 225, 315, 20, 160, 200, 340)  # углы выносок диаметров на виде по оси
 MAX_EDGES = 20000
 
+_ECACHE = {}                 # CP-122: кромки вида — один раз (getEdgeByIndex дорогой)
+_LOG = {"path": None, "t0": None, "last": ""}
+_REP = {"path": None, "data": None, "rep": []}
+
+
+def _log(msg, path=None):
+    """CP-122: строка хода — в <ID>.techdraw.log, в Report view и в отчёт.
+
+    Отчёт <ID>.techdraw.md пишется с первой секунды, поэтому при зависании видно,
+    на каком именно шаге остановились (раньше отчёт появлялся только в самом конце)."""
+    import time
+    if _LOG["path"] is None:
+        _LOG["t0"] = time.time()
+        p = re.sub(r"\.assy\.json$", "", path) + ".techdraw.log" if path else "—"
+        _LOG["path"] = p
+        if p != "—":
+            try:
+                fresh = not os.path.exists(p) or os.path.getsize(p) == 0
+                with open(p, "a", encoding="utf-8", newline="\n") as f:
+                    if fresh:
+                        f.write("EGM TechDraw: ход построения (CP-122); "
+                                "последняя строка — где остановились\n")
+            except Exception:
+                _LOG["path"] = "—"
+    _LOG["last"] = msg
+    line = f"[{time.time() - (_LOG['t0'] or time.time()):7.1f} с] {msg}"
+    App.Console.PrintMessage("EGM TechDraw: " + line + "\n")
+    if _LOG["path"] != "—":
+        try:
+            with open(_LOG["path"], "a", encoding="utf-8", newline="\n") as f:
+                f.write(line + "\n")
+        except Exception:
+            pass
+    if _REP["data"] is not None:                 # частичный отчёт: шапка + текущий этап
+        _report(_REP["path"], _REP["data"], _REP["rep"], msg)
+
+
 
 def _repo(path):
     starts = [os.path.dirname(os.path.abspath(path))]
@@ -309,7 +346,11 @@ def _symbol(doc, page, pid, b, scale):
 
 
 def _edges(v):
-    """[(«EdgeN», кромка)] в нумерации ссылок размеров (getEdgeByIndex), с косметикой."""
+    """[(«EdgeN», кромка)] в нумерации ссылок размеров (getEdgeByIndex), с косметикой.
+    CP-122: кэш на вид — иначе каждый размер заново перебирает кромки (до MAX_EDGES)."""
+    key = getattr(v, "Name", None) or str(id(v))
+    if key in _ECACHE:
+        return _ECACHE[key]
     out = []
     for i in range(MAX_EDGES):
         try:
@@ -319,6 +360,7 @@ def _edges(v):
         if e is None:
             break
         out.append((f"Edge{i}", e))
+    _ECACHE[key] = out
     return out
 
 
@@ -398,7 +440,7 @@ def _pdf(page, path, rec):
         return None
 
 
-WAIT_S = 180.0                                  # предел ожидания HLR видов листа, с (Д-70)
+WAIT_S = float(os.environ.get("EGM_TD_WAIT") or 180.0)   # предел ожидания HLR, с (Д-70)
 
 
 def _ready(v):
@@ -432,6 +474,7 @@ def _wait(views, timeout=WAIT_S, times=None, t0=None):
     start = time.time()
     t0 = start if t0 is None else t0
     left = [k for k, v in views.items() if v is not None]
+    n0, last = len(left), -15.0
     while True:
         pump()
         still = []
@@ -442,7 +485,11 @@ def _wait(views, timeout=WAIT_S, times=None, t0=None):
             else:
                 still.append(k)
         left = still
-        if not left or time.time() - start > timeout:
+        el = time.time() - start
+        if el - last >= 15.0 and 0 < el < timeout:      # CP-122: видно, что идёт HLR, а не зависание
+            last = el
+            _log(f"жду HLR: готово {n0 - len(left)} из {n0}, {el:.0f} с")
+        if not left or el > timeout:
             return left, time.time() - start
         time.sleep(0.1)
 
@@ -531,7 +578,9 @@ def _dim_span(doc, page, pid, v, refs, fmt, s, r):
 def _start(TD, TS, doc, grp, tpl, pid, rec, shape):
     """Проход 1 (Д-71): замеры по 3D, лист и виды без размеров. HLR не ждём —
     он запускается общим recompute для всех листов сразу (_run)."""
+    _log(f"лист {pid}: замеры 3D (сечений {len({c.get('z') for c in rec['checks'] if c.get('z') is not None})})")
     meas = measure(shape, rec["checks"])
+    _log(f"лист {pid}: замеры готовы → виды")
     res = TD.compare(rec["checks"], meas, rec.get("tol", TD.TOL))
     warn = TD.warnings(res)
     bb = shape.BoundBox
@@ -630,35 +679,44 @@ def _run(TD, TS, doc, jobs, path, pdf):
     идёт — легенды и примечания; затем общее ожидание, косметика, размеры, PDF."""
     import time
     t0 = time.time()
+    _log(f"HLR: recompute {len(jobs)} листов, видов {sum(len(j['views']) for j in jobs)}")
     doc.recompute()
+    _log("HLR: recompute вернулся — ждём кромки")
     for j in jobs:
         _guard(j, lambda: _legend(TS, doc, j))
     allv = {(j["pid"], k): v for j in jobs for k, v in j["views"].items()}
     times = {}
     late, _ = _wait(allv, WAIT_S, times, t0)
+    _log(f"HLR: готово {len(allv) - len(late)} из {len(allv)} за {time.time() - t0:.0f} с")
     coarse = [key for key in late if _coarse(allv[key])]
     if coarse:
         doc.recompute()
         late, _ = _wait({key: allv[key] for key in late}, 60.0, times, t0)
+    _log(f"косметика: {len(jobs)} листов")
     for j in jobs:
         _guard(j, lambda: _cosmetics(TD, j, late))
     doc.recompute()
     _wait({key: v for key, v in allv.items() if key not in late}, 60.0)
+    _log("размеры: начало")
+    _ECACHE.clear()
     for j in jobs:
         _guard(j, lambda: _dims(TD, doc, j))
+    _log("размеры: готово")
     doc.recompute()
-    for j in jobs:
+    for k, j in enumerate(jobs, 1):
+        _log(f"PDF {k}/{len(jobs)}: {j['page'].Label}") if pdf else None
         out = _pdf(j["page"], path, j["rec"]) if pdf else None
         j["head"] = _head(j, out, times, coarse, late)
         j["table"] = TD.md_table(j["res"])
 
 
-def _report(path, data, rep):
+def _report(path, data, rep, stage=None):
     out = _stem(path) + ".techdraw.md"
     lines = [f"# Чертежи TechDraw {data.get('id', '')} (Д-65, Д-66; пишет макрос, НЕ ПРАВИТЬ РУКАМИ)",
-             "", f"Источник геометрии: STEP; эталоны: {os.path.basename(path)} → drawings", ""]
+             "", f"Источник геометрии: STEP; эталоны: {os.path.basename(path)} → drawings", "",
+             f"Этап: {stage or 'готово'}", ""]
     for pid, lab, head, table in rep:
-        lines += [f"## {pid} — {lab}", "", head, ""] + table + [""]
+        lines += [f"## {pid} — {lab}", "", head or f"в работе: {stage or ''}", ""] + table + [""]
         App.Console.PrintMessage(f"EGM TechDraw: {lab}: {head}\n")
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines))
@@ -671,6 +729,7 @@ def apply(path, doc=None, pdf=True):
         raise RuntimeError("нет открытого документа: открыть <ID>.step или запустить "
                            "tools/freecad_egm.py (откроет STEP сам)")
     TD, TS = _td(path)
+    _ECACHE.clear()
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     drw = data.get("drawings") or {}
@@ -678,6 +737,9 @@ def apply(path, doc=None, pdf=True):
         App.Console.PrintError("EGM TechDraw: в .assy.json нет drawings — пересоздать: "
                                "python -m egm.cad <ID> --assy (CP-55)\n")
         return []
+    _REP.update(path=path, data=data, rep=[])      # CP-122: отчёт существует с первой секунды
+    _log(f"старт: листов {len(drw)}, документ «{doc.Name}»", path)
+    _report(path, data, [], "старт")
     _clear(doc)
     tpl = _stem(path) + ".A3.svg"
     with open(tpl, "w", encoding="utf-8", newline="\n") as f:
@@ -690,7 +752,8 @@ def apply(path, doc=None, pdf=True):
         App.Console.PrintWarning("EGM TechDraw: нет формы для меток: " + ", ".join(miss)
                                  + "\n  метки в документе (первые 30): " + ", ".join(have[:30]) + "\n")
     rep, jobs = [], []
-    for pid, rec in drw.items():
+    _REP["rep"] = rep
+    for k, (pid, rec) in enumerate(drw.items(), 1):
         lab = rec.get("label", pid)
         if "error" in rec:
             rep.append((pid, lab, "пропущен: " + rec["error"], []))
@@ -698,6 +761,7 @@ def apply(path, doc=None, pdf=True):
             rep.append((pid, lab, "пропущен: нет объекта с такой меткой в документе", []))
         else:
             try:
+                _log(f"лист {k}/{len(drw)}: {pid} — {lab}")
                 jobs.append(_start(TD, TS, doc, grp, tpl, pid, rec, src[lab]))
                 rep.append((pid, lab, None, []))
             except Exception as e:
@@ -706,7 +770,8 @@ def apply(path, doc=None, pdf=True):
     done = {j["pid"]: j for j in jobs}
     rep = [(p, lab, done[p]["head"], done[p]["table"]) if h is None else (p, lab, h, t)
            for p, lab, h, t in rep]
-    _report(path, data, rep)
+    _report(path, data, rep, "готово")
+    _log("готово")
     _show(doc)
     return rep
 

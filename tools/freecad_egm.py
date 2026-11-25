@@ -38,6 +38,19 @@ def _strip(label):
     return re.sub(r"(?<=\))\d+$", "", label)
 
 
+def _log(path, msg):
+    """CP-122: этап в Report view и в <ID>.techdraw.log — видно, где встали."""
+    import time
+    line = time.strftime("%H:%M:%S") + " " + msg
+    App.Console.PrintMessage("EGM: " + line + "\n")
+    try:
+        with open(re.sub(r"\.assy\.json$", "", path) + ".techdraw.log", "a",
+                  encoding="utf-8", newline="\n") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+
+
 def _doc(path):
     with open(path, encoding="utf-8") as f:
         labels = set(json.load(f).get("labels") or {})
@@ -45,6 +58,8 @@ def _doc(path):
     if doc is not None and any(_strip(o.Label) in labels for o in doc.Objects):
         return doc
     step = re.sub(r"\.assy\.json$", ".step", path)
+    _log(path, f"STEP: {os.path.basename(step)} {os.path.getsize(step) / 1048576:.1f} МБ — "
+               "импорт (самый долгий шаг на крупной сборке)")
     if not os.path.exists(step):
         raise FileNotFoundError(f"нет {step}: открыть STEP вручную или пересоздать "
                                 "python -m egm.cad <ID> --assy")
@@ -55,6 +70,7 @@ def _doc(path):
     else:
         import Import
         Import.open(step)
+    _log(path, f"STEP открыт: объектов {len(App.ActiveDocument.Objects)}")
     return App.ActiveDocument
 
 
@@ -65,7 +81,9 @@ def apply(path, pdf=True):
     meta = importlib.reload(freecad_meta)
     td = importlib.reload(freecad_techdraw)
     doc = _doc(path)
+    _log(path, "метаданные egm_*")
     n = meta.apply(path, doc)
+    _log(path, "чертежи TechDraw")
     rep = td.apply(path, doc, pdf)
     ok = sum(1 for r in rep if not r[2].startswith(("пропущен", "ошибка")))
     App.Console.PrintMessage(f"EGM: метаданные — {n} объектов; чертежей — {ok} из {len(rep)}\n")
