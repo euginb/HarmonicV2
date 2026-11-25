@@ -39,6 +39,7 @@ MAX_SEC_EDGES = 4000   # рёбер в сечении больше — конт�
 RHO_MAX = 6000         # точек дискретизации на одно ребро контура (CP-122)
 CYL_BAND = 1.0         # CP-123: Ø цилиндра считается той же величиной, если Δ от эталона ≤ 1 мм
 EXT_COARSE, EXT_FINE, EXT_TOP = 48, 1200, 3   # CP-123: экстремум ρ — грубо по рёбрам, точно по 3
+EXT_EDGES = 200        # CP-124: контур с большим числом рёбер не обходим (венец, Д-136)
 
 _ECACHE = {}                 # CP-122: кромки вида — один раз (getEdgeByIndex дорогой)
 _LOG = {"path": None, "t0": None, "last": ""}
@@ -175,6 +176,8 @@ def _circ(w):
 
 
 def _extreme(w, want="max"):
+    """-> (значение | None, причина отказа | None). CP-124: сплайновый контур венца
+    (step: spline) не обходится вовсе — OCC на нём не отвечает часами."""
     """Экстремум ρ контура: max — DВ (впадины), min — Dверш.
 
     CP-123: раньше контур дискретизировался целиком с шагом 0.05 мм по каждому ребру
@@ -182,8 +185,15 @@ def _extreme(w, want="max"):
     диаметров давали сотни тысяч точек — OCC считал их минутами, снаружи это зависание.
     Теперь: грубая выборка по каждому ребру (EXT_COARSE точек) -> три лучших ребра ->
     тонкая выборка только по ним. Работы ограничено (рёбра × 48 + 3 × 1200)."""
+    ed = w.Edges
+    if len(ed) > EXT_EDGES:
+        return None, f"контур {len(ed)} рёбер (предел {EXT_EDGES}) — не обхожу (Д-136)"
+    spl = sum(1 for e in ed if _tn(getattr(e, "Curve", None)) == "BSplineCurve")
+    if spl:
+        return None, (f"контур впадин B-сплайн ({spl} из {len(ed)} рёбер) — обход ρ "
+                      "отключён (Д-136)")
     er = []
-    for e in w.Edges:
+    for e in ed:
         rr = [math.hypot(p.x, p.y) for p in e.discretize(Number=EXT_COARSE)]
         er.append((min(rr), max(rr), e))
     j = 1 if want == "max" else 0
@@ -192,7 +202,7 @@ def _extreme(w, want="max"):
     for _, _, e in best:
         n = min(RHO_MAX, max(64, int(e.Length / 0.05) + 1))
         vals += [math.hypot(p.x, p.y) for p in e.discretize(Number=n)]
-    return max(vals) if want == "max" else min(vals)
+    return (max(vals) if want == "max" else min(vals)), None
 
 
 def _by_cyl(cyl, v, k):
@@ -278,7 +288,10 @@ def _value(c, sec, cyl, bb, rad=()):
         return sec["n"]
     oc = sec["oc"]
     if k == "d_out":
-        return 2 * oc[2] if oc else 2 * _extreme(sec["outer"], "max")
+        if oc:
+            return 2 * oc[2]
+        v, why = _extreme(sec["outer"], "max")
+        return 2 * v if why is None else why
     if k == "center":
         return [oc[0], oc[1]] if oc else "наружный контур не окружность"
     if k in ("d_root", "d_tip"):
@@ -287,7 +300,8 @@ def _value(c, sec, cyl, bb, rad=()):
             return d
         if sec["inner"] is None:
             return "нет внутреннего контура"
-        return 2 * _extreme(sec["inner"], "max" if k == "d_root" else "min")
+        v, why = _extreme(sec["inner"], "max" if k == "d_root" else "min")
+        return 2 * v if why is None else why
     hs = sec["holes"]
     if k == "n_holes":
         return len(hs)
