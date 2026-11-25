@@ -37,6 +37,8 @@ MAX_EDGES = 20000
 SKIP = tuple(k.strip() for k in (os.environ.get("EGM_TD_SKIP") or "").split(",") if k.strip())
 MAX_SEC_EDGES = 4000   # рёбер в сечении больше — контуры не обходим (повисание OCC)
 RHO_MAX = 6000         # точек дискретизации на одно ребро контура (CP-122)
+CYL_BAND = 1.0         # CP-123: Ø цилиндра считается той же величиной, если Δ от эталона ≤ 1 мм
+EXT_COARSE, EXT_FINE, EXT_TOP = 48, 1200, 3   # CP-123: экстремум ρ — грубо по рёбрам, точно по 3
 
 _ECACHE = {}                 # CP-122: кромки вида — один раз (getEdgeByIndex дорогой)
 _LOG = {"path": None, "t0": None, "last": ""}
@@ -172,14 +174,46 @@ def _circ(w):
     return c0.Center.x, c0.Center.y, c0.Radius
 
 
-def _rho(w, step=0.05, cap=RHO_MAX):
-    """Радиусы точек контура; точек на ребро не больше cap (CP-122: длинная кромка
-    при шаге 0.05 мм давала сотни тысяч точек и выглядела как зависание)."""
-    out = []
+def _extreme(w, want="max"):
+    """Экстремум ρ контура: max — DВ (впадины), min — Dверш.
+
+    CP-123: раньше контур дискретизировался целиком с шагом 0.05 мм по каждому ребру
+    (до RHO_MAX точек на ребро). У цевочного контура рёбер десятки, и 24 отверстия двух
+    диаметров давали сотни тысяч точек — OCC считал их минутами, снаружи это зависание.
+    Теперь: грубая выборка по каждому ребру (EXT_COARSE точек) -> три лучших ребра ->
+    тонкая выборка только по ним. Работы ограничено (рёбра × 48 + 3 × 1200)."""
+    er = []
     for e in w.Edges:
-        n = min(cap, max(16, int(e.Length / step) + 1))
-        out += [math.hypot(p.x, p.y) for p in e.discretize(Number=n)]
-    return out
+        rr = [math.hypot(p.x, p.y) for p in e.discretize(Number=EXT_COARSE)]
+        er.append((min(rr), max(rr), e))
+    j = 1 if want == "max" else 0
+    best = sorted(er, key=lambda t: t[j], reverse=(want == "max"))[:EXT_TOP]
+    vals = []
+    for _, _, e in best:
+        n = min(RHO_MAX, max(64, int(e.Length / 0.05) + 1))
+        vals += [math.hypot(p.x, p.y) for p in e.discretize(Number=n)]
+    return max(vals) if want == "max" else min(vals)
+
+
+def _by_cyl(cyl, v, k):
+    """Ø по цилиндрической грани с осью z, ближайший к эталону (CP-123).
+
+    Впадины/вершины цевочного контура в STEP — цилиндрические грани: значение берётся
+    с грани (точное, без дискретизации), а сечение остаётся запасным путём. Грань
+    принимается, если её Ø отличается от эталона не более CYL_BAND (иначе это другая
+    поверхность — меряем по сечению и получаем честное расхождение)."""
+    if not cyl:
+        _log(f"  {k}: цилиндрических граней нет — меряю по сечению")
+        return None
+    r = min(cyl, key=lambda q: abs(2 * q - v))
+    d = 2 * r
+    if abs(d - v) <= CYL_BAND:
+        _log(f"  {k}: по цилиндрической грани Ø{d:.4f} (эталон {v:g}, "
+             f"Δ {abs(d - v):.4f})")
+        return d
+    _log(f"  {k}: грань Ø{d:.3f} — не та (эталон {v:g}, Δ {abs(d - v):.3f} > "
+         f"{CYL_BAND:g}); меряю по сечению")
+    return None
 
 
 def _split(ws):
@@ -244,14 +278,16 @@ def _value(c, sec, cyl, bb, rad=()):
         return sec["n"]
     oc = sec["oc"]
     if k == "d_out":
-        return 2 * oc[2] if oc else 2 * max(_rho(sec["outer"]))
+        return 2 * oc[2] if oc else 2 * _extreme(sec["outer"], "max")
     if k == "center":
         return [oc[0], oc[1]] if oc else "наружный контур не окружность"
     if k in ("d_root", "d_tip"):
+        d = _by_cyl(cyl, v, "DВ" if k == "d_root" else "Dверш")   # CP-123
+        if d is not None:
+            return d
         if sec["inner"] is None:
             return "нет внутреннего контура"
-        r = _rho(sec["inner"])
-        return 2 * max(r) if k == "d_root" else 2 * min(r)
+        return 2 * _extreme(sec["inner"], "max" if k == "d_root" else "min")
     hs = sec["holes"]
     if k == "n_holes":
         return len(hs)
