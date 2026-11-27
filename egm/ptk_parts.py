@@ -32,7 +32,7 @@ def separator(n, R, a, D, l, pitch, rows, lim, sep_k):
             "web": round(2 * r_in * math.sin(math.pi / n) - w, 3), "rows": win}
 
 
-def sep_band(sep, d_root, lim, fill=False):
+def sep_band(sep, d_root, lim, fill=False, r_asm=None):
     """Пояса сепаратора — кольца между окнами соседних рядов и у торцов (CP-98, Д-118, OQ-46).
 
     h_mid — от окна ряда до окна следующего, h_end — от торца до окна; t — радиальная толщина.
@@ -40,22 +40,37 @@ def sep_band(sep, d_root, lim, fill=False):
     в осевой зоне шайб .05 (h_mid = h шайбы − sep_gap) до t_max = dвн шайбы/2 − sep_band_gap − r_in,
     dвн = DВ + 2·spacer_gap. Пояс осесимметричен — балансировку не меняет; dm — добавка массы, г.
     CAD пояса нет (ptk_sep) — до него sep_band_t не входит в хэш ID (OQ-46).
-    CP-95b: fill — пояс до t_max под M_req (D и B не растут, растёт масса dm)."""
+    CP-95b: fill — пояс до t_max под M_req (D и B не растут, растёт масса dm).
+    CP-134 (Д-150): r_asm = (r_lo, r_hi) — коридор ввода цельного сепаратора в расточку венца
+    (r_hi = D_верш/2 − c) и узла генератора сквозь пояса (r_lo = D_г/2 + a_ω + c). Пояс лежит
+    в коридоре: t ≤ r_hi − r_lo, сначала наружу до r_hi, остаток внутрь. Сечение, не влезшее
+    по радиусу, добирается по оси (hb, Д-150) — не радиальным утолщением."""
     t = sep["r_out"] - sep["r_in"]
     rw = sep["rows"]
     h_end = round(rw[0]["z0"], 3) if rw else 0.0
     h_mid = round(rw[1]["z0"] - rw[0]["z0"] - sep["h"], 3) if len(rw) > 1 else 0.0
     t_max = d_root / 2 + lim.spacer_gap - lim.sep_band_gap - sep["r_in"]
+    t_asm = None
+    if r_asm is not None:                         # CP-134 (Д-150): коридор сборки
+        t_asm = r_asm[1] - r_asm[0]
+        t_max = min(t_max, t_asm)
     # CP-95b: fill — пояс до t_max под M_req; D и B не растут, растёт масса dm (осесимметрично)
     tb = max(t, t_max) if fill else max(t, min(lim.sep_band_t or t, t_max))
     warns = []
     if lim.sep_band_t and lim.sep_band_t > t_max + 1e-9:
         warns.append(f"сепаратор: пояс sep_band_t {lim.sep_band_t:g} > {t_max:.2f} мм до шайбы .05 "
                      f"— принят {tb:.2f} мм (CP-98)")
+    if r_asm is not None and (sep["r_in"] < r_asm[0] - 1e-9 or sep["r_out"] > r_asm[1] + 1e-9):
+        warns.append(f"сепаратор: стенка {sep['r_in']:.2f}…{sep['r_out']:.2f} вне коридора ввода "
+                     f"{r_asm[0]:.2f}…{r_asm[1]:.2f} мм — сборка невозможна (CP-134, Д-150)")
     H = h_mid * max(len(rw) - 1, 0) + 2 * h_end
-    dm = lim.rho * 1e-6 * math.pi * ((sep["r_in"] + tb) ** 2 - sep["r_out"] ** 2) * H
+    r_hi = sep["r_in"] + tb if r_asm is None else min(sep["r_in"] + tb, r_asm[1])
+    r_lo = r_hi - tb                              # Д-150: остаток толщины — внутрь
+    dm = lim.rho * 1e-6 * math.pi * (r_hi ** 2 - r_lo ** 2 - sep["r_out"] ** 2
+                                     + sep["r_in"] ** 2) * H
     return {"t": round(tb, 3), "t_max": round(t_max, 3), "h_mid": h_mid, "h_end": h_end,
-            "dm": round(dm, 1), "warnings": warns}
+            "dm": round(dm, 1), "r_band": [round(r_lo, 3), round(r_hi, 3)],
+            "t_asm": None if t_asm is None else round(t_asm, 3), "warnings": warns}
 
 
 def _fit(N, d, a, Re, r_lo, w):
@@ -263,4 +278,12 @@ def self_test():
     q = spacer_parts("PTK-T", sp, 4)
     assert [(x["id"], x["pos"]) for x in q] == [("PTK-T.05A", [0, 4]), ("PTK-T.05B", [1, 2, 3])], q
     assert q[0]["rows"] == [1, 4] and q[1]["rows"] == [1, 2, 3, 4], q
+    # CP-134 (Д-150): коридор ввода — пояс не выходит за D_верш/2 − c
+    Lb = type("L", (), {"spacer_gap": 0.5, "sep_band_gap": 0.2, "sep_band_t": 0.0, "rho": 7850.0})()
+    spb = {"r_in": 81.01, "r_out": 84.09, "h": 20.05,
+           "rows": [{"z0": 3.475}, {"z0": 29.475}]}
+    bf = sep_band(spb, 174.9, Lb, True)
+    assert abs(bf["t"] - 6.74) < 1e-6, ("без коридора — t_max", bf)
+    bc = sep_band(spb, 174.9, Lb, True, (80.75, 84.35))
+    assert abs(bc["t"] - 3.6) < 1e-6 and bc["r_band"] == [80.75, 84.35], ("коридор", bc)
     return True
