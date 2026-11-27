@@ -95,6 +95,13 @@ class PtkLimits:
     rim_k_ov: float = 0.0068      # CP-96: δ = k·P·r³/(E·I), 2-я гармоника нагрузки (OQ-48)
     rim_fit_k: float = 0.0004     # CP-96: натяг обода на наружное кольцо, δ/D
     rim_sigma_fit: float = 300.0  # CP-96: допускаемое σθ обода от натяга, МПа (OQ-48)
+    ring_ov_mode: str = "free"    # CP-130 (Д-140): овализация венца .01 — free | pack | off
+    ring_k_w: float = 0.05        # CP-130: допустимый прогиб венца / a_ω (OQ-51, оценка до МКЭ)
+    ring_harm: int = 12           # CP-130: гармоник ряда Фурье кольца (m = 2…ring_harm)
+    ring_grade: str = ""          # CP-130: марка венца (σ₋₁ ядра из materials.yaml); "" — ниже
+    ring_sigma_m1: float = 509.0  # CP-130: σ₋₁ венца, МПа, при пустом ring_grade (40Х)
+    ring_K: float = 2.0           # CP-130: концентрация (отверстия у нейтрали, зубья) — сверить
+    ring_S: float = 2.5           # CP-130: запас многоцикловой усталости венца
     groove_f: float = 0.52        # жёлоб под шарик на эксцентрике: r = groove_f·D_ш, > 0.5 (Д-45)
     sep_gap: float = 0.05         # зазор тела в окне сепаратора, мм (Д-46)
     rho: float = 7850.0           # плотность стали эксцентрика, тел, колец, кг/м³
@@ -150,6 +157,7 @@ class PtkResult:
     M_H: float = 0.0              # допускаемый момент по Герцу, Н·м (Д-41)
     M_B: float = 0.0              # то же по C0 подшипника, Н·м
     M_sep: float = 0.0            # предел по сепаратору, Н·м (CP-94, Д-116)
+    M_ov: float = 0.0             # CP-130: предел по овализации венца .01, Н·м (Д-140)
     M_row: float = 0.0            # референс: предел одного ряда окон, Н·м (CP-98, Д-118)
     k_sep: float = 0.0            # CP-116: сила тела на окно / момент ряда, 1/мм
     sep_t: float = 0.0            # CP-118: стенка сепаратора t = 2·SEP_K·a_ω, мм
@@ -182,6 +190,7 @@ class PtkResult:
     ecc: dict = field(default_factory=dict)       # эксцентрик .03 (Д-46)
     spacer: dict = field(default_factory=dict)    # шайбы .05 (Д-53)
     rim: dict = field(default_factory=dict)       # обод .18 при gen = rim (CP-96)
+    ring_ov: dict = field(default_factory=dict)   # CP-130: овализация венца .01 (Д-140)
 
 
 def _load(cls, d):
@@ -455,6 +464,11 @@ def load_config(cfg):
     bad = [g for g in lim.gen_types if g not in GEN_TYPES]
     if bad or not lim.gen_types:
         raise ValueError(f"limits.gen_types: {list(lim.gen_types)} — допустимы {GEN_TYPES} (Д-42)")
+    if lim.ring_ov_mode not in ("free", "pack", "off"):
+        raise ValueError(f"limits.ring_ov_mode = {lim.ring_ov_mode!r}: допустимы free | pack | off "
+                         f"(CP-130, Д-140)")
+    if lim.ring_harm < 2 or lim.ring_k_w <= 0:
+        raise ValueError("limits.ring_harm ≥ 2 и ring_k_w > 0 (CP-130)")
     for where, prm in u_params(lim):                    # CP-101: имена креплений — из ring_mounts
         badm = [k for k in (prm.get("mounts") or ()) if k not in mounts]
         if badm:
@@ -687,7 +701,7 @@ def holes_code(holes):
 
 
 def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0, hb=0.0, fill=False,
-                mat=None):
+                mat=None, ring_up=0.0):
     """Все параметры, определяющие геометрию исполнения (вход хэша и CAD).
 
     CP-95: dR — подъём R_Σ у eccentric/rim. Ключ добавляется только при dR > 0, поэтому ID прямой
@@ -705,15 +719,17 @@ def geom_params(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0, hb=0.
         g["hb"] = hb
     if fill:                                            # CP-95b: пояс до t_max (CAD пояса — OQ-46)
         g["band_fill"] = True
+    if ring_up > 1e-9:                                  # CP-130: D венца поднят под M_req (Д-140)
+        g["ring_up"] = ring_up
     if mat is not None:                                 # CP-103 (Д-126): только ссылка
         g["material"] = {"ref": mat["ref"]}
     return _n(g)
 
 
 def config_id(u, rol, lim, holes, fast, brg=None, gen="bearing", dR=0.0, hb=0.0, fill=False,
-              mat=None):
+              mat=None, ring_up=0.0):
     """ID исполнения PTK-<u>-<тело>-<отверстия>-<хэш> (Д-80) и снимок геометрии."""
-    g = geom_params(u, rol, lim, holes, fast, brg, gen, dR, hb, fill, mat)
+    g = geom_params(u, rol, lim, holes, fast, brg, gen, dR, hb, fill, mat, ring_up)
     raw = json.dumps(g, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
     h = hashlib.sha1(raw.encode("ascii")).hexdigest()[:6].upper()
     return f"PTK-{u:03d}-{roller_code(rol)}-{holes_code(holes)}-{h}", g
@@ -785,6 +801,56 @@ def rim_pick(Dg, l, a, MB1, need_d, bears, lim):
                              "dfl_allow": round(allow, 4), "M_ov": math.floor(10 * M_ov) / 10,
                              "m_g": round(m, 1)})
     return (best[1], best[2]) if best else (None, {})
+
+
+def _ring_allow(lim):
+    """CP-130: [σ] венца = σ₋₁/(ring_K·ring_S); σ₋₁ — ядро марки ring_grade (materials.yaml)
+    или limits.ring_sigma_m1 -> (МПа, источник)."""
+    m1, src = float(lim.ring_sigma_m1), "limits"
+    if lim.ring_grade:
+        p = materials.sep_props(_mats_catalog(), lim.ring_grade)
+        v = ((p or {}).get("core") or {}).get("sigma_m1")
+        if v:
+            m1, src = float(v), lim.ring_grade
+    return m1 / (lim.ring_K * lim.ring_S), src
+
+
+def ring_ov(n, z, a, R, d_root, d_out, b, lim, sig_allow):
+    """CP-130 (Д-140): овализация венца .01 — прогиб и напряжение на 1 Н·м, предел M_ov.
+
+    Сечение сплошное b × t: t = (D − D_В)/2 (зубья не учитываются — запас), R_c = (D_В + D)/4,
+    I = b·t³/12. Отклик нагрузки — ptk_force.ring_unit. На 1 Н·м: w1 = R_c³·W/(E·I); изгиб
+    Mb1 = R_c·(Mb + 2π·F/(12·n)) — гармоники до ring_harm и местный изгиб между телами F·s/12;
+    σ1 = Mb1/(b·t²/6) + N/(b·t). M_w = ring_k_w·a_ω/w1 (жёсткость), M_s = [σ]/σ1 (прочность),
+    M_ov = min. k_ov = w1·E·I/(P·R_c³) — эквивалент rim_k_ov (OQ-48). w_k, s_k — на 1 кН·м."""
+    u1 = ptk_force.ring_unit(n, z, a, R, lim.rows, lim.row_phases, lim.ring_ov_mode, lim.ring_harm)
+    t, Rc = (d_out - d_root) / 2, (d_root + d_out) / 4
+    I, A, Ws = b * t ** 3 / 12, b * t, b * t ** 2 / 6
+    ok = t > 0 and b > 0
+    w1 = Rc ** 3 * u1["W"] / (lim.E_mod * I) if ok else math.inf
+    s1 = (Rc * (u1["Mb"] + 2 * math.pi * u1["F"] / (12 * n)) / Ws + u1["N"] / A) if ok else math.inf
+    allow = lim.ring_k_w * a
+    Mw = allow / w1 if w1 > 0 else math.inf
+    Ms = sig_allow / s1 if s1 > 0 else math.inf
+    M_ov, by = min((Mw, "жёсткость"), (Ms, "прочность"))
+    fl = lambda x: math.floor(10 * x) / 10 if math.isfinite(x) else 0.0
+    return {"mode": lim.ring_ov_mode, "b": round(b, 3), "t": round(t, 3), "Rc": round(Rc, 3),
+            "I": round(I, 1), "w_k": round(1000 * w1, 5) if ok else 0.0,
+            "s_k": round(1000 * s1, 2) if ok else 0.0, "w_allow": round(allow, 4),
+            "sig_allow": round(sig_allow, 1), "M_w": fl(Mw), "M_s": fl(Ms), "M_ov": fl(M_ov),
+            "by": by, "P1": round(u1["P"], 4),
+            "k_ov": round(w1 * lim.E_mod * I / (u1["P"] * Rc ** 3), 5) if ok and u1["P"] else 0.0}
+
+
+def ring_fit(n, z, a, R, d_root, d_out, b, lim, sig_allow, target):
+    """CP-130 (Д-140): подбор сечения под M_req, а не отбраковка — наименьший D с шагом
+    d_out_step, при котором M_ov ≥ target; не выше d_out_max (без предела — до 1.5·D)."""
+    o = ring_ov(n, z, a, R, d_root, d_out, b, lim, sig_allow)
+    top, step, d = lim.d_out_max or 1.5 * d_out, lim.d_out_step or 1.0, d_out
+    while target > 0 and o["M_ov"] < target - 1e-9 and d + step <= top + 1e-9:
+        d = round(d + step, 6)
+        o = ring_ov(n, z, a, R, d_root, d, b, lim, sig_allow)
+    return d, o
 
 
 def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fill=False,
@@ -871,6 +937,24 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
             r.errors.append(f"D {rg['d_out']:g} > {lim.d_out_max:g}: тела Dш {D:g} при n={n} "
                             f"с отверстиями {rg['label']} не вмещаются; Dш max ≈ "
                             f"{r.Drol_max:g} мм (OQ-05)")
+    if lim.ring_ov_mode != "off":                       # CP-130 (Д-140): овализация венца .01
+        s_al, s_src = _ring_allow(lim)
+        d0 = rg["d_out"]
+        fits = not lim.d_out_max or d0 <= lim.d_out_max + 1e-9
+        d1, ro = (ring_fit(n, z, a, R, d_root, d0, rol["l"], lim, s_al, m_req) if fits
+                  else (d0, ring_ov(n, z, a, R, d_root, d0, rol["l"], lim, s_al)))
+        up = round(d1 - d0, 6)
+        r.ring_ov = {**ro, "sig_src": s_src, "d_out0": d0, "ring_up": up}
+        if lim.ring_grade and s_src == "limits":
+            r.warnings.append(f"венец .01: у марки {lim.ring_grade} нет σ₋₁ в materials.yaml — "
+                              f"[σ] из limits.ring_sigma_m1 (OQ-36, CP-130)")
+        if lim.ring_ov_mode == "pack":
+            r.warnings.append("венец .01: схема pack — венцы связаны на радиальный сдвиг; верно "
+                              "только при торцевых зубьях (Д-144, CP-134), оценка до МКЭ (OQ-51)")
+        if up > 1e-9:                                   # Д-80: другой D — другой ID
+            rg["d_out"] = d1
+            r.id, r.geom = config_id(u, rol, lim, holes, fast, brg, gen, dR, hb, fill, mat,
+                                     ring_up=up)
     if lim.rows != len(lim.row_phases):
         r.errors.append("число рядов не совпадает с фазировкой")
     ph = phasing(z, n, holes, lim)
@@ -912,6 +996,9 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
             cand.append((r.M_B, "подшипник"))
         if r.rim:                                        # CP-96: овализация обода — свой предел
             cand.append((r.rim["M_ov"], "обод"))
+        if r.ring_ov:                                    # CP-130 (Д-140): овализация венца .01
+            r.M_ov = r.ring_ov["M_ov"]
+            cand.append((r.M_ov, "венец (овализация)"))
         sep_in = (r.sep, t["k_sep"], D, rol["l"], rol.get("type", "roller"), lim.rows, R, a, lim,
                   mat)
         ref = {}
@@ -924,6 +1011,11 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
         if r.rim:                                        # CP-96: прогиб обода при принятом M, мм
             r.rim["dfl"] = (round(r.rim["dfl_allow"] * r.M / r.rim["M_ov"], 4)
                             if r.rim["M_ov"] else 0.0)
+        if r.ring_ov:                                    # CP-130: прогиб, σ и люфт при принятом M
+            o = r.ring_ov
+            o["w"] = round(o["w_allow"] * r.M / o["M_w"], 4) if o["M_w"] else 0.0
+            o["sig"] = round(o["sig_allow"] * r.M / o["M_s"], 1) if o["M_s"] else 0.0
+            o["lost"] = round(o["w"] * 5400 / (n * a), 2)   # ′: Δθ ≈ w·π/(2·n·a_ω)
         body = [(r.M_body_gen, "генератор"), (r.M_body_ring, "венец")]
         r.M_by_body = min(body + ([(r.M_body_win, "окно")] if r.sep else []))[1]
         if r.sep:
@@ -1458,6 +1550,28 @@ def self_test():
         raise AssertionError("rollers вне каталога принят")
     bb3 = calc(19, "t", b, lim, holes, fast, bears, "bearing", 3.0)   # bearing: dR -> больший подшипник
     assert bb3.R_sum >= r.R_sum - 1e-9 and bb3.dR == 3.0 and "dR" not in bb3.geom, bb3.R_sum
+    # CP-130 (Д-140): овализация венца — образец F84938 (Д-147) руками: M_w ≈ 826, k_ov ≈ 0.016
+    sa = lim.ring_sigma_m1 / (lim.ring_K * lim.ring_S)
+    o = ring_ov(32, 33, 1.4, 82.55, 174.9, 202.0, 20.0, lim, sa)
+    assert 740.0 < o["M_w"] < 910.0 and o["by"] == "жёсткость", o
+    assert 0.012 < o["k_ov"] < 0.020 and o["M_s"] > 1.5 * o["M_w"], o
+    assert ring_ov(32, 33, 1.4, 82.55, 174.9, 203.0, 20.0, lim, sa)["M_w"] > o["M_w"]
+    op = ring_ov(32, 33, 1.4, 82.55, 174.9, 202.0, 20.0, replace(lim, ring_ov_mode="pack"), sa)
+    assert op["M_w"] > 50 * o["M_w"] and op["M_ov"] > 10 * o["M_ov"], (op, o)   # m = 2 гасится
+    r0 = c(19)                                            # положительный: M_ov в строке, M ≤ M_ov
+    assert r0.ring_ov and r0.M_ov > 0 and r0.M <= r0.M_ov + 0.1, r0.ring_ov
+    assert r0.ring_ov["ring_up"] == 0 and "ring_up" not in r0.geom
+    kw = lim.ring_k_w * 0.5 * r0.M / r0.M_ov              # отрицательный: M_ov = M/2 — венец лимитирует
+    rk = calc(19, "t", b, replace(lim, ring_k_w=kw), holes, fast, bears)
+    assert rk.M_by == "венец (овализация)" and abs(rk.M - rk.M_ov) < 0.11, (rk.M_by, rk.M, rk.M_ov)
+    assert rk.id == r0.id, "k_w не в хэше: ID не меняется"
+    rt = calc(19, "t", b, replace(lim, ring_k_w=kw, d_out_max=None), holes, fast, bears,
+              "bearing", 0.0, 0.0, False, 0.8 * r0.M)     # подбор D под M_req (Д-140)
+    assert rt.d_out > r0.d_out and rt.M_ov >= 0.8 * r0.M - 0.1, rt.ring_ov
+    assert rt.id != r0.id and rt.geom["ring_up"] == rt.ring_ov["ring_up"] > 0, rt.geom
+    rn = calc(19, "t", b, replace(lim, ring_k_w=kw, d_out_max=r0.d_out), holes, fast, bears,
+              "bearing", 0.0, 0.0, False, 0.8 * r0.M)     # некуда расти — венец ограничивает
+    assert rn.d_out == r0.d_out and rn.M_by == "венец (овализация)" and rn.id == r0.id, rn.ring_ov
     return True
 
 

@@ -11,6 +11,8 @@ from types import SimpleNamespace
 from egm import ptk_profile
 
 K_PHASE = 8        # положений генератора внутри шага тел; берётся худшее
+RING_GRID = 72     # CP-130: точек по окружности венца при поиске максимума прогиба/момента
+_RING = {}         # CP-130: кэш отклика венца и таблиц cos/sin
 
 
 def e_star(E, nu):
@@ -94,6 +96,75 @@ def torque(n, z, a, R, D, l, kind, brg, lim, rows):
     return {"M_H": round(rows * MH, 1), "M_B": round(rows * MB, 1) if brg else None,
             "M_g": round(rows * MG, 1), "M_v": round(rows * MV, 1),
             "F_g": round(Fg, 1), "F_v": round(Fv, 1), "k_sep": k_sep}
+
+
+def _ring_tab(n_harm):
+    """CP-130: (cos mθ, sin mθ) на сетке RING_GRID для m = 0…n_harm (кэш)."""
+    key = ("tab", n_harm)
+    if key not in _RING:
+        th = [2 * math.pi * g / RING_GRID for g in range(RING_GRID)]
+        _RING[key] = [[(math.cos(m * t), math.sin(m * t)) for m in range(n_harm + 1)] for t in th]
+    return _RING[key]
+
+
+def ring_unit(n, z, a, R, rows, phases=(0.0,), mode="free", n_harm=12):
+    """CP-130 (Д-140): отклик венца .01 на 1 Н·м выходного момента пакета (без сечения).
+
+    Силы тел как в torque(): R_i = R_max·sin φ_i при 0 < φ_i < π, R_max = 1000/(rows·mom),
+    mom = Σ sin φ·(R_о/R)·Y. На венец: F_r = R_i·cos ψ_i (окно радиально — радиальную несёт
+    генератор), F_t = R_i·((R_о/R) + a_ω·sin φ/Y) — реакция момента венца M·(u+1)/u.
+    Нерастяжимое кольцо, точечные силы в угле тела, m = 2…n_harm:
+      w = R_c³/(E·I) · Σ(C_m cos mθ + S_m sin mθ)/(π(m²−1)²),
+      M = R_c · Σ(C_m cos mθ + S_m sin mθ)/(π(m²−1)),
+      C_m = Σ(F_r cos mφ − F_t sin mφ/m), S_m = Σ(F_r sin mφ + F_t cos mφ/m);
+    m = 0 — растяжение N = ΣF_r/(2π), m = 1 — сдвиг кольца (несёт опора).
+    -> {W, Mb, F, N, P}, Н: max|Σ/(m²−1)²|/π, max|Σ/(m²−1)|/π, наибольшая F_r, N, равнодействующая
+    ряда; худшее из K_PHASE положений. mode = pack — силы всех рядов (фазы phases) на кольце
+    жёсткостью rows·E·I: гармоники, не кратные числу рядов, гасятся (Д-144, оценка, OQ-51)."""
+    key = (n, z, round(a, 6), round(R, 6), rows, tuple(float(p) for p in phases), mode, n_harm)
+    if key in _RING:
+        return _RING[key]
+    tab = _ring_tab(n_harm)
+    sets = [math.radians(float(p)) for p in phases] if mode == "pack" else [0.0]
+    out = {"W": 0.0, "Mb": 0.0, "F": 0.0, "N": 0.0, "P": 0.0}
+    for j in range(K_PHASE):
+        loads, mom = [], 0.0
+        for i in range(n):
+            p = (2 * math.pi * (i + j / K_PHASE) / n) % (2 * math.pi)
+            if not 1e-9 < p < math.pi - 1e-9:
+                continue
+            s = math.sin(p)
+            ro, _ = ptk_profile.contact_ratios(p, a, R, z)
+            y = ptk_profile.Y(p, a, R)
+            mom += s * ro * y
+            loads.append((p, s * math.cos(ptk_profile.psi(p, a, R)), s * (ro + a * s / y)))
+        if mom <= 0 or not loads:
+            continue
+        k = 1000.0 / (rows * mom)
+        C, S = [0.0] * (n_harm + 1), [0.0] * (n_harm + 1)
+        for ph in sets:
+            for p, fr, ft in loads:
+                q = p + ph
+                for m in range(2, n_harm + 1):
+                    c, si = math.cos(m * q), math.sin(m * q)
+                    C[m] += k * (fr * c - ft * si / m)
+                    S[m] += k * (fr * si + ft * c / m)
+        W = Mb = 0.0
+        for row in tab:
+            w = mb = 0.0
+            for m in range(2, n_harm + 1):
+                v = C[m] * row[m][0] + S[m] * row[m][1]
+                w += v / (m * m - 1) ** 2
+                mb += v / (m * m - 1)
+            W, Mb = max(W, abs(w)), max(Mb, abs(mb))
+        div = math.pi * len(sets)
+        px = k * sum(fr * math.cos(p) for p, fr, _ in loads)
+        py = k * sum(fr * math.sin(p) for p, fr, _ in loads)
+        cur = {"W": W / div, "Mb": Mb / div, "F": k * max(fr for _, fr, _ in loads),
+               "N": k * sum(fr for _, fr, _ in loads) / (2 * math.pi), "P": math.hypot(px, py)}
+        out = {kk: max(out[kk], cur[kk]) for kk in out}
+    _RING[key] = out
+    return out
 
 
 def _strip(sep):

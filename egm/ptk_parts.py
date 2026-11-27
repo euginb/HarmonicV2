@@ -203,13 +203,23 @@ def _msep(r):
             f"({c.get('by', '—')}, {c.get('lim_elem', '—')})")
 
 
+def _ring(r):
+    """CP-130: венец .01 — t × b (+подъём D), прогиб и люфт при M, M_ov (механизм)."""
+    o = r.get("ring_ov") or {}
+    if not o:
+        return "—"
+    up = f", D +{o['ring_up']:g}" if o.get("ring_up") else ""
+    return (f"{o['t']:g} × {o['b']:g}{up}; w {o.get('w', 0):g} мм ({o.get('lost', 0):g}′); "
+            f"{o['M_ov']:g} ({o['by']})")
+
+
 def table(rows):
     """SPEC-10: детали .02, .03 реализуемых исполнений."""
     L = ["| ID | Генератор | Dэ × t, мм | Пазы шпонки, ° | U, г·мм | Отв. балансировки | "
          "Остаток, г·мм | Сепаратор dс / Dс × B | Окна w × h | Перемычка | "
          "M_sep пакет / ряд, Н·м | "
-         "Шайбы .05 dвн / D, h торец / между |",
-         "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+         "Шайбы .05 dвн / D, h торец / между | Венец .01 t × b; w (люфт); M_ov, Н·м |",
+         "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         e, s = r.get("ecc"), r.get("sep")
         if not e or not s:
@@ -221,7 +231,8 @@ def table(rows):
         L.append(f"| {r['id']} | {gname} | {e['De']:g} × {e['t']:g} | {keys} | "
                  f"{e['U']['sum']:g} | {holes} | {b['res']:g} | "
                  f"{2 * s['r_in']:g} / {2 * s['r_out']:g} × {s['length']:g} | "
-                 f"{s['w']:g} × {s['h']:g} | {s['web']:g} | {_msep(r)} | {_sp(r.get('spacer'))} |")
+                 f"{s['w']:g} × {s['h']:g} | {s['web']:g} | {_msep(r)} | {_sp(r.get('spacer'))} | "
+                 f"{_ring(r)} |")
     return "\n".join(L) if len(L) > 2 else "нет реализуемых исполнений"
 
 
