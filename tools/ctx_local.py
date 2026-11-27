@@ -54,7 +54,10 @@ PROFILES = {
                       "CP-133", "CP-134", "CP-135"],
         "stock_keys": ["ШХ15"],
         "product_parts": ["01", "05", "07", "18"],
-        "config_ids": ["PTK-032-R7X20-22M5P2", "PTK-032-R7X20-22M5P2-CFF527"],
+        # Д-147: основной образец серии; его запись обязательна в контексте
+        "config_ids": ["PTK-032-R7X20-22M5P2-F84938"],
+        "main_id": "PTK-032-R7X20-22M5P2-F84938",
+        "spec10_neighbours": 2,
     },
 }
 PROFILES["ring"]["stock_keys"] += []      # новые марки добавляет CP-129
@@ -144,6 +147,51 @@ def _records(text, prefix):
     return "\n".join(out).rstrip()
 
 
+def _spec10(prof_main, neighbours):
+    """SPEC-10 — выборкой (Д-147): строки design_input + образец + соседи по u/телу."""
+    text = open(os.path.join(ROOT, "specs/SPEC-10_PTK_CALC.md"), encoding="utf-8").read()
+    rows, head, seen = [], [], set()
+    for ln in text.split("\n"):
+        if ln.startswith("| ID |"):
+            head = [ln]
+        elif ln.startswith("|---") and head and len(head) == 1:
+            head.append(ln)
+        elif ln.startswith("| PTK-"):
+            c = [x.strip() for x in ln.strip().strip("|").split("|")]
+            if c[0] in seen:
+                continue
+            seen.add(c[0])
+            rows.append((c, ln))
+    prefixes = [d["id"] for d in yaml_ids()]
+    chosen, why = [], {}
+    for c, ln in rows:
+        for pr in prefixes:
+            if c[0].startswith(pr):
+                chosen.append(c[0]); why[c[0]] = "designs[] (ptk_design_input)"
+    main = next(((c, ln) for c, ln in rows if c[0] == prof_main), None)
+    if main:
+        if main[0][0] not in why:
+            chosen.append(main[0][0])
+        why[main[0][0]] = "ОБЯЗАТЕЛЬНО: основной образец (Д-147)"
+        u, rol, d_out = main[0][1], main[0][2], float(main[0][15])
+        near = sorted(((c, ln) for c, ln in rows
+                       if c[1] == u and c[2] == rol and c[0] != prof_main),
+                      key=lambda t: abs(float(t[0][15]) - d_out))[:neighbours]
+        for c, ln in near:
+            if c[0] not in why:
+                chosen.append(c[0])
+                why[c[0]] = f"соседняя позиция: u {u}, то же тело, |D − D_обр| = {abs(float(c[15]) - d_out):g} мм"
+    out = ["### FRAGMENT: specs/SPEC-10_PTK_CALC.md — «Результаты» выборкой (Д-147, не целиком)\n",
+           "Отбор: " + "; ".join(f"`{k}` — {v}" for k, v in why.items()) + ".\n"]
+    out += head + [ln for c, ln in rows if c[0] in chosen]
+    return "\n".join(out) + "\n", chosen
+
+
+def yaml_ids():
+    import yaml
+    return yaml.safe_load(open(os.path.join(ROOT, "specs/ptk_design_input.yaml"), encoding="utf-8"))["designs"]
+
+
 def build(prof, base, cp, out, allow_missing=False, opt=False):
     P = PROFILES[prof]
     doc, manifest, problems = [], {"profile": prof, "base": base, "cp": cp, "files": []}, []
@@ -191,13 +239,22 @@ def build(prof, base, cp, out, allow_missing=False, opt=False):
                + "\n".join(f"#### parts.{n}\n{_section(prods, repr(n))}" for n in P["product_parts"]) + "\n")
 
     cfgs = read("specs/ptk_configs.yaml").decode()
-    doc.append("### FRAGMENT: specs/ptk_configs.yaml — записи (без parts:, Д-139/3.4.1)\n"
-               + "\n".join(_records(cfgs, i) for i in P["config_ids"]) + "\n")
+    recs = "\n".join(_records(cfgs, i) for i in P["config_ids"])
+    doc.append("### FRAGMENT: specs/ptk_configs.yaml — записи (без parts:, Д-139/3.4.1)\n" + recs + "\n")
+    if P["main_id"] not in recs:
+        problems.append(f"нет записи ptk_configs основного образца: {P['main_id']}")
+    sp, chosen = _spec10(P["main_id"], P["spec10_neighbours"])
+    doc.append(sp)
+    if P["main_id"] not in chosen:
+        problems.append(f"в выборке SPEC-10 нет основного образца: {P['main_id']}")
+    manifest["spec10_rows"] = chosen
     doc.append("### Данные прогона\n"
                "- Таблица SPEC-10 после `d_out_max = 203`: `python3 main.py calc` (exit 0, 2026-11-27), "
                "57 исполнений; выгрузка — `out/specs/SPEC-10_PTK_CALC.md`.\n"
                "- `.assy.json` венца локально НЕ строится (нет cadquery) — запросить у заказчика.\n"
-               "- Осевой порядок фаз — цитата `egm/ptk.py::phasing` (см. файл выше).\n")
+               "- Осевой порядок фаз — цитата `egm/ptk.py::phasing` (см. файл выше).\n"
+               "- `specs/ptk_designs.yaml` (шаг 2) на базе построен до смены подшипника на "
+               "NU213-ECJ — проработки в контекст НЕ подаются как актуальные.\n")
     text = "\n".join(doc)
 
     # самопроверка: каждый блок читается обратно и совпадает по sha
