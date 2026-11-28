@@ -55,12 +55,47 @@ PROFILES = {
         "stock_keys": ["ШХ15"],
         "product_parts": ["01", "05", "07", "18"],
         # Д-147: основной образец серии; его запись обязательна в контексте
-        "config_ids": ["PTK-032-R7X20-22M5P2-F84938"],
-        "main_id": "PTK-032-R7X20-22M5P2-F84938",
+        "config_ids": ["PTK-032-R7X20-22M5P2-00AD4E"],
+        "main_id": "PTK-032-R7X20-22M5P2-00AD4E",
         "spec10_neighbours": 2,
     },
 }
 PROFILES["ring"]["stock_keys"] += []      # новые марки добавляет CP-129
+
+# профиль tech07 — review TECH-07 (сборка ПТК) и старт CP-134 (межвенцовое зацепление), rev16.0
+PROFILES["tech07"] = {
+    "title": "TECH-07 «Сборка ПТК» + CP-134 «Прямой зуб внатяг / монолит»",
+    "whole": [
+        "docs/Технология изготовления/TECH-07-Сборка ПТК (пакет венцов и генератор).md",
+        "egm/ptk.py",
+        "egm/ptk_force.py",
+        "egm/ptk_profile.py",
+        "egm/ptk_parts.py",
+        "egm/ptk_layout.py",
+        "egm/materials.py",
+        "egm/cad/ptk_ring.py",
+        "egm/cad/assy.py",
+        "egm/cad/model.py",
+        "specs/ptk_input.yaml",
+        "specs/materials.yaml",
+        "templates/SPEC-10_PTK_CALC.md.tmpl",
+    ],
+    "optional": [
+        "egm/cad/step.py",
+        "egm/cad/svg.py",
+        "configs/application.yaml",
+    ],
+    "decisions": ["Д-08", "Д-19", "Д-46", "Д-49", "Д-52", "Д-61",
+                  "Д-140", "Д-141", "Д-142", "Д-143", "Д-144", "Д-145",
+                  "Д-146", "Д-147", "Д-148", "Д-149"],
+    "oq": ["OQ-48", "OQ-51", "OQ-52", "OQ-54", "OQ-55", "OQ-56"],
+    "cp_prefix": ["CP-130", "CP-131", "CP-134", "CP-132", "CP-133", "CP-135"],
+    "stock_keys": ["ШХ15", "ШХ15СГ"],
+    "product_parts": ["01", "02", "03", "04", "05", "07", "11", "18"],
+    "config_ids": ["PTK-032-R7X20-22M5P2-00AD4E"],
+    "main_id": "PTK-032-R7X20-22M5P2-00AD4E",
+    "spec10_neighbours": 2,
+}
 
 sha = lambda b: hashlib.sha256(b).hexdigest()
 def read(rel):

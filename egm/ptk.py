@@ -78,6 +78,8 @@ class PtkLimits:
     sep_state: str = ""          # состояние марки (materials.yaml → states)
     sep_band_t: float = 0.0       # радиальная толщина поясов сепаратора, мм; 0 — = стенка (CP-98, OQ-46)
     sep_band_gap: float = 0.2     # зазор утолщённого пояса до dвн шайбы .05, мм (CP-98)
+    sep_asm_gap: float = None     # CP-134 (Д-150): радиальный зазор ввода сепаратора и узла
+    # генератора, мм; None — коридор не проверяется
     M_min: float = 0.0            # требуемый выходной момент, Н·м; 0 — не проверяется (Д-41)
     # CP-99, Д-123: таблица расчёта по u — {u: {M_req: {параметры варианта}}}. Пустая внутренняя
     # таблица — прямая постановка; ключ внутренней — целевой момент M_req, Н·м. Состав ключей u
@@ -968,7 +970,9 @@ def calc(u, rid, rol, lim, holes, fast, bears, gen="bearing", dR=0.0, hb=0.0, fi
     r.width = round(lim.rows * pitch + (lim.rows + 1) * lim.row_gap, 1)
     if not r.errors and (brg is not None or gen == "eccentric"):    # Д-46: детали .02, .03
         r.sep = ptk_parts.separator(n, R, a, D, rol["l"], pitch, r.phasing, lim, SEP_K)
-        r.sep["band"] = ptk_parts.sep_band(r.sep, d_root, lim, fill)   # CP-98; CP-95b: fill
+        r_asm = (None if lim.sep_asm_gap is None else
+                 (r.Dgen / 2 + a + lim.sep_asm_gap, r.d_tip / 2 - lim.sep_asm_gap))  # Д-150
+        r.sep["band"] = ptk_parts.sep_band(r.sep, d_root, lim, fill, r_asm)  # CP-98; CP-134
         r.sep_t = round(r.sep["r_out"] - r.sep["r_in"], 3)   # CP-118
         r.warnings += r.sep["band"].pop("warnings")
         if fill:                                        # CP-95b: CAD утолщения пояса нет
@@ -1118,7 +1122,9 @@ def sep_scan(r, lim, bears, rol):
         if l < r.Drol - 1e-9:                       # короче диаметра — не ролик
             continue
         sep = _sep_at(r.sep, l, max(l, bB) + r.hb, lim)
-        sep["band"] = ptk_parts.sep_band(sep, r.d_root, lim, r.band_fill)
+        r_asm = (None if lim.sep_asm_gap is None else
+                 (r.Dgen / 2 + r.a_w + lim.sep_asm_gap, r.d_tip / 2 - lim.sep_asm_gap))
+        sep["band"] = ptk_parts.sep_band(sep, r.d_root, lim, r.band_fill, r_asm)
         M, _ = ptk_force.sep_limit(sep, r.k_sep, r.Drol, l, kind, lim.rows, r.R_sum, r.a_w, lim, mat)
         if abs(l - l0) < 1e-9:
             M0 = M
